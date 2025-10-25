@@ -68,17 +68,23 @@ class DocumentProcessor:
             
         Raises:
             FileNotFoundError: If PDF file doesn't exist
+            ValueError: If PDF is invalid
         """
-        if not os.path.exists(pdf_path):
-            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+        # Validate PDF first
+        self.validate_pdf(pdf_path)
         
         print(f"📄 Loading PDF: {os.path.basename(pdf_path)}")
         
         try:
             loader = PyPDFLoader(pdf_path)
             documents = loader.load()
+            
+            if not documents:
+                raise ValueError("PDF contains no readable text")
+            
             print(f"✅ Loaded {len(documents)} pages from PDF")
             return documents
+            
         except Exception as e:
             print(f"❌ Error loading PDF: {str(e)}")
             raise
