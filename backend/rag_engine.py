@@ -147,6 +147,14 @@ class RAGEngine:
         prompt = self.generate_prompt(question, chunks)
         return {"prompt": prompt, "chunks": chunks}
 
+    def answer_with_ollama(self, question: str, k: int = 3, model: str = "llama3", temperature: float = 0.2) -> Dict[str, Any]:
+        chunks = self.retrieve_context(question, k=k)
+        prompt = self.generate_prompt(question, chunks)
+        from .llm_ollama import OllamaClient
+        client = OllamaClient(model=model, temperature=temperature)
+        result = client.generate(prompt)
+        return {"prompt": prompt, "chunks": chunks, **result}
+
 
 if __name__ == "__main__":
     engine = RAGEngine(auto_embeddings=False)
