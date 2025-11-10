@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.rag_engine import RAGEngine
+from backend.llm_config import GeminiClient
 
 
 def doc_stats(engine: RAGEngine) -> Dict[str, Any]:
@@ -71,7 +72,30 @@ def build_ui() -> None:
         st.header("Settings")
         k = st.slider("Top-k context chunks", min_value=1, max_value=8, value=3, step=1)
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=float(os.getenv("GEMINI_TEMPERATURE", 0.2)), step=0.05)
-        model_input = st.text_input("Model (optional)", value=os.getenv("GEMINI_MODEL", ""))
+        # Load available models and present a dropdown of supported ones
+        @st.cache_data(ttl=3600)
+        def load_models() -> list[str]:
+            try:
+                client = GeminiClient()
+                return client.list_supported_models()
+            except Exception:
+                return []
+
+        models = load_models()
+        default_model_env = os.getenv("GEMINI_MODEL", "")
+        default_idx = 0
+        if models:
+            if "gemini-1.5-flash-latest" in models:
+                default_idx = models.index("gemini-1.5-flash-latest")
+            elif default_model_env in models:
+                default_idx = models.index(default_model_env)
+            model_input = st.selectbox("Model", options=models, index=default_idx, help="Only shows models that support generateContent")
+            with st.expander("Available models", expanded=False):
+                st.write(models)
+        else:
+            st.warning("Could not list models for your API key. Enter a model manually or set GEMINI_MODEL in .env.")
+            fallback_default = default_model_env or "gemini-1.0-pro"
+            model_input = st.text_input("Model (optional)", value=fallback_default)
         show_prompt = st.checkbox("Show final prompt", value=False)
         st.divider()
         st.subheader("Document Stats")
