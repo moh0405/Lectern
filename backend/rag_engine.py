@@ -155,6 +155,22 @@ class RAGEngine:
         result = client.generate(prompt)
         return {"prompt": prompt, "chunks": chunks, **result}
 
+    def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
+        """Answer using Google Gemini API (cloud inference only).
+
+        - Keeps retrieval and prompt formatting identical to Ollama path
+        - Reads API key from environment; fails gracefully with clear error
+        """
+        chunks = self.retrieve_context(question, k=k)
+        prompt = self.generate_prompt(question, chunks)
+        try:
+            from .llm_config import GeminiClient
+            client = GeminiClient(model=model, temperature=temperature)
+        except Exception as e:
+            return {"prompt": prompt, "chunks": chunks, "ok": False, "error": str(e), "model": model}
+        result = client.generate(prompt, temperature=temperature)
+        return {"prompt": prompt, "chunks": chunks, **result}
+
 
 if __name__ == "__main__":
     engine = RAGEngine(auto_embeddings=False)
