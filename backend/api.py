@@ -42,7 +42,7 @@ def query(req: QueryRequest) -> QueryResponse:
 class AnswerRequest(BaseModel):
     question: str
     k: int = 3
-    model: str = "llama3"
+    model: str | None = None  # Gemini model optional; defaults via env
     temperature: float = 0.2
 
 
@@ -57,8 +57,9 @@ class AnswerResponse(BaseModel):
 
 @app.post("/answer", response_model=AnswerResponse)
 def answer(req: AnswerRequest) -> AnswerResponse:
+    # Cloud-only path: use Gemini for generation, keep RAG retrieval identical
     engine = RAGEngine(auto_embeddings=False)
-    result = engine.answer_with_ollama(req.question, k=req.k, model=req.model, temperature=req.temperature)
+    result = engine.answer_with_gemini(req.question, k=req.k, model=req.model, temperature=req.temperature)
     chunks = [Chunk(**c) for c in result.get("chunks", [])]
     return AnswerResponse(
         prompt=result.get("prompt", ""),
