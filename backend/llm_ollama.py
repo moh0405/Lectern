@@ -4,7 +4,7 @@ import json
 
 
 class OllamaClient:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = None, temperature: float = 0.2):
+    def __init__(self, base_url: str = "http://127.0.0.1:11434", model: str = None, temperature: float = 0.2):
         self.base_url = base_url.rstrip("/")
         self.model = model or os.getenv("OLLAMA_MODEL", "llama3")
         self.temperature = temperature
@@ -49,7 +49,7 @@ class OllamaClient:
             return True
         return self.pull_model(mdl)
 
-    def generate(self, prompt: str, model: Optional[str] = None, temperature: Optional[float] = None) -> Dict[str, Any]:
+    def generate(self, prompt: str, model: Optional[str] = None, temperature: Optional[float] = None, stream: bool = True, timeout: int = 180) -> Dict[str, Any]:
         mdl = model or self.model
         temp = float(temperature if temperature is not None else self.temperature)
         # Ensure model exists (attempt to pull if missing)
@@ -68,11 +68,29 @@ class OllamaClient:
         # Fallback to HTTP direct API
         try:
             import requests
-            payload = {"model": mdl, "prompt": prompt, "stream": False, "options": {"temperature": temp}}
-            r = requests.post(f"{self.base_url}/api/generate", data=json.dumps(payload), timeout=30)
-            if r.status_code == 200:
-                data = r.json()
-                return {"ok": True, "model": mdl, "answer": data.get("response", "")}
+            payload = {"model": mdl, "prompt": prompt, "stream": bool(stream), "options": {"temperature": temp}}
+            if stream:
+                resp_text = []
+                with requests.post(f"{self.base_url}/api/generate", data=json.dumps(payload), timeout=timeout, stream=True) as r:
+                    if r.status_code != 200:
+                        return {"ok": False, "error": f"HTTP {r.status_code}: {r.text}"}
+                    for line in r.iter_lines(decode_unicode=True):
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                            chunk = obj.get("response", "")
+                            if chunk:
+                                resp_text.append(chunk)
+                        except Exception:
+                            # Ignore malformed lines
+                            continue
+                return {"ok": True, "model": mdl, "answer": "".join(resp_text)}
+            else:
+                r = requests.post(f"{self.base_url}/api/generate", data=json.dumps(payload), timeout=timeout)
+                if r.status_code == 200:
+                    data = r.json()
+                    return {"ok": True, "model": mdl, "answer": data.get("response", "")}
             return {"ok": False, "error": f"HTTP {r.status_code}: {r.text}"}
         except Exception as e:
             return {"ok": False, "error": str(e)}
