@@ -14,8 +14,7 @@ pypdf==3.17.0
 python-magic==0.4.27
 unstructured==0.11.6
 
-# LLM Backends
-langchain-ollama==0.0.1
+# LLM Backends (Gemini via google-generativeai; Ollama dependency removed)
 
 # Web Framework
 fastapi==0.109.0
