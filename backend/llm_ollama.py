@@ -1,11 +1,12 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+import os
 import json
 
 
 class OllamaClient:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3", temperature: float = 0.2):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = None, temperature: float = 0.2):
         self.base_url = base_url.rstrip("/")
-        self.model = model
+        self.model = model or os.getenv("OLLAMA_MODEL", "llama3")
         self.temperature = temperature
 
     def is_available(self) -> bool:
@@ -16,9 +17,45 @@ class OllamaClient:
         except Exception:
             return False
 
+    def list_models(self) -> List[str]:
+        try:
+            import requests
+            r = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            if r.status_code == 200:
+                return [m.get("name") for m in r.json().get("models", [])]
+        except Exception:
+            pass
+        return []
+
+    def has_model(self, name: Optional[str] = None) -> bool:
+        mdl = name or self.model
+        return mdl in set(self.list_models())
+
+    def pull_model(self, name: Optional[str] = None) -> bool:
+        mdl = name or self.model
+        try:
+            import requests
+            payload = {"name": mdl, "stream": False}
+            r = requests.post(f"{self.base_url}/api/pull", data=json.dumps(payload), timeout=300)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    def ensure_model(self, name: Optional[str] = None) -> bool:
+        mdl = name or self.model
+        if not self.is_available():
+            return False
+        if self.has_model(mdl):
+            return True
+        return self.pull_model(mdl)
+
     def generate(self, prompt: str, model: Optional[str] = None, temperature: Optional[float] = None) -> Dict[str, Any]:
         mdl = model or self.model
         temp = float(temperature if temperature is not None else self.temperature)
+        # Ensure model exists (attempt to pull if missing)
+        if not self.ensure_model(mdl):
+            return {"ok": False, "error": f"Ollama model '{mdl}' not available (pull failed). Please run: ollama pull {mdl}"}
+
         # Try langchain_ollama first
         try:
             from langchain_ollama import ChatOllama
