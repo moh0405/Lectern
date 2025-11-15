@@ -43,3 +43,6 @@ gitpython==3.1.43
 openai==1.43.0
 genanki==0.13.1
 readability-lxml==0.8.1
+plotly==5.22.0
+scikit-learn==1.4.2
+sympy==1.13.2
