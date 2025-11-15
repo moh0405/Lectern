@@ -100,6 +100,7 @@ class RAGEngine:
         return arr
 
     def _create_prompt_template(self) -> str:
+        """Default prompt when no mode is specified."""
         return (
             "You are a helpful Computer Science tutor. Answer the question based ONLY on the context provided below.\n\n"
             "Context:\n{context}\n\n"
@@ -111,6 +112,42 @@ class RAGEngine:
             "4. Cite sources when possible\n\n"
             "Answer:"
         )
+
+    def _prompt_for_mode(self, mode: str | None = None) -> str:
+        """Return a prompt template based on study mode.
+
+        Modes:
+        - eli5: simple explanation, analogies
+        - technical: detailed, include complexity and code snippets
+        - interview: structured answer with bullet points and edge cases
+        - summary: short bullet list summary
+        """
+        m = (mode or "").strip().lower()
+        if m in {"eli5", "eli 5", "explain like i'm 5"}:
+            return (
+                "Explain like I'm 5 (ELI5). Use simple language and analogies.\n\n"
+                "Context:\n{context}\n\nQuestion: {question}\n\n"
+                "Instructions:\n- Use short sentences\n- Avoid jargon\n- Include a friendly analogy\n- End with a one-sentence recap\n\nAnswer:"
+            )
+        if m in {"technical", "detailed"}:
+            return (
+                "Technical mode: provide a rigorous explanation using ONLY the context.\n\n"
+                "Context:\n{context}\n\nQuestion: {question}\n\n"
+                "Instructions:\n- Define terms precisely\n- Include time/space complexity where relevant\n- Provide a short pseudocode or code example if present in context\n- Mention trade-offs and edge cases\n- Cite sources\n\nAnswer:"
+            )
+        if m in {"interview", "interview prep"}:
+            return (
+                "Interview Prep mode: produce a concise, structured answer.\n\n"
+                "Context:\n{context}\n\nQuestion: {question}\n\n"
+                "Instructions:\n- Start with a 2-sentence overview\n- Bullet points: approach, complexity, edge cases\n- Common pitfalls\n- Short example if in context\n- Cite sources\n\nAnswer:"
+            )
+        if m in {"summary", "quick summary"}:
+            return (
+                "Quick Summary mode: produce bullet points only from context.\n\n"
+                "Context:\n{context}\n\nQuestion: {question}\n\n"
+                "Instructions:\n- 5–8 bullets\n- Each bullet one sentence\n- No speculation beyond context\n- Cite sources if possible\n\nAnswer:"
+            )
+        return self._create_prompt_template()
 
     def _embed_query(self, query: str) -> np.ndarray:
         if self.embedder is None:
@@ -158,32 +195,32 @@ class RAGEngine:
             lines.append(f"- [{src}] {c['text']}")
         return "\n".join(lines)
 
-    def generate_prompt(self, question: str, chunks: List[Dict[str, Any]]) -> str:
-        template = self._create_prompt_template()
+    def generate_prompt(self, question: str, chunks: List[Dict[str, Any]], mode: str | None = None) -> str:
+        template = self._prompt_for_mode(mode)
         context = self.format_context(chunks)
         return template.format(context=context, question=question)
 
-    def answer_question(self, question: str, k: int = 3) -> Dict[str, Any]:
+    def answer_question(self, question: str, k: int = 3, mode: str | None = None) -> Dict[str, Any]:
         chunks = self.retrieve_context(question, k=k)
-        prompt = self.generate_prompt(question, chunks)
+        prompt = self.generate_prompt(question, chunks, mode=mode)
         return {"prompt": prompt, "chunks": chunks}
 
-    def answer_with_ollama(self, question: str, k: int = 3, model: str = "llama3", temperature: float = 0.2) -> Dict[str, Any]:
+    def answer_with_ollama(self, question: str, k: int = 3, model: str = "llama3", temperature: float = 0.2, mode: str | None = None) -> Dict[str, Any]:
         chunks = self.retrieve_context(question, k=k)
-        prompt = self.generate_prompt(question, chunks)
+        prompt = self.generate_prompt(question, chunks, mode=mode)
         from .llm_ollama import OllamaClient
         client = OllamaClient(model=model, temperature=temperature)
         result = client.generate(prompt)
         return {"prompt": prompt, "chunks": chunks, **result}
 
-    def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
+    def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2, mode: str | None = None) -> Dict[str, Any]:
         """Answer using Google Gemini API (cloud inference only).
 
         - Keeps retrieval and prompt formatting identical to Ollama path
         - Reads API key from environment; fails gracefully with clear error
         """
         chunks = self.retrieve_context(question, k=k)
-        prompt = self.generate_prompt(question, chunks)
+        prompt = self.generate_prompt(question, chunks, mode=mode)
         try:
             from .llm_config import GeminiClient
             client = GeminiClient(model=model, temperature=temperature)
@@ -191,6 +228,105 @@ class RAGEngine:
             return {"prompt": prompt, "chunks": chunks, "ok": False, "error": str(e), "model": model}
         result = client.generate(prompt, temperature=temperature)
         return {"prompt": prompt, "chunks": chunks, **result}
+
+    # -----------------------------------------------------
+    # Extras for hackathon killer features
+    # -----------------------------------------------------
+    def _collect_context_snippet(self, max_chars: int = 4000) -> str:
+        items = self._docstore_iter()
+        texts: List[str] = []
+        size = 0
+        for it in items:
+            t = (it.get("text") or "").strip()
+            if not t:
+                continue
+            if size + len(t) > max_chars:
+                break
+            texts.append(t)
+            size += len(t)
+        return "\n\n".join(texts)
+
+    def generate_query_suggestions(self, max_questions: int = 5, model: str | None = None, temperature: float = 0.2) -> List[str]:
+        """Use Gemini to propose study questions from current corpus.
+
+        Falls back to static examples on error.
+        """
+        ctx = self._collect_context_snippet(max_chars=2500)
+        prompt = (
+            "From the following study corpus, propose {n} diverse, high-impact questions "
+            "about data structures & algorithms. Cover fundamentals and advanced topics. "
+            "Return as a numbered list, one question per line.\n\nCorpus:\n{ctx}"
+        ).format(n=max_questions, ctx=ctx or "(empty)")
+        try:
+            from .llm_config import GeminiClient
+            client = GeminiClient(model=model, temperature=temperature)
+            res = client.generate(prompt, temperature=temperature)
+            text = (res.get("answer") or "").strip()
+            qs = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # strip leading numbering
+                line = line.split(". ", 1)[-1] if line[0].isdigit() else line
+                qs.append(line)
+            return qs[:max_questions] or [
+                "Explain dynamic programming",
+                "Difference between BFS and DFS",
+                "How do hash tables handle collisions?",
+                "What is a balanced binary search tree?",
+                "Describe Dijkstra vs Bellman-Ford",
+            ]
+        except Exception:
+            return [
+                "Explain dynamic programming",
+                "Difference between BFS and DFS",
+                "How do hash tables handle collisions?",
+                "What is a balanced binary search tree?",
+                "Describe Dijkstra vs Bellman-Ford",
+            ]
+
+    def multi_source_synthesis(self, question: str, k_per_doc: int = 2, model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
+        """Compare answers across sources and highlight agreements/conflicts.
+
+        Retrieves top chunks per document and asks Gemini to synthesize.
+        Returns {'ok': bool, 'answer': str, 'citations': List[Dict], 'error': str?}
+        """
+        items = self._docstore_iter()
+        # Group by doc
+        by_doc: Dict[str, List[Dict[str, Any]]] = {}
+        import re as _re
+        q_tokens = set(_re.findall(r"\b\w+\b", question.lower()))
+        for it in items:
+            doc = it.get("doc") or ""
+            if not doc:
+                continue
+            # simple overlap score
+            t_tokens = set(_re.findall(r"\b\w+\b", (it.get("text") or "").lower()))
+            inter = len(q_tokens & t_tokens)
+            by_doc.setdefault(doc, []).append({"score": inter, **it})
+        # pick top k per doc
+        chosen: List[Dict[str, Any]] = []
+        for doc, arr in by_doc.items():
+            arr.sort(key=lambda x: x.get("score", 0), reverse=True)
+            chosen.extend(arr[:k_per_doc])
+        # build context
+        context = self.format_context([{"text": c.get("text",""), "doc": c.get("doc",""), "page": c.get("page")} for c in chosen])
+        synth_prompt = (
+            "Synthesize an answer to the question by comparing information across sources.\n\n"
+            "Context (multi-source):\n{context}\n\nQuestion: {question}\n\n"
+            "Instructions:\n- Note where sources agree\n- Highlight conflicting claims\n- Provide citations like [doc (page N)] after statements\n- Be concise\n\nAnswer:"
+        ).format(context=context, question=question)
+        try:
+            from .llm_config import GeminiClient
+            client = GeminiClient(model=model, temperature=temperature)
+            res = client.generate(synth_prompt, temperature=temperature)
+            ans = res.get("answer") or ""
+            # naive citations list
+            cites = [{"doc": c.get("doc"), "page": c.get("page")} for c in chosen]
+            return {"ok": True, "answer": ans, "citations": cites}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
 
 if __name__ == "__main__":

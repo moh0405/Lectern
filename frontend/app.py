@@ -30,6 +30,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.rag_engine import RAGEngine
 from backend.llm_config import GeminiClient
 from backend.document_processor import list_chunks_from_dir
+import random
+import pandas as pd
 
 
 def inject_css():
@@ -150,6 +152,14 @@ def build_ui():
         models = load_models()
         model = st.selectbox("Model", options=models or ["gemini-flash-latest"], index=0)
 
+        # Study Mode selector
+        mode = st.selectbox(
+            "Study Mode",
+            options=["ELI5", "Technical", "Interview Prep", "Quick Summary"],
+            index=1,
+            help="Changes the prompt template and answer style",
+        )
+
         st.divider()
         st.subheader("Upload & URLs")
         files = st.file_uploader("Upload PDF(s)", type=["pdf"], accept_multiple_files=True)
@@ -182,20 +192,24 @@ def build_ui():
     c2.metric("Chunks", stats["chunks"])
     if "query_count" not in st.session_state:
         st.session_state["query_count"] = 0
-    c3.metric("Queries", st.session_state["query_count"])
+    c3.metric("Queries", st.session_state["query_count"]) 
 
-    # Example questions
-    st.caption("Examples: click to auto-fill")
-    ex_col = st.columns([1,1,1,1])
-    examples = [
-        "Explain dynamic programming",
-        "Difference between BFS and DFS",
-        "What is a monad in functional programming?",
-        "How do hash tables handle collisions?",
-    ]
-    for i, ex in enumerate(examples):
-        if ex_col[i].button(ex):
-            st.session_state["question"] = ex
+    # Intelligent Query Suggestions
+    st.caption("Smart Suggestions from your corpus")
+    try:
+        suggestions = RAGEngine(auto_embeddings=False).generate_query_suggestions(max_questions=5, model=model, temperature=temperature)
+    except Exception:
+        suggestions = [
+            "Explain dynamic programming",
+            "Difference between BFS and DFS",
+            "How do hash tables handle collisions?",
+            "What is a balanced binary search tree?",
+            "Describe Dijkstra vs Bellman-Ford",
+        ]
+    sug_cols = st.columns(min(5, len(suggestions)))
+    for i, q_s in enumerate(suggestions):
+        if sug_cols[i].button(q_s):
+            st.session_state["question"] = q_s
             st.experimental_rerun()
 
     # Visual RAG — side-by-side
@@ -220,6 +234,15 @@ def build_ui():
 
     if run and question.strip():
         st.session_state["query_count"] += 1
+        start_t = time.time()
+        thinking_msgs = [
+            "Analyzing structures…",
+            "Balancing trees…",
+            "Hashing thoughts…",
+            "Traversing graphs…",
+            "Dynamic programming in progress…",
+        ]
+        st.info(random.choice(thinking_msgs))
         # Step: retrieve
         with ctx_col:
             st.subheader("Context")
@@ -229,6 +252,13 @@ def build_ui():
                 st.success(f"Retrieved {len(chunks)} chunk(s)")
                 for c in chunks:
                     chunk_card(c, question)
+                # Similarity scores graph (simple bar)
+                try:
+                    df_scores = pd.DataFrame({"chunk": [f"{c.get('doc')} p{c.get('page')}" for c in chunks], "score": [float(c.get('score') or 0.0) for c in chunks]})
+                    st.caption("Similarity scores")
+                    st.bar_chart(df_scores.set_index("chunk"))
+                except Exception:
+                    pass
             except Exception as e:
                 st.error(f"Retrieval error: {e}")
 
@@ -237,7 +267,7 @@ def build_ui():
             st.subheader("Answer")
             ph = st.empty()
             try:
-                result = engine.answer_with_gemini(question, k=k, model=model, temperature=temperature)
+                result = engine.answer_with_gemini(question, k=k, model=model, temperature=temperature, mode=mode)
                 answer_result = result
                 full = result.get("answer", "") or ""
                 # Simulate streaming word-by-word for UX polish
@@ -255,6 +285,8 @@ def build_ui():
                         st.markdown(f"- [{src}]({url})")
                     else:
                         st.markdown(f"- {src}")
+                elapsed = time.time() - start_t
+                st.caption(f"Response time: {elapsed:.2f}s")
                 toast("Answer generated", "success")
             except Exception as e:
                 st.error(f"Generation error: {e}")
@@ -262,6 +294,16 @@ def build_ui():
         # Chat history
         hist = st.session_state.setdefault("history", [])
         hist.append({"q": question, "answer": answer_result.get("answer", ""), "chunks": retrieved_chunks})
+
+        # Progressive learning tracker
+        tracker = st.session_state.setdefault("learning", {})
+        toks = set(re.findall(r"\b\w+\b", question.lower()))
+        for t in toks:
+            if len(t) <= 2:
+                continue
+            d = tracker.get(t, {"asked": 0})
+            d["asked"] += 1
+            tracker[t] = d
 
     st.divider()
     st.subheader("Chat History")
@@ -280,6 +322,54 @@ def build_ui():
         for h in hist:
             md.append(f"## Q: {h['q']}\n\n{h.get('answer','')}\n")
         st.download_button("Export markdown", data="\n".join(md), file_name="chat_export.md")
+        # Flashcards CSV (Q, A)
+        try:
+            import io, csv
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["Question", "Answer"])
+            for h in hist:
+                writer.writerow([h["q"], (h.get("answer") or "").strip()])
+            st.download_button("Download flashcards (CSV)", data=buf.getvalue(), file_name="flashcards.csv", mime="text/csv")
+        except Exception:
+            pass
+
+    # Learning Tracker view and follow-ups
+    st.divider()
+    st.subheader("Learning Tracker")
+    tracker = st.session_state.get("learning", {})
+    if not tracker:
+        st.caption("Ask questions to populate topics.")
+    else:
+        df_t = pd.DataFrame(sorted([(k, v.get("asked", 0)) for k, v in tracker.items()], key=lambda x: -x[1]), columns=["topic","asked"])
+        st.dataframe(df_t, height=220)
+        # suggest follow-ups for low-frequency topics
+        low = [t for t, n in df_t.values if n == 1][:5]
+        if low:
+            st.caption("Follow-up suggestions")
+            cols = st.columns(min(5, len(low)))
+            for i, t in enumerate(low):
+                if cols[i].button(f"Explain {t}"):
+                    st.session_state["question"] = f"Explain {t}"
+                    st.experimental_rerun()
+
+    # Multi-Source Synthesis (compare answers)
+    st.divider()
+    st.subheader("Multi-Source Synthesis")
+    synth_q = st.text_input("Topic to synthesize", value="Linked lists vs arrays")
+    if st.button("Compare sources"):
+        with st.spinner("Synthesizing across sources…"):
+            try:
+                res = RAGEngine(auto_embeddings=False).multi_source_synthesis(synth_q, k_per_doc=2, model=model, temperature=temperature)
+                if res.get("ok"):
+                    st.markdown(res.get("answer",""))
+                    st.caption("Citations")
+                    for c in res.get("citations", [])[:8]:
+                        st.markdown(f"- {c.get('doc')} (page {c.get('page')})")
+                else:
+                    st.error(res.get("error","Synthesis failed"))
+            except Exception as e:
+                st.error(f"Synthesis error: {e}")
 
 
 if __name__ == "__main__":
