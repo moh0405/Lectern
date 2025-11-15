@@ -31,6 +31,8 @@ from backend.advanced_ai import (
     math_solve,
 )
 from frontend.components import inject_assets, command_palette_hint, lottie_animation
+from backend.leetcode_handler import LeetCodeHandler
+import random
 
 
 def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
@@ -114,6 +116,11 @@ def init_analytics():
             "events": [],  # each: {ts, q, avg_sim, latency_ms, tokens_prompt, tokens_answer, docs, cache_hit}
             "doc_usage": {},  # doc -> count
             "streak_days": 0,
+            # parallel arrays for simple charts
+            "queries": [],
+            "timestamps": [],
+            "scores": [],
+            "sources": [],
         }
     if "query_cache" not in st.session_state:
         st.session_state["query_cache"] = {}
@@ -140,6 +147,11 @@ def record_event(question: str, chunks: List[Dict[str, Any]], result: Dict[str, 
             "cache_hit": bool(cache_hit),
         }
         st.session_state["analytics"]["events"].append(ev)
+        # parallel arrays for Analytics tab
+        st.session_state["analytics"]["queries"].append(question)
+        st.session_state["analytics"]["timestamps"].append(time.time())
+        st.session_state["analytics"]["scores"].append(avg_sim)
+        st.session_state["analytics"]["sources"].append(docs)
         # doc usage
         du = st.session_state["analytics"]["doc_usage"]
         for d in docs:
@@ -278,7 +290,7 @@ def build_ui() -> None:
     c3.metric("Queries", st.session_state["query_count"])
 
     # Main layout: Advanced Tutor Tabs
-    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz, tab_analytics = st.tabs([
+    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz, tab_leetcode, tab_analytics = st.tabs([
         "Ask",
         "Concept Map",
         "Socratic Tutor",
@@ -286,6 +298,7 @@ def build_ui() -> None:
         "Adaptive Tutor",
         "Math",
         "3D Viz",
+        "LeetCode",
         "Analytics",
     ])
 
@@ -294,8 +307,23 @@ def build_ui() -> None:
         q_col, xr_col = st.columns([0.4, 0.6])
         with q_col:
             st.subheader("Question")
-            question = st.text_area("Enter question", placeholder="e.g., What is a linked list?", height=120)
-            run = st.button("Run RAG")
+            # Example questions and shortcuts
+            st.markdown("**Try these:**")
+            ex_cols = st.columns(4)
+            if ex_cols[0].button("Explain DP"):
+                st.session_state["question"] = "Explain dynamic programming"
+            if ex_cols[1].button("Hash Tables"):
+                st.session_state["question"] = "What is a hash table?"
+            if ex_cols[2].button("BFS vs DFS"):
+                st.session_state["question"] = "Difference between BFS and DFS"
+            if ex_cols[3].button("Solve Two Sum"):
+                st.session_state["question"] = "Solve Two Sum problem"
+
+            with st.form("ask-form"):
+                question = st.text_area("Enter question", value=st.session_state.get("question",""), placeholder="e.g., What is a linked list?", height=120)
+                submitted = st.form_submit_button("Run RAG")
+            st.caption("Shortcuts: Enter (submit), Cmd+K (search)")
+            run = submitted
             # Pipeline visualization
             st.markdown(
                 """
@@ -325,7 +353,10 @@ def build_ui() -> None:
                     result = cached.get("result", {})
                     cache_hit = True
                 else:
-                    st.info("Step 1: Retrieving relevant chunks…")
+                    # playful loading messages
+                    msgs = ["🤔 Thinking deeply…", "📚 Consulting archives…", "🔍 Scanning knowledge base…", "🧠 Reasoning about your query…"]
+                    holder = st.empty()
+                    holder.info(random.choice(msgs))
                     engine = RAGEngine(auto_embeddings=False)
                     chunks = engine.retrieve_context(question, k=k)
                     st.success(f"Retrieved {len(chunks)} chunk(s)")
@@ -336,7 +367,7 @@ def build_ui() -> None:
                     chunk_card(c)
 
                 if not cache_hit:
-                    st.info("Step 2: Generating answer…")
+                    holder.info(random.choice(msgs))
                     mdl = model_input.strip() or None
                     result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
                 prompt = result.get("prompt", "")
@@ -409,80 +440,54 @@ def build_ui() -> None:
                 import plotly.graph_objects as go
                 import pandas as pd
                 df = pd.DataFrame(evs)
-                # Study Analytics
-                st.markdown("**Study Analytics**")
-                sa1, sa2, sa3 = st.columns(3)
-                total_time_min = int((time.time() - st.session_state["analytics"]["session_start"]) / 60)
-                sa1.metric("Time Spent (min)", total_time_min)
-                sa2.metric("Questions", len(evs))
-                sa3.metric("Streak (days)", st.session_state["analytics"].get("streak_days", 1))
+                # Top Metrics
+                tm1, tm2, tm3, tm4 = st.columns(4)
+                total_queries = len(df)
+                avg_similarity = float(df["avg_sim"].mean()) if "avg_sim" in df else 0.0
+                topics_covered = len(set([t for q in df["q"].tolist() for t in re.findall(r"\b\w+\b", str(q).lower()) if len(t)>2]))
+                streak_days = st.session_state["analytics"].get("streak_days", 1)
+                tm1.metric("Total Queries", total_queries)
+                tm2.metric("Avg Similarity", f"{avg_similarity:.2f}")
+                tm3.metric("Topics Covered", topics_covered)
+                tm4.metric("Study Streak", f"{streak_days} days")
 
-                # Topics explored (simple tag cloud from question tokens)
-                st.caption("Topics explored")
+                # Query Timeline
+                df_time = df.copy()
+                df_time["time"] = df_time["ts"].apply(lambda t: time.strftime('%H:%M:%S', time.localtime(t)))
+                fig_tl = px.line(df_time, x="time", y=df_time.index, labels={"y":"Queries"}, title="Query Timeline")
+                st.plotly_chart(fig_tl, use_container_width=True)
+
+                # Topic Distribution (bar)
                 tokens = {}
                 for q in df["q"].tolist():
                     for t in re.findall(r"\b\w+\b", str(q).lower()):
                         if len(t) <= 2:
                             continue
                         tokens[t] = tokens.get(t, 0) + 1
-                tags = sorted(tokens.items(), key=lambda x: x[1], reverse=True)[:30]
-                cloud = " ".join([f"<span style='font-size:{12+v*2}px;color:#cbd5e1;margin:4px;display:inline-block'>{k}</span>" for k,v in tags])
-                st.markdown(f"<div class='card'>{cloud}</div>", unsafe_allow_html=True)
+                df_topics = pd.DataFrame({"topic": list(tokens.keys()), "count": list(tokens.values())}).sort_values("count", ascending=False).head(20)
+                fig_topics = px.bar(df_topics, x="topic", y="count", title="Most Queried Topics")
+                st.plotly_chart(fig_topics, use_container_width=True)
 
-                # RAG Performance Metrics
-                st.markdown("**RAG Performance**")
-                c1, c2 = st.columns(2)
-                fig_sim = px.line(df, y="avg_sim", title="Avg Similarity over Queries")
-                c1.plotly_chart(fig_sim, use_container_width=True)
-                fig_lat = px.line(df, y="latency_ms", title="Response Latency (ms)")
-                c2.plotly_chart(fig_lat, use_container_width=True)
-
-                # Token usage
-                fig_tok = px.area(df[["tokens_prompt", "tokens_answer"]], title="Token Usage (approx)")
-                st.plotly_chart(fig_tok, use_container_width=True)
-
-                # Cache hit rate gauge
-                hit_rate = float(df["cache_hit"].mean()) if "cache_hit" in df else 0.0
+                # Similarity Gauge
                 gauge = go.Figure(go.Indicator(
                     mode="gauge+number",
-                    value=hit_rate*100,
-                    title={"text": "Cache Hit Rate (%)"},
+                    value=max(0.0, min(1.0, avg_similarity)) * 100,
+                    title={"text": "Average Similarity (%)"},
                     gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#22c55e"}},
                 ))
                 st.plotly_chart(gauge, use_container_width=True)
 
-                # Document Insights
-                st.markdown("**Document Insights**")
+                # Document Usage Heatmap
                 du = st.session_state["analytics"]["doc_usage"]
                 if du:
                     df_du = pd.DataFrame({"doc": list(du.keys()), "count": list(du.values())})
-                    fig_docs = px.bar(df_du, x="doc", y="count", title="Most Queried Documents")
-                    st.plotly_chart(fig_docs, use_container_width=True)
+                    fig_heat = px.imshow(df_du[["count"]].values.reshape(-1, 1),
+                                         labels=dict(x="Count", y="Document"),
+                                         x=["Queries"], y=df_du["doc"].tolist(),
+                                         title="Document Usage (Heatmap)")
+                    st.plotly_chart(fig_heat, use_container_width=True)
                 else:
                     st.info("No document usage yet.")
-
-                # Question Quality Score
-                st.markdown("**Question Quality**")
-                if len(df):
-                    last_q = str(df.iloc[-1]["q"])
-                    length_score = min(1.0, len(last_q)/80)
-                    specificity = 1.0 - (len([t for t in re.findall(r"\b\w+\b", last_q.lower()) if t in {"what","how","why","the","a","an"}]) / max(1, len(re.findall(r"\b\w+\b", last_q))))
-                    quality = int((length_score*0.4 + specificity*0.6) * 100)
-                    st.metric("Quality Score", quality)
-                    st.caption("Tip: add concrete entities, constraints, and desired output format.")
-                    if quality < 70:
-                        st.info(f"Try asking: '{last_q} in the context of DSA, include examples and trade-offs' ")
-
-                # Comparison Mode
-                st.markdown("**Comparison Mode**")
-                if len(df) >= 4:
-                    first_half = df.iloc[:len(df)//2]
-                    second_half = df.iloc[len(df)//2:]
-                    imp = (second_half["avg_sim"].mean() - first_half["avg_sim"].mean())
-                    pct = int((imp / max(1e-6, first_half["avg_sim"].mean())) * 100)
-                    st.success(f"You've improved {pct}% in similarity this session")
-                else:
-                    st.caption("Run more queries to enable comparison.")
 
                 # Export Options
                 st.markdown("**Export**")
@@ -499,6 +504,84 @@ def build_ui() -> None:
 
             except Exception as e:
                 st.error(f"Analytics rendering error: {e}")
+
+    # LeetCode tab
+    with tab_leetcode:
+        st.subheader("LeetCode Practice + Mentor")
+        if "leetcode_handler" not in st.session_state:
+            st.session_state["leetcode_handler"] = LeetCodeHandler()
+        lc: LeetCodeHandler = st.session_state["leetcode_handler"]
+
+        c1, c2 = st.columns([1, 2])
+        if c1.button("Load/Refresh Datasets"):
+            with st.spinner("Loading LeetCode datasets…"):
+                try:
+                    n, status = lc.load_all(generate_embeddings=False)
+                    st.success(f"Loaded {n} problems ({status})")
+                except Exception as e:
+                    st.error(f"LeetCode load failed: {e}")
+        if lc.is_loaded():
+            stats = lc.get_stats()
+            c2.metric("Problems", stats.get("total", 0))
+            by_diff = stats.get("by_difficulty", {})
+            d1, d2, d3 = st.columns(3)
+            d1.metric("Easy", by_diff.get("Easy", 0))
+            d2.metric("Medium", by_diff.get("Medium", 0))
+            d3.metric("Hard", by_diff.get("Hard", 0))
+
+        st.divider()
+        query = st.text_input("Search problems", value="binary tree traversal")
+        left, right = st.columns([1, 2])
+        difficulties = left.multiselect("Difficulty", options=["Easy", "Medium", "Hard"], default=["Easy", "Medium", "Hard"]) 
+        topic_str = left.text_input("Topics (comma-separated)", value="Tree, DFS, BFS")
+        topics = [t.strip() for t in topic_str.split(",") if t.strip()]
+        top_k = right.slider("Top K", min_value=5, max_value=30, value=10)
+        run = right.button("Search")
+
+        results = []
+        if run:
+            with st.spinner("Searching…"):
+                try:
+                    results = lc.search(query, top_k=top_k, difficulty=difficulties, topics=topics)
+                except Exception as e:
+                    st.error(f"Search failed: {e}")
+
+        if results:
+            st.caption(f"Showing {len(results)} matches")
+            for r in results:
+                with st.expander(f"{r['title']} [{r['difficulty']}] — score {r['score']:.3f}"):
+                    meta_cols = st.columns(4)
+                    meta_cols[0].write(f"PID: {r['pid']}")
+                    meta_cols[1].write(f"Likes: {r.get('likes') or '-'}")
+                    meta_cols[2].write(f"Acceptance: {r.get('acceptance') or '-'}")
+                    if r.get("url"):
+                        meta_cols[3].write(f"[Open]({r['url']})")
+
+                    exp_c1, exp_c2 = st.columns([1, 1])
+                    if exp_c1.button("Explain & Guide", key=f"exp_{r['pid']}"):
+                        with st.spinner("Generating study guide…"):
+                            try:
+                                mdl = (model_input or "").strip() or None
+                                out = lc.explain_problem(r["pid"], temperature=temperature, model=mdl)
+                                if out.get("ok"):
+                                    st.markdown(out.get("markdown") or "")
+                                else:
+                                    st.error(out.get("error"))
+                            except Exception as e:
+                                st.error(f"Explanation failed: {e}")
+
+                    # Track analytics for LeetCode searches
+                    try:
+                        st.session_state["analytics"]["events"].append({
+                            "ts": time.time(),
+                            "q": f"LeetCode search: {query}",
+                            "avg_sim": float(r.get("score", 0.0)),
+                            "latency_ms": 0,
+                            "tokens_prompt": None,
+                            "tokens_answer": None,
+                        })
+                    except Exception:
+                        pass
 
     # Concept Map tab
     with tab_map:
