@@ -25,11 +25,26 @@ class RAGEngine:
 
     def _load_vector_store(self) -> Tuple[Any, Any]:
         out_path = Path(self.store_dir)
-        index = faiss.read_index(str(out_path / "index.faiss"))
+        index_path = out_path / "index.faiss"
+        meta_path = out_path / "index.pkl"
         import pickle
-
-        with open(out_path / "index.pkl", "rb") as f:
-            obj = pickle.load(f)
+        index = None
+        obj = None
+        # Load metadata if present
+        if meta_path.exists():
+            with open(meta_path, "rb") as f:
+                obj = pickle.load(f)
+        # Try to load FAISS index if present
+        if index_path.exists():
+            index = faiss.read_index(str(index_path))
+        # If neither exists, build a lightweight meta-only store from inputs directory
+        if obj is None:
+            try:
+                from .document_processor import list_chunks_from_dir
+                chunks = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+                obj = {"metadata": chunks}
+            except Exception:
+                obj = {"metadata": []}
         return index, obj
 
     def _docstore_iter(self) -> List[Dict[str, Any]]:

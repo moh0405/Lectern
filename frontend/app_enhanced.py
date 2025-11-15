@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.rag_engine import RAGEngine
 from backend.llm_config import GeminiClient
+from backend.document_processor import list_chunks_from_dir
 
 
 def doc_stats(engine: RAGEngine) -> Dict[str, Any]:
@@ -116,6 +117,46 @@ def build_ui() -> None:
         except Exception as e:
             st.warning(f"Stats unavailable: {e}")
 
+        st.divider()
+        st.subheader("Add Sources")
+        with st.expander("Add URLs (one per line)", expanded=False):
+            st.caption("YouTube, web article, or GitHub repo")
+            existing = ""
+            try:
+                sources_fp = Path("data/uploaded_files/sources.txt")
+                if sources_fp.exists():
+                    existing = sources_fp.read_text()
+            except Exception:
+                pass
+            urls_text = st.text_area("sources.txt", value=existing, height=120)
+            if st.button("Save URLs"):
+                try:
+                    sources_fp = Path("data/uploaded_files/sources.txt")
+                    sources_fp.parent.mkdir(parents=True, exist_ok=True)
+                    sources_fp.write_text(urls_text.strip())
+                    st.success("Saved sources.txt. Use 'Refresh stats' to rescan.")
+                except Exception as e:
+                    st.error(f"Could not save: {e}")
+
+        with st.expander("Upload audio (mp3/mp4/wav/m4a)", expanded=False):
+            up = st.file_uploader("Audio file", type=["mp3","mp4","wav","m4a"], accept_multiple_files=False)
+            if up is not None:
+                try:
+                    out_fp = Path("data/uploaded_files") / up.name
+                    out_fp.parent.mkdir(parents=True, exist_ok=True)
+                    out_fp.write_bytes(up.getbuffer())
+                    st.success(f"Uploaded {up.name}. Use 'Refresh stats' to rescan.")
+                except Exception as e:
+                    st.error(f"Upload failed: {e}")
+
+        if st.button("Refresh stats"):
+            try:
+                # Warm metadata by scanning sources so stats update immediately
+                list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+                st.experimental_rerun()
+            except Exception:
+                st.experimental_rerun()
+
     # Main layout
     col_left, col_right = st.columns([0.5, 0.5])
 
@@ -157,8 +198,28 @@ def build_ui() -> None:
                 st.divider()
                 st.caption("Sources")
                 for c in st.session_state.get("last_chunks", []):
-                    src = f"{c.get('doc','')} (page {c.get('page')})"
-                    st.markdown(f"- {src}")
+                    src_type = c.get("source") or "pdf"
+                    doc = c.get("doc", "")
+                    page = c.get("page")
+                    url = c.get("url")
+                    start = c.get("start")
+                    end = c.get("end")
+                    extra = []
+                    if page:
+                        extra.append(f"page {page}")
+                    if src_type in ("youtube", "audio") and (start is not None):
+                        try:
+                            def fmt(t: float) -> str:
+                                t = int(t)
+                                return f"{t//60}:{t%60:02d}"
+                            extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
+                        except Exception:
+                            pass
+                    if url:
+                        extra.append(url)
+                    label = doc or (url or src_type)
+                    suffix = f" ({'; '.join(extra)})" if extra else ""
+                    st.markdown(f"- {label}{suffix}")
             else:
                 st.error(res.get("error", "Unknown error"))
 

@@ -170,6 +170,34 @@ def build_vector_store(inputs: List[str], out_dir: str) -> Tuple[int, int]:
     return processed, len(all_chunks)
 
 
+def list_chunks_from_dir(input_dir: str) -> List[Dict[str, Any]]:
+    """Collect chunks from all supported sources in a directory without building embeddings.
+
+    Used for meta-only fallback when FAISS/embeddings are unavailable.
+    """
+    input_path = Path(input_dir)
+    inputs: List[str] = []
+    inputs.extend([str(p) for p in sorted(input_path.glob("*.pdf"))])
+    for ext in ["*.mp3", "*.mp4", "*.wav", "*.m4a"]:
+        inputs.extend([str(p) for p in sorted(input_path.glob(ext))])
+    sources_file = input_path / "sources.txt"
+    if sources_file.exists():
+        try:
+            for line in sources_file.read_text().splitlines():
+                url = line.strip()
+                if url:
+                    inputs.append(url)
+        except Exception:
+            pass
+    all_chunks: List[Dict[str, Any]] = []
+    for inp in inputs:
+        try:
+            all_chunks.extend(build_chunks_from_input(inp))
+        except Exception:
+            continue
+    return all_chunks
+
+
 def build_vector_store_from_dir(input_dir: str, out_dir: str) -> Tuple[int, int]:
     input_path = Path(input_dir)
     inputs: List[str] = []
