@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 from typing import List, Dict, Any
 import sys
 from pathlib import Path
@@ -105,9 +106,66 @@ def keyword_highlights(question: str, text: str) -> str:
         return text
 
 
+def init_analytics():
+    # Initialize session analytics before any UI logic uses it
+    if "analytics" not in st.session_state:
+        st.session_state["analytics"] = {
+            "session_start": time.time(),
+            "events": [],  # each: {ts, q, avg_sim, latency_ms, tokens_prompt, tokens_answer, docs, cache_hit}
+            "doc_usage": {},  # doc -> count
+            "streak_days": 0,
+        }
+    if "query_cache" not in st.session_state:
+        st.session_state["query_cache"] = {}
+
+
+def record_event(question: str, chunks: List[Dict[str, Any]], result: Dict[str, Any], latency_ms: int, cache_hit: bool = False):
+    # Safely record a query interaction for analytics and streaks
+    try:
+        sims = [float(c.get("score") or 0.0) for c in (chunks or [])]
+        avg_sim = sum(sims)/len(sims) if sims else 0.0
+        prompt = result.get("prompt", "")
+        answer = result.get("answer", "")
+        tokens_prompt = int(len(prompt)/4)
+        tokens_answer = int(len(answer)/4)
+        docs = [c.get("doc") or (c.get("url") or "") for c in (chunks or [])]
+        ev = {
+            "ts": time.time(),
+            "q": question,
+            "avg_sim": avg_sim,
+            "latency_ms": latency_ms,
+            "tokens_prompt": tokens_prompt,
+            "tokens_answer": tokens_answer,
+            "docs": docs,
+            "cache_hit": bool(cache_hit),
+        }
+        st.session_state["analytics"]["events"].append(ev)
+        # doc usage
+        du = st.session_state["analytics"]["doc_usage"]
+        for d in docs:
+            if not d:
+                continue
+            du[d] = du.get(d, 0) + 1
+        # streak: if last event day differs from previous and is consecutive
+        evs = st.session_state["analytics"]["events"]
+        if len(evs) >= 2:
+            import datetime as _dt
+            prev_day = _dt.datetime.fromtimestamp(evs[-2]["ts"]).date()
+            curr_day = _dt.datetime.fromtimestamp(evs[-1]["ts"]).date()
+            if (curr_day - prev_day).days == 1:
+                st.session_state["analytics"]["streak_days"] += 1
+            elif (curr_day - prev_day).days > 1:
+                st.session_state["analytics"]["streak_days"] = 1
+        else:
+            st.session_state["analytics"]["streak_days"] = 1
+    except Exception:
+        pass
+
+
 def build_ui() -> None:
     st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
     inject_assets()
+    init_analytics()
     # Hero header with badges (polished)
     st.markdown(
         """
@@ -220,7 +278,7 @@ def build_ui() -> None:
     c3.metric("Queries", st.session_state["query_count"])
 
     # Main layout: Advanced Tutor Tabs
-    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz = st.tabs([
+    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz, tab_analytics = st.tabs([
         "Ask",
         "Concept Map",
         "Socratic Tutor",
@@ -228,6 +286,7 @@ def build_ui() -> None:
         "Adaptive Tutor",
         "Math",
         "3D Viz",
+        "Analytics",
     ])
 
     # Ask tab (RAG Q&A)
@@ -257,23 +316,37 @@ def build_ui() -> None:
                 st.session_state["last_question"] = question
                 st.session_state["query_count"] = st.session_state.get("query_count", 0) + 1
 
-                st.info("Step 1: Retrieving relevant chunks…")
-                engine = RAGEngine(auto_embeddings=False)
-                chunks = engine.retrieve_context(question, k=k)
-                st.success(f"Retrieved {len(chunks)} chunk(s)")
+                start_ts = time.time()
+                cache_hit = False
+                # Simple cache to demonstrate cache hit rate
+                if question in st.session_state["query_cache"]:
+                    cached = st.session_state["query_cache"][question]
+                    chunks = cached.get("chunks", [])
+                    result = cached.get("result", {})
+                    cache_hit = True
+                else:
+                    st.info("Step 1: Retrieving relevant chunks…")
+                    engine = RAGEngine(auto_embeddings=False)
+                    chunks = engine.retrieve_context(question, k=k)
+                    st.success(f"Retrieved {len(chunks)} chunk(s)")
 
                 # Retrieved banner
                 st.markdown(f"<div class='retrieved-banner'>Retrieved {len(chunks)} chunk(s)</div>", unsafe_allow_html=True)
                 for c in chunks:
                     chunk_card(c)
 
-                st.info("Step 2: Generating answer…")
-                mdl = model_input.strip() or None
-                result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
+                if not cache_hit:
+                    st.info("Step 2: Generating answer…")
+                    mdl = model_input.strip() or None
+                    result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
                 prompt = result.get("prompt", "")
                 st.session_state["last_prompt"] = prompt
                 st.session_state["last_chunks"] = chunks
                 st.session_state["last_result"] = result
+                latency_ms = int((time.time() - start_ts) * 1000)
+                record_event(question, chunks, result, latency_ms, cache_hit=cache_hit)
+                if not cache_hit:
+                    st.session_state["query_cache"][question] = {"chunks": chunks, "result": result}
 
                 # Animated pipeline feedback (subtle)
                 lottie_animation({
@@ -323,6 +396,109 @@ def build_ui() -> None:
             if show_prompt and (prompt := st.session_state.get("last_prompt")):
                 st.subheader("Prompt used")
                 st.code(prompt)
+
+    # Analytics dashboard
+    with tab_analytics:
+        st.subheader("Analytics Dashboard")
+        evs = st.session_state["analytics"]["events"]
+        if not evs:
+            st.info("Run a few queries to populate analytics.")
+        else:
+            try:
+                import plotly.express as px
+                import plotly.graph_objects as go
+                import pandas as pd
+                df = pd.DataFrame(evs)
+                # Study Analytics
+                st.markdown("**Study Analytics**")
+                sa1, sa2, sa3 = st.columns(3)
+                total_time_min = int((time.time() - st.session_state["analytics"]["session_start"]) / 60)
+                sa1.metric("Time Spent (min)", total_time_min)
+                sa2.metric("Questions", len(evs))
+                sa3.metric("Streak (days)", st.session_state["analytics"].get("streak_days", 1))
+
+                # Topics explored (simple tag cloud from question tokens)
+                st.caption("Topics explored")
+                tokens = {}
+                for q in df["q"].tolist():
+                    for t in re.findall(r"\b\w+\b", str(q).lower()):
+                        if len(t) <= 2:
+                            continue
+                        tokens[t] = tokens.get(t, 0) + 1
+                tags = sorted(tokens.items(), key=lambda x: x[1], reverse=True)[:30]
+                cloud = " ".join([f"<span style='font-size:{12+v*2}px;color:#cbd5e1;margin:4px;display:inline-block'>{k}</span>" for k,v in tags])
+                st.markdown(f"<div class='card'>{cloud}</div>", unsafe_allow_html=True)
+
+                # RAG Performance Metrics
+                st.markdown("**RAG Performance**")
+                c1, c2 = st.columns(2)
+                fig_sim = px.line(df, y="avg_sim", title="Avg Similarity over Queries")
+                c1.plotly_chart(fig_sim, use_container_width=True)
+                fig_lat = px.line(df, y="latency_ms", title="Response Latency (ms)")
+                c2.plotly_chart(fig_lat, use_container_width=True)
+
+                # Token usage
+                fig_tok = px.area(df[["tokens_prompt", "tokens_answer"]], title="Token Usage (approx)")
+                st.plotly_chart(fig_tok, use_container_width=True)
+
+                # Cache hit rate gauge
+                hit_rate = float(df["cache_hit"].mean()) if "cache_hit" in df else 0.0
+                gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=hit_rate*100,
+                    title={"text": "Cache Hit Rate (%)"},
+                    gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#22c55e"}},
+                ))
+                st.plotly_chart(gauge, use_container_width=True)
+
+                # Document Insights
+                st.markdown("**Document Insights**")
+                du = st.session_state["analytics"]["doc_usage"]
+                if du:
+                    df_du = pd.DataFrame({"doc": list(du.keys()), "count": list(du.values())})
+                    fig_docs = px.bar(df_du, x="doc", y="count", title="Most Queried Documents")
+                    st.plotly_chart(fig_docs, use_container_width=True)
+                else:
+                    st.info("No document usage yet.")
+
+                # Question Quality Score
+                st.markdown("**Question Quality**")
+                if len(df):
+                    last_q = str(df.iloc[-1]["q"])
+                    length_score = min(1.0, len(last_q)/80)
+                    specificity = 1.0 - (len([t for t in re.findall(r"\b\w+\b", last_q.lower()) if t in {"what","how","why","the","a","an"}]) / max(1, len(re.findall(r"\b\w+\b", last_q))))
+                    quality = int((length_score*0.4 + specificity*0.6) * 100)
+                    st.metric("Quality Score", quality)
+                    st.caption("Tip: add concrete entities, constraints, and desired output format.")
+                    if quality < 70:
+                        st.info(f"Try asking: '{last_q} in the context of DSA, include examples and trade-offs' ")
+
+                # Comparison Mode
+                st.markdown("**Comparison Mode**")
+                if len(df) >= 4:
+                    first_half = df.iloc[:len(df)//2]
+                    second_half = df.iloc[len(df)//2:]
+                    imp = (second_half["avg_sim"].mean() - first_half["avg_sim"].mean())
+                    pct = int((imp / max(1e-6, first_half["avg_sim"].mean())) * 100)
+                    st.success(f"You've improved {pct}% in similarity this session")
+                else:
+                    st.caption("Run more queries to enable comparison.")
+
+                # Export Options
+                st.markdown("**Export**")
+                report_md = "\n".join([f"- {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e['ts']))}: Q='{e['q']}', sim={e['avg_sim']:.2f}, lat={e['latency_ms']}ms" for e in evs])
+                st.download_button("Download Study Report (Markdown)", data=report_md, file_name="study-report.md")
+                import csv
+                from io import StringIO
+                sio = StringIO()
+                writer = csv.DictWriter(sio, fieldnames=["ts","q","avg_sim","latency_ms","tokens_prompt","tokens_answer","cache_hit"]) 
+                writer.writeheader()
+                for e in evs:
+                    writer.writerow({k: e.get(k) for k in writer.fieldnames})
+                st.download_button("Export Analytics (CSV)", data=sio.getvalue(), file_name="analytics.csv")
+
+            except Exception as e:
+                st.error(f"Analytics rendering error: {e}")
 
     # Concept Map tab
     with tab_map:
