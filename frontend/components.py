@@ -11,9 +11,17 @@ from pathlib import Path
 def inject_assets() -> None:
     """Inject global CSS and JS assets for glassmorphism and micro-interactions."""
     css_path = Path(__file__).resolve().parent / "static" / "style.css"
+    # Also load the hackathon polished dark theme if available
+    enhanced_css = Path(__file__).resolve().parent / "styles.css"
     js_path = Path(__file__).resolve().parent / "static" / "app.js"
     try:
         st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
+    except Exception:
+        pass
+    # Load enhanced dark theme for gradient, cards, badges, pipeline, etc.
+    try:
+        if enhanced_css.exists():
+            st.markdown(f"<style>{enhanced_css.read_text()}</style>", unsafe_allow_html=True)
     except Exception:
         pass
     try:

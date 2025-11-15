@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import List, Dict, Any
 import sys
 from pathlib import Path
@@ -70,24 +71,56 @@ def chunk_card(chunk: Dict[str, Any]) -> None:
     doc = chunk.get("doc", "")
     page = chunk.get("page", None)
     text = (chunk.get("text", "") or "").strip()
-    snippet = (text[:400] + ("…" if len(text) > 400 else ""))
+    snippet = (text[:500] + ("…" if len(text) > 500 else ""))
+    # Keyword highlights from the last asked question if present
+    q = str(st.session_state.get("last_question", ""))
+    highlighted = keyword_highlights(q, snippet)
     st.markdown(
         f"""
-        <div style="border-left: 6px solid {color}; padding: 10px; margin-bottom: 10px; background: #0f172a18;">
-            <div style="font-size: 0.9rem; color: #64748b;">Source: <strong>{doc}</strong>{f' — page {page}' if page else ''}</div>
-            <div style="font-size: 0.85rem; color: #334155;">Similarity: <strong>{score:.4f}</strong></div>
-            <div style="margin-top: 6px;">{snippet}</div>
+        <div class="chunk-card">
+            <div class="chunk-meta">
+              <span>{doc}{f' • page {page}' if page else ''}</span>
+              <span class="score-bar" style="--score:{score:.2f}; background: {color}">{score:.2f}</span>
+            </div>
+            <div class="chunk-text">{highlighted}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+def keyword_highlights(question: str, text: str) -> str:
+    """Wrap overlapping keywords for visual RAG."""
+    try:
+        q_tokens = set(re.findall(r"\b\w+\b", (question or "").lower()))
+        words = re.findall(r"\b\w+\b|\W+", text)
+        out = []
+        for w in words:
+            ww = w.lower()
+            if ww.isalpha() and ww in q_tokens:
+                out.append(f"<span class='hl'>{w}</span>")
+            else:
+                out.append(w)
+        return "".join(out)
+    except Exception:
+        return text
+
 
 def build_ui() -> None:
     st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
     inject_assets()
-    st.title("AI Study Mentor — Intelligent Tutor (Gemini Cloud)")
-    st.caption("Ask questions, generate concept maps, compare sources, and learn with adaptive tutoring.")
+    # Hero header with badges (polished)
+    st.markdown(
+        """
+        <div class="hero">
+          <div>
+            <h1>AI Study Mentor</h1>
+            <p>RAG + Adaptive Tutoring — polished, fast, demo-ready.</p>
+          </div>
+          <div class="badges"><span>RAG</span><span>Gemini</span><span>Dark Mode</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Sidebar settings
     with st.sidebar:
@@ -177,6 +210,15 @@ def build_ui() -> None:
             except Exception:
                 st.experimental_rerun()
 
+    # Stats dashboard
+    stats = doc_stats(None)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Documents", stats["documents"])
+    c2.metric("Chunks", stats["chunks"])
+    if "query_count" not in st.session_state:
+        st.session_state["query_count"] = 0
+    c3.metric("Queries", st.session_state["query_count"])
+
     # Main layout: Advanced Tutor Tabs
     tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz = st.tabs([
         "Ask",
@@ -190,36 +232,50 @@ def build_ui() -> None:
 
     # Ask tab (RAG Q&A)
     with tab_ask:
-        col_left, col_right = st.columns([0.5, 0.5])
-        with col_left:
-            st.subheader("Ask a question")
-            question = st.text_area("Question", placeholder="e.g., What is a linked list?", height=100)
+        q_col, xr_col = st.columns([0.4, 0.6])
+        with q_col:
+            st.subheader("Question")
+            question = st.text_area("Enter question", placeholder="e.g., What is a linked list?", height=120)
             run = st.button("Run RAG")
+            # Pipeline visualization
+            st.markdown(
+                """
+                <div class="pipeline">
+                  <div class="step">Query</div><div class="arrow">→</div>
+                  <div class="step">Embed</div><div class="arrow">→</div>
+                  <div class="step">Search</div><div class="arrow">→</div>
+                  <div class="step">Retrieve</div><div class="arrow">→</div>
+                  <div class="step">Generate</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
+        with xr_col:
+            st.subheader("Context & Answer")
             if run and question.strip():
+                st.session_state["last_question"] = question
+                st.session_state["query_count"] = st.session_state.get("query_count", 0) + 1
+
                 st.info("Step 1: Retrieving relevant chunks…")
                 engine = RAGEngine(auto_embeddings=False)
                 chunks = engine.retrieve_context(question, k=k)
                 st.success(f"Retrieved {len(chunks)} chunk(s)")
 
-                st.subheader("Selected Context")
+                # Retrieved banner
+                st.markdown(f"<div class='retrieved-banner'>Retrieved {len(chunks)} chunk(s)</div>", unsafe_allow_html=True)
                 for c in chunks:
                     chunk_card(c)
 
-                st.info("Step 2: Generating answer with Gemini (cloud)…")
+                st.info("Step 2: Generating answer…")
                 mdl = model_input.strip() or None
                 result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
                 prompt = result.get("prompt", "")
                 st.session_state["last_prompt"] = prompt
                 st.session_state["last_chunks"] = chunks
-
-                if show_prompt:
-                    st.subheader("Prompt used")
-                    st.code(prompt)
-
                 st.session_state["last_result"] = result
-                # Animated pipeline feedback
-                st.info("Animating pipeline…")
+
+                # Animated pipeline feedback (subtle)
                 lottie_animation({
                     "v":"5.7.4","fr":30,"ip":0,"op":60,"w":600,"h":180,"nm":"bar",
                     "ddd":0,"assets":[],"layers":[{"ddd":0,"ty":4,"nm":"bar","sr":1,
@@ -228,40 +284,45 @@ def build_ui() -> None:
                     "shapes":[{"ty":"rc","d":1,"s":{"a":0,"k":[600,20]},"p":{"a":0,"k":[0,0]},"r":{"a":0,"k":8}},
                     {"ty":"fl","c":{"a":0,"k":[0.486,0.227,0.929,1]},"o":{"a":0,"k":90}}]}] }, width=600, height=180, loop=False)
 
-        with col_right:
-            st.subheader("Answer")
+            # Answer card
             if "last_result" in st.session_state:
                 res = st.session_state["last_result"]
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
                 if res.get("ok"):
                     st.markdown(res.get("answer", ""))
-                    # Source attribution
-                    st.divider()
-                    st.caption("Sources")
-                    for c in st.session_state.get("last_chunks", []):
-                        src_type = c.get("source") or "pdf"
-                        doc = c.get("doc", "")
-                        page = c.get("page")
-                        url = c.get("url")
-                        start = c.get("start")
-                        end = c.get("end")
-                        extra = []
-                        if page:
-                            extra.append(f"page {page}")
-                        if src_type in ("youtube", "audio") and (start is not None):
-                            try:
-                                def fmt(t: float) -> str:
-                                    t = int(t)
-                                    return f"{t//60}:{t%60:02d}"
-                                extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
-                            except Exception:
-                                pass
-                        if url:
-                            extra.append(url)
-                        label = doc or (url or src_type)
-                        suffix = f" ({'; '.join(extra)})" if extra else ""
-                        st.markdown(f"- {label}{suffix}")
                 else:
                     st.error(res.get("error", "Unknown error"))
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Source attribution list
+                st.caption("Sources")
+                for c in st.session_state.get("last_chunks", []):
+                    src_type = c.get("source") or "pdf"
+                    doc = c.get("doc", "")
+                    page = c.get("page")
+                    url = c.get("url")
+                    start = c.get("start")
+                    end = c.get("end")
+                    extra = []
+                    if page:
+                        extra.append(f"page {page}")
+                    if src_type in ("youtube", "audio") and (start is not None):
+                        try:
+                            def fmt(t: float) -> str:
+                                t = int(t)
+                                return f"{t//60}:{t%60:02d}"
+                            extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
+                        except Exception:
+                            pass
+                    if url:
+                        extra.append(url)
+                    label = doc or (url or src_type)
+                    suffix = f" ({'; '.join(extra)})" if extra else ""
+                    st.markdown(f"- {label}{suffix}")
+
+            if show_prompt and (prompt := st.session_state.get("last_prompt")):
+                st.subheader("Prompt used")
+                st.code(prompt)
 
     # Concept Map tab
     with tab_map:
