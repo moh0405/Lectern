@@ -29,7 +29,7 @@ class GeminiClient:
         if not key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment or .env file.")
         genai.configure(api_key=key)
-        requested = model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+        requested = model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
         self.model = self._resolve_model(requested)
         try:
             self.temperature = float(os.getenv("GEMINI_TEMPERATURE", str(temperature)))
@@ -61,6 +61,10 @@ class GeminiClient:
 
             # Prefer flash latest, then flash, then pro latest
             for candidate in [
+                # Prefer broadly available non-1.5 aliases first
+                "gemini-flash-latest",
+                "gemini-pro-latest",
+                # Then 1.5 variants if the account supports them
                 "gemini-1.5-flash-latest",
                 "gemini-1.5-flash",
                 "gemini-1.5-pro-latest",
@@ -107,10 +111,15 @@ class GeminiClient:
         # Try primary then a sequence of common, compatible fallbacks.
         candidates = [
             self.model,
+            # Prefer non-1.5 aliases for wider availability
+            "gemini-flash-latest",
+            "gemini-pro-latest",
+            # Then 1.5 variants
             "gemini-1.5-flash-latest",
             "gemini-1.5-flash-001",
             "gemini-1.5-pro-latest",
             "gemini-1.5-pro-001",
+            # Legacy
             "gemini-1.0-pro",
         ]
         last_err = None

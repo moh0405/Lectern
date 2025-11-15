@@ -85,7 +85,10 @@ def build_ui() -> None:
         default_model_env = os.getenv("GEMINI_MODEL", "")
         default_idx = 0
         if models:
-            if "gemini-1.5-flash-latest" in models:
+            # Prefer non-1.5 alias for broader availability
+            if "gemini-flash-latest" in models:
+                default_idx = models.index("gemini-flash-latest")
+            elif "gemini-1.5-flash-latest" in models:
                 default_idx = models.index("gemini-1.5-flash-latest")
             elif default_model_env in models:
                 default_idx = models.index(default_model_env)
