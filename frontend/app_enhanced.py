@@ -140,7 +140,7 @@ def init_analytics():
 # Performance: cached resources and data-level caches
 # -----------------------------------------------------
 @st.cache_resource
-def load_rag_engine() -> RAGEngine:
+def load_rag_engine(version: int = 2) -> RAGEngine:
     """Load once and keep in memory; prefer precomputed embeddings if available.
 
     If `data/vector_store/embeddings.npy` exists, enable `auto_embeddings` so the engine
@@ -165,7 +165,7 @@ def load_leetcode_handler() -> LeetCodeHandler:
     return LeetCodeHandler()
 
 
-rag_engine = load_rag_engine()
+rag_engine = load_rag_engine(version=2)
 
 
 @st.cache_data(ttl=300)
@@ -174,7 +174,15 @@ def search_cached(query: str, k: int = 3) -> List[Dict[str, Any]]:
 
 
 @st.cache_data(ttl=3600)
-def get_answer_cached(question: str, k: int, model: str | None, temperature: float) -> Dict[str, Any]:
+def get_answer_cached(question: str, k: int, model: str | None, temperature: float, context_text: str | None = None) -> Dict[str, Any]:
+    # If explicit context provided, synthesize directly; else perform retrieval-driven answer
+    if context_text:
+        try:
+            # Prefer direct synthesis on provided context
+            return rag_engine.generate_answer(question, context_text, model=model, temperature=temperature, mode="technical")
+        except AttributeError:
+            # Fallback if engine instance predates patch: do standard retrieval answer
+            return rag_engine.answer_with_gemini(question, k=k, model=model, temperature=temperature)
     return rag_engine.answer_with_gemini(question, k=k, model=model, temperature=temperature)
 
 
@@ -458,17 +466,22 @@ def build_ui() -> None:
                         chunks = search_cached(question, k=k)
                     st.success(f"Found {len(chunks)} relevant chunk(s) ✓")
 
-                # Retrieved banner
+                # Retrieved banner (do not render raw chunks inline)
                 st.markdown(f"<div class='retrieved-banner'>Retrieved {len(chunks)} chunk(s)</div>", unsafe_allow_html=True)
-                for c in chunks:
-                    chunk_card(c)
 
                 if not cache_hit and generate_answers:
-                    holder.info("Generating answer (cached for 60 min)…")
+                    holder.info("Generating synthesized answer (cached for 60 min)…")
                     mdl = model_input.strip() or None
-                    result = get_answer_cached(question, k=k, model=mdl, temperature=temperature)
+                    # Build explicit context text for higher-quality synthesis
+                    context_text = "\n\n---\n\n".join([
+                        f"From {c.get('doc','')}" + (f" (page {c.get('page')})" if c.get('page') else "") + ":\n" + (c.get('text','') or "")
+                        for c in chunks
+                    ])
+                    result = get_answer_cached(question, k=k, model=mdl, temperature=temperature, context_text=context_text)
                 elif not cache_hit and not generate_answers:
-                    result = {"ok": True, "answer": "Generation disabled (Fast Mode). See retrieved context and sources.", "prompt": rag_engine.generate_prompt(question, chunks)}
+                    # Provide a quick summary from context instead of raw chunks
+                    summary_prompt = rag_engine.generate_prompt(question, chunks, mode="summary")
+                    result = {"ok": True, "answer": summary_prompt, "prompt": summary_prompt}
                 prompt = result.get("prompt", "")
                 st.session_state["last_prompt"] = prompt
                 st.session_state["last_chunks"] = chunks
@@ -487,37 +500,42 @@ def build_ui() -> None:
                     "shapes":[{"ty":"rc","d":1,"s":{"a":0,"k":[600,20]},"p":{"a":0,"k":[0,0]},"r":{"a":0,"k":8}},
                     {"ty":"fl","c":{"a":0,"k":[0.486,0.227,0.929,1]},"o":{"a":0,"k":90}}]}] }, width=600, height=180, loop=False)
 
-            # Answer card
+            # Answer card — ONE coherent answer
             if "last_result" in st.session_state:
                 res = st.session_state["last_result"]
                 st.markdown("<div class='card'>", unsafe_allow_html=True)
                 if res.get("ok"):
+                    st.markdown("### Answer")
                     st.markdown(res.get("answer", ""))
                 else:
                     st.error(res.get("error", "Unknown error"))
                 st.markdown("</div>", unsafe_allow_html=True)
-
-                # Source attribution list
-                st.caption("Sources")
-                for c in st.session_state.get("last_chunks", []):
-                    src_type = c.get("source") or "pdf"
-                    doc = c.get("doc", "")
-                    page = c.get("page")
-                    url = c.get("url")
-                    start = c.get("start")
-                    end = c.get("end")
-                    extra = []
-                    if page:
-                        extra.append(f"page {page}")
-                    if src_type in ("youtube", "audio") and (start is not None):
-                        try:
-                            def fmt(t: float) -> str:
-                                t = int(t)
-                                return f"{t//60}:{t%60:02d}"
-                            extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
-                        except Exception:
-                            pass
-                    if url:
+                # Sources and raw chunks are hidden under an expander
+                with st.expander("📚 View Retrieved Context"):
+                    for i, c in enumerate(st.session_state.get("last_chunks", []), 1):
+                        src_type = c.get("source") or "pdf"
+                        doc = c.get("doc", "")
+                        page = c.get("page")
+                        url = c.get("url")
+                        start = c.get("start")
+                        end = c.get("end")
+                        extra = []
+                        if page:
+                            extra.append(f"page {page}")
+                        if src_type in ("youtube", "audio") and (start is not None):
+                            try:
+                                def fmt(t: float) -> str:
+                                    t = int(t)
+                                    return f"{t//60}:{t%60:02d}"
+                                extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
+                            except Exception:
+                                pass
+                        parts = [str(p) for p in extra if p is not None and str(p) != ""]
+                        suffix = f" ({'; '.join(parts)})" if parts else ""
+                        st.info(f"**Source {i}** — {doc}{suffix}")
+                        snippet = (c.get("text") or "")[:500]
+                        if snippet:
+                            st.code(snippet + ("..." if len(c.get("text") or "") > 500 else ""))
                         extra.append(url)
                     label = doc or (url or src_type)
                     suffix = f" ({'; '.join(extra)})" if extra else ""

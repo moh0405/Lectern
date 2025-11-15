@@ -200,6 +200,23 @@ class RAGEngine:
         context = self.format_context(chunks)
         return template.format(context=context, question=question)
 
+    def generate_answer(self, question: str, context: str, model: str | None = None, temperature: float = 0.2, mode: str | None = "technical") -> Dict[str, Any]:
+        """Synthesize ONE coherent answer from provided context using Gemini.
+
+        - Uses tutor-style prompt with explicit instructions
+        - Does not perform retrieval; callers provide `context`
+        - Returns {"ok": bool, "answer": str, "model": str?, "error": str?}
+        """
+        template = self._prompt_for_mode(mode)
+        prompt = template.format(context=context, question=question)
+        try:
+            from .llm_config import GeminiClient
+            client = GeminiClient(model=model, temperature=temperature)
+            res = client.generate(prompt, temperature=temperature)
+            return {"ok": bool(res.get("ok", True)), "answer": res.get("answer", ""), "model": res.get("model"), "prompt": prompt}
+        except Exception as e:
+            return {"ok": False, "answer": "", "error": str(e), "model": model, "prompt": prompt}
+
     def answer_question(self, question: str, k: int = 3, mode: str | None = None) -> Dict[str, Any]:
         chunks = self.retrieve_context(question, k=k)
         prompt = self.generate_prompt(question, chunks, mode=mode)
