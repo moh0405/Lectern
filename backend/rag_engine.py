@@ -32,11 +32,17 @@ class RAGEngine:
         obj = None
         # Load metadata if present
         if meta_path.exists():
-            with open(meta_path, "rb") as f:
-                obj = pickle.load(f)
-        # Try to load FAISS index if present
-        if index_path.exists():
-            index = faiss.read_index(str(index_path))
+            try:
+                with open(meta_path, "rb") as f:
+                    obj = pickle.load(f)
+            except Exception:
+                obj = None
+        # Try to load FAISS index only if metadata loaded and faiss + file are present
+        if obj is not None and faiss is not None and index_path.exists():
+            try:
+                index = faiss.read_index(str(index_path))
+            except Exception:
+                index = None
         # If neither exists, build a lightweight meta-only store from inputs directory
         if obj is None:
             try:

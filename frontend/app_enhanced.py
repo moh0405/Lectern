@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Dict, Any
 import sys
 from pathlib import Path
@@ -19,10 +20,28 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.rag_engine import RAGEngine
 from backend.llm_config import GeminiClient
 from backend.document_processor import list_chunks_from_dir
+from backend.advanced_ai import (
+    build_concept_map,
+    concept_map_to_dot,
+    socratic_tutor,
+    multi_document_synthesis,
+    adaptive_explain,
+    math_solve,
+)
 
 
-def doc_stats(engine: RAGEngine) -> Dict[str, Any]:
-    items = engine._docstore_iter()
+def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
+    try:
+        if engine is None:
+            engine = RAGEngine(auto_embeddings=False)
+        items = engine._docstore_iter()
+    except Exception:
+        # Fallback: scan uploaded sources directly (no FAISS required)
+        try:
+            from backend.document_processor import list_chunks_from_dir
+            items = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+        except Exception:
+            items = []
     docs = sorted({it.get("doc", "") for it in items if it.get("doc")})
     pages = [it.get("page") for it in items if it.get("page")]
     return {
@@ -64,9 +83,9 @@ def chunk_card(chunk: Dict[str, Any]) -> None:
 
 
 def build_ui() -> None:
-    st.set_page_config(page_title="AI Study Mentor — RAG Visualizer", layout="wide")
-    st.title("AI Study Mentor — RAG Visualizer (Gemini Cloud)")
-    st.caption("Explore how RAG selects context and forms answers, visually.")
+    st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
+    st.title("AI Study Mentor — Intelligent Tutor (Gemini Cloud)")
+    st.caption("Ask questions, generate concept maps, compare sources, and learn with adaptive tutoring.")
 
     # Sidebar settings
     with st.sidebar:
@@ -104,8 +123,7 @@ def build_ui() -> None:
         st.divider()
         st.subheader("Document Stats")
         try:
-            engine_tmp = RAGEngine(auto_embeddings=False)
-            stats = doc_stats(engine_tmp)
+            stats = doc_stats(None)
             st.markdown(f"- Documents: {stats['documents']}")
             st.markdown(f"- Chunks: {stats['chunks']}")
             if stats["min_page"] is not None:
@@ -157,71 +175,192 @@ def build_ui() -> None:
             except Exception:
                 st.experimental_rerun()
 
-    # Main layout
-    col_left, col_right = st.columns([0.5, 0.5])
+    # Main layout: Advanced Tutor Tabs
+    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math = st.tabs([
+        "Ask",
+        "Concept Map",
+        "Socratic Tutor",
+        "Synthesis",
+        "Adaptive Tutor",
+        "Math",
+    ])
 
-    with col_left:
-        st.subheader("Ask a question")
-        question = st.text_area("Question", placeholder="e.g., What is a linked list?", height=100)
-        run = st.button("Run RAG")
+    # Ask tab (RAG Q&A)
+    with tab_ask:
+        col_left, col_right = st.columns([0.5, 0.5])
+        with col_left:
+            st.subheader("Ask a question")
+            question = st.text_area("Question", placeholder="e.g., What is a linked list?", height=100)
+            run = st.button("Run RAG")
 
-        if run and question.strip():
-            st.info("Step 1: Retrieving relevant chunks…")
-            engine = RAGEngine(auto_embeddings=False)
-            chunks = engine.retrieve_context(question, k=k)
-            st.success(f"Retrieved {len(chunks)} chunk(s)")
+            if run and question.strip():
+                st.info("Step 1: Retrieving relevant chunks…")
+                engine = RAGEngine(auto_embeddings=False)
+                chunks = engine.retrieve_context(question, k=k)
+                st.success(f"Retrieved {len(chunks)} chunk(s)")
 
-            st.subheader("Selected Context")
-            for c in chunks:
-                chunk_card(c)
+                st.subheader("Selected Context")
+                for c in chunks:
+                    chunk_card(c)
 
-            st.info("Step 2: Generating answer with Gemini (cloud)…")
-            mdl = model_input.strip() or None
-            result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
-            prompt = result.get("prompt", "")
-            st.session_state["last_prompt"] = prompt
-            st.session_state["last_chunks"] = chunks
+                st.info("Step 2: Generating answer with Gemini (cloud)…")
+                mdl = model_input.strip() or None
+                result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
+                prompt = result.get("prompt", "")
+                st.session_state["last_prompt"] = prompt
+                st.session_state["last_chunks"] = chunks
 
-            if show_prompt:
-                st.subheader("Prompt used")
-                st.code(prompt)
+                if show_prompt:
+                    st.subheader("Prompt used")
+                    st.code(prompt)
 
-            st.session_state["last_result"] = result
+                st.session_state["last_result"] = result
 
-    with col_right:
-        st.subheader("Answer")
-        if "last_result" in st.session_state:
-            res = st.session_state["last_result"]
-            if res.get("ok"):
-                st.markdown(res.get("answer", ""))
-                # Source attribution
-                st.divider()
-                st.caption("Sources")
-                for c in st.session_state.get("last_chunks", []):
-                    src_type = c.get("source") or "pdf"
-                    doc = c.get("doc", "")
-                    page = c.get("page")
-                    url = c.get("url")
-                    start = c.get("start")
-                    end = c.get("end")
-                    extra = []
-                    if page:
-                        extra.append(f"page {page}")
-                    if src_type in ("youtube", "audio") and (start is not None):
-                        try:
-                            def fmt(t: float) -> str:
-                                t = int(t)
-                                return f"{t//60}:{t%60:02d}"
-                            extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
-                        except Exception:
-                            pass
-                    if url:
-                        extra.append(url)
-                    label = doc or (url or src_type)
-                    suffix = f" ({'; '.join(extra)})" if extra else ""
-                    st.markdown(f"- {label}{suffix}")
+        with col_right:
+            st.subheader("Answer")
+            if "last_result" in st.session_state:
+                res = st.session_state["last_result"]
+                if res.get("ok"):
+                    st.markdown(res.get("answer", ""))
+                    # Source attribution
+                    st.divider()
+                    st.caption("Sources")
+                    for c in st.session_state.get("last_chunks", []):
+                        src_type = c.get("source") or "pdf"
+                        doc = c.get("doc", "")
+                        page = c.get("page")
+                        url = c.get("url")
+                        start = c.get("start")
+                        end = c.get("end")
+                        extra = []
+                        if page:
+                            extra.append(f"page {page}")
+                        if src_type in ("youtube", "audio") and (start is not None):
+                            try:
+                                def fmt(t: float) -> str:
+                                    t = int(t)
+                                    return f"{t//60}:{t%60:02d}"
+                                extra.append(f"{fmt(float(start))}–{fmt(float(end or start))}")
+                            except Exception:
+                                pass
+                        if url:
+                            extra.append(url)
+                        label = doc or (url or src_type)
+                        suffix = f" ({'; '.join(extra)})" if extra else ""
+                        st.markdown(f"- {label}{suffix}")
+                else:
+                    st.error(res.get("error", "Unknown error"))
+
+    # Concept Map tab
+    with tab_map:
+        st.subheader("Concept Map Generator")
+        topic = st.text_input("Topic", value="Machine Learning")
+        gen = st.button("Generate Concept Map")
+        if gen:
+            result = build_concept_map(topic, temperature=temperature)
+            if result.get("ok"):
+                nodes = result.get("nodes", [])
+                edges = result.get("edges", [])
+                dot = concept_map_to_dot(nodes, edges)
+                st.graphviz_chart(dot, use_container_width=True)
+                # Interactivity: inspect a node
+                node_ids = [n.get("id") or n.get("label") for n in nodes]
+                selected = st.selectbox("Inspect concept", options=node_ids)
+                if selected:
+                    # Show neighbors
+                    nbrs = []
+                    for e in edges:
+                        if e.get("from") == selected:
+                            nbrs.append((e.get("to"), e.get("label")))
+                        elif e.get("to") == selected:
+                            nbrs.append((e.get("from"), e.get("label")))
+                    st.markdown("**Related concepts:**")
+                    for nid, lbl in nbrs:
+                        st.markdown(f"- {nid} ({lbl})")
+                # Export
+                st.download_button("Download JSON", data=json.dumps({"nodes": nodes, "edges": edges}, indent=2), file_name=f"concept-map-{topic}.json")
+                st.download_button("Download DOT", data=dot, file_name=f"concept-map-{topic}.dot")
             else:
-                st.error(res.get("error", "Unknown error"))
+                st.error(result.get("error", "Could not build map"))
+
+    # Socratic Tutor tab
+    with tab_socratic:
+        st.subheader("Socratic Tutor Mode")
+        q = st.text_area("Your question", placeholder="Ask something you want to reason through.")
+        more_help = st.button("Guide me")
+        if "socratic_depth" not in st.session_state:
+            st.session_state["socratic_depth"] = 0
+        if more_help and q.strip():
+            # Use RAG context for grounding
+            eng = RAGEngine(auto_embeddings=False)
+            chunks = eng.retrieve_context(q, k=k)
+            out = socratic_tutor(q, chunks, depth=st.session_state["socratic_depth"], temperature=temperature)
+            if out.get("ok"):
+                st.session_state["socratic_depth"] += 1
+                st.markdown("**Guiding Questions**")
+                for i, qq in enumerate(out.get("questions", []), 1):
+                    st.markdown(f"{i}. {qq}")
+                st.markdown("**Hints (progressively explicit)**")
+                for i, h in enumerate(out.get("hints", []), 1):
+                    st.markdown(f"{i}. {h}")
+            else:
+                st.error(out.get("error", "Could not generate guidance"))
+
+    # Synthesis tab
+    with tab_synthesis:
+        st.subheader("Multi-Document Synthesis")
+        t = st.text_input("Topic to compare", value="Linked Lists")
+        run_syn = st.button("Compare & Synthesize")
+        if run_syn:
+            res = multi_document_synthesis(t, k_per_doc=2, temperature=temperature)
+            if res.get("ok"):
+                st.markdown("**Similarities**")
+                for s in res.get("similarities", []):
+                    st.markdown(f"- {s}")
+                st.markdown("**Conflicts**")
+                for c in res.get("conflicts", []):
+                    st.markdown(f"- {c}")
+                st.markdown("**Unified Explanation**")
+                st.write(res.get("synthesis", ""))
+                st.markdown("**Citations**")
+                for cit in res.get("citations", []):
+                    st.markdown(f"- {cit.get('doc')}: {cit.get('point')}")
+            else:
+                st.error(res.get("error", "Could not synthesize"))
+
+    # Adaptive Tutor tab
+    with tab_adaptive:
+        st.subheader("Explain Like I’m… (Adaptive)")
+        level = st.selectbox("Complexity level", options=["ELI5", "ELI10", "Undergrad", "Grad", "Expert"], index=2)
+        aq = st.text_area("Question to explain", placeholder="e.g., Explain dynamic programming.")
+        run_adapt = st.button("Explain at selected level")
+        if run_adapt and aq.strip():
+            res = adaptive_explain(aq, level=level, temperature=temperature)
+            if res.get("ok"):
+                st.write(res.get("answer"))
+                st.divider()
+                st.caption("Context used:")
+                eng = RAGEngine(auto_embeddings=False)
+                for c in res.get("chunks", []):
+                    chunk_card(c)
+            else:
+                st.error(res.get("error", "Could not generate explanation"))
+
+    # Math tab
+    with tab_math:
+        st.subheader("LaTeX Math Rendering + Steps")
+        expr = st.text_input("Math prompt", value="differentiate sin(x)")
+        run_math = st.button("Compute")
+        if run_math and expr.strip():
+            res = math_solve(expr)
+            if res.get("ok"):
+                if res.get("latex"):
+                    st.latex(res.get("latex"))
+                st.markdown("**Steps**")
+                for s in res.get("steps", []):
+                    st.markdown(f"- {s}")
+            else:
+                st.error(res.get("error", "Math engine error"))
 
 
 if __name__ == "__main__":

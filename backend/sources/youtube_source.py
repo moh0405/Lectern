@@ -51,6 +51,26 @@ class YouTubeSource(BaseSource):
             pass
         return data
 
+    def _fetch_duration(self, url: str) -> Optional[int]:
+        if requests is None:
+            return None
+        try:
+            r = requests.get(url, timeout=10)
+            if not r.ok:
+                return None
+            txt = r.text
+            m = re.search(r'"lengthSeconds"\s*:\s*"(\d+)"', txt)
+            if m:
+                return int(m.group(1))
+            m2 = re.search(r'<meta itemprop="duration" content="PT(\d+)M(\d+)S">', txt)
+            if m2:
+                mins = int(m2.group(1))
+                secs = int(m2.group(2))
+                return mins * 60 + secs
+        except Exception:
+            return None
+        return None
+
     def extract(self, input_value: str) -> List[Dict[str, Any]]:
         if YouTubeTranscriptApi is None:
             raise RuntimeError("youtube-transcript-api not installed. Add it to requirements.")
@@ -67,11 +87,13 @@ class YouTubeSource(BaseSource):
         meta = self._fetch_oembed(input_value)
         title = meta.get("title") or f"YouTube Video {vid}"
         thumb = meta.get("thumbnail_url") or f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+        duration = self._fetch_duration(input_value)
         self._meta = {
             "source_type": "youtube",
             "video_id": vid,
             "title": title,
             "thumbnail_url": thumb,
+            "duration_seconds": duration,
             "url": input_value,
         }
 
@@ -107,6 +129,8 @@ class YouTubeSource(BaseSource):
                         "start": start_ts,
                         "end": end_ts,
                         "citation_url": citation_url,
+                        "thumbnail_url": thumb,
+                        "duration_seconds": duration,
                     },
                 })
                 buf_text = []
@@ -130,6 +154,8 @@ class YouTubeSource(BaseSource):
                     "start": start_ts,
                     "end": end_ts,
                     "citation_url": citation_url,
+                    "thumbnail_url": thumb,
+                    "duration_seconds": duration,
                 },
             })
 
