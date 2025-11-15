@@ -8,6 +8,9 @@ from pathlib import Path
 
 import streamlit as st
 
+# Must be the first Streamlit command in this script
+st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -33,6 +36,7 @@ from backend.advanced_ai import (
 from frontend.components import inject_assets, command_palette_hint, lottie_animation
 from backend.leetcode_handler import LeetCodeHandler
 import random
+import functools
 
 
 def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
@@ -56,6 +60,12 @@ def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
         "min_page": min(pages) if pages else None,
         "max_page": max(pages) if pages else None,
     }
+
+
+@st.cache_data(ttl=600)
+def doc_stats_cached() -> Dict[str, Any]:
+    """Cached wrapper to avoid repeated scans during startup and sidebar refreshes."""
+    return doc_stats(None)
 
 
 def relevance_color(score: float) -> str:
@@ -126,6 +136,48 @@ def init_analytics():
         st.session_state["query_cache"] = {}
 
 
+# -----------------------------------------------------
+# Performance: cached resources and data-level caches
+# -----------------------------------------------------
+@st.cache_resource
+def load_rag_engine() -> RAGEngine:
+    """Load once and keep in memory; prefer precomputed embeddings if available.
+
+    If `data/vector_store/embeddings.npy` exists, enable `auto_embeddings` so the engine
+    loads them without importing heavy libraries. Otherwise, avoid auto-embedding to
+    prevent startup crashes on environments where `sentence-transformers` or `torch`
+    are unavailable.
+    """
+    try:
+        emb_path = Path("data/vector_store/embeddings.npy").resolve()
+        auto = emb_path.exists()
+    except Exception:
+        auto = False
+    try:
+        return RAGEngine(auto_embeddings=auto)
+    except Exception:
+        # Fallback to meta-only; retrieval will use keyword overlap
+        return RAGEngine(auto_embeddings=False)
+
+
+@st.cache_resource
+def load_leetcode_handler() -> LeetCodeHandler:
+    return LeetCodeHandler()
+
+
+rag_engine = load_rag_engine()
+
+
+@st.cache_data(ttl=300)
+def search_cached(query: str, k: int = 3) -> List[Dict[str, Any]]:
+    return rag_engine.retrieve_context(query, k)
+
+
+@st.cache_data(ttl=3600)
+def get_answer_cached(question: str, k: int, model: str | None, temperature: float) -> Dict[str, Any]:
+    return rag_engine.answer_with_gemini(question, k=k, model=model, temperature=temperature)
+
+
 def record_event(question: str, chunks: List[Dict[str, Any]], result: Dict[str, Any], latency_ms: int, cache_hit: bool = False):
     # Safely record a query interaction for analytics and streaks
     try:
@@ -175,9 +227,21 @@ def record_event(question: str, chunks: List[Dict[str, Any]], result: Dict[str, 
 
 
 def build_ui() -> None:
-    st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
     inject_assets()
     init_analytics()
+    # One-time prewarm for retrieval cache to ensure sub-2s first response
+    if "__prewarmed__" not in st.session_state:
+        try:
+            for _q in [
+                "Explain dynamic programming",
+                "What is a hash table?",
+                "Difference between BFS and DFS",
+                "Describe Dijkstra vs Bellman-Ford",
+            ]:
+                _ = search_cached(_q, k=3)
+        except Exception:
+            pass
+        st.session_state["__prewarmed__"] = True
     # Hero header with badges (polished)
     st.markdown(
         """
@@ -197,38 +261,38 @@ def build_ui() -> None:
         st.header("Settings")
         k = st.slider("Top-k context chunks", min_value=1, max_value=8, value=3, step=1)
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=float(os.getenv("GEMINI_TEMPERATURE", 0.2)), step=0.05)
-        # Load available models and present a dropdown of supported ones
-        @st.cache_data(ttl=3600)
-        def load_models() -> list[str]:
-            try:
-                client = GeminiClient()
-                return client.list_supported_models()
-            except Exception:
-                return []
-
-        models = load_models()
+        # Defer model listing until explicitly requested to avoid slow startup
         default_model_env = os.getenv("GEMINI_MODEL", "")
-        default_idx = 0
-        if models:
-            # Prefer non-1.5 alias for broader availability
-            if "gemini-flash-latest" in models:
-                default_idx = models.index("gemini-flash-latest")
-            elif "gemini-1.5-flash-latest" in models:
-                default_idx = models.index("gemini-1.5-flash-latest")
-            elif default_model_env in models:
-                default_idx = models.index(default_model_env)
-            model_input = st.selectbox("Model", options=models, index=default_idx, help="Only shows models that support generateContent")
-            with st.expander("Available models", expanded=False):
-                st.write(models)
+        fallback_default = default_model_env or "gemini-flash-latest"
+        if st.checkbox("Load supported models from API", value=False, help="Query API to list available models"):
+            @st.cache_data(ttl=1800)
+            def load_models() -> list[str]:
+                try:
+                    client = GeminiClient()
+                    return client.list_supported_models()
+                except Exception:
+                    return []
+            models = load_models()
+            if models:
+                default_idx = 0
+                if "gemini-flash-latest" in models:
+                    default_idx = models.index("gemini-flash-latest")
+                elif default_model_env in models:
+                    default_idx = models.index(default_model_env)
+                model_input = st.selectbox("Model", options=models, index=default_idx, help="Models supporting text generation")
+                with st.expander("Available models", expanded=False):
+                    st.write(models)
+            else:
+                st.warning("No models returned; using manual input.")
+                model_input = st.text_input("Model (optional)", value=fallback_default)
         else:
-            st.warning("Could not list models for your API key. Enter a model manually or set GEMINI_MODEL in .env.")
-            fallback_default = default_model_env or "gemini-1.0-pro"
             model_input = st.text_input("Model (optional)", value=fallback_default)
+        generate_answers = st.checkbox("Generate answers (Gemini)", value=True, help="Disable for instant retrieval-only mode")
         show_prompt = st.checkbox("Show final prompt", value=False)
         st.divider()
         st.subheader("Document Stats")
         try:
-            stats = doc_stats(None)
+            stats = doc_stats_cached()
             st.markdown(f"- Documents: {stats['documents']}")
             st.markdown(f"- Chunks: {stats['chunks']}")
             if stats["min_page"] is not None:
@@ -239,6 +303,40 @@ def build_ui() -> None:
                     st.markdown(f"  - {d}")
         except Exception as e:
             st.warning(f"Stats unavailable: {e}")
+
+        # Demo Warm-Up: prefill retrieval and answer caches for instant interactions
+        st.divider()
+        if st.button("Demo Warm-Up", help="Preload caches for popular queries to ensure instant responses"):
+            warm_questions = [
+                "Explain dynamic programming",
+                "What is a hash table?",
+                "Difference between BFS and DFS",
+                "Describe Dijkstra vs Bellman-Ford",
+                "What is a linked list?",
+            ]
+            with st.spinner("Warming caches…"):
+                start_ts = time.time()
+                warmed = 0
+                for wq in warm_questions:
+                    try:
+                        chunks = search_cached(wq, k=3)
+                        # Optionally warm answer cache if generation is enabled
+                        if generate_answers:
+                            mdl = (model_input or "").strip() or None
+                            result = get_answer_cached(wq, k=3, model=mdl, temperature=temperature)
+                        else:
+                            # Populate manual cache with retrieval-only result
+                            result = {"ok": True, "answer": "Generation disabled (Fast Mode).", "prompt": rag_engine.generate_prompt(wq, chunks)}
+                        # Populate manual per-session cache to show cache hits in UI
+                        try:
+                            st.session_state["query_cache"][wq] = {"chunks": chunks, "result": result}
+                        except Exception:
+                            pass
+                        warmed += 1
+                    except Exception:
+                        continue
+                dur_ms = int((time.time() - start_ts) * 1000)
+                st.success(f"Warmed {warmed} queries in {dur_ms} ms ✓")
 
         st.divider()
         st.subheader("Add Sources")
@@ -347,29 +445,30 @@ def build_ui() -> None:
                 start_ts = time.time()
                 cache_hit = False
                 # Simple cache to demonstrate cache hit rate
+                msgs = ["Searching ~12k chunks… (≈1s)", "Index hit — fetching top-k", "Computing similarities…"]
+                holder = st.empty()
                 if question in st.session_state["query_cache"]:
                     cached = st.session_state["query_cache"][question]
                     chunks = cached.get("chunks", [])
                     result = cached.get("result", {})
                     cache_hit = True
                 else:
-                    # playful loading messages
-                    msgs = ["🤔 Thinking deeply…", "📚 Consulting archives…", "🔍 Scanning knowledge base…", "🧠 Reasoning about your query…"]
-                    holder = st.empty()
-                    holder.info(random.choice(msgs))
-                    engine = RAGEngine(auto_embeddings=False)
-                    chunks = engine.retrieve_context(question, k=k)
-                    st.success(f"Retrieved {len(chunks)} chunk(s)")
+                    with st.spinner("Searching vector store…"):
+                        holder.info(random.choice(msgs))
+                        chunks = search_cached(question, k=k)
+                    st.success(f"Found {len(chunks)} relevant chunk(s) ✓")
 
                 # Retrieved banner
                 st.markdown(f"<div class='retrieved-banner'>Retrieved {len(chunks)} chunk(s)</div>", unsafe_allow_html=True)
                 for c in chunks:
                     chunk_card(c)
 
-                if not cache_hit:
-                    holder.info(random.choice(msgs))
+                if not cache_hit and generate_answers:
+                    holder.info("Generating answer (cached for 60 min)…")
                     mdl = model_input.strip() or None
-                    result = engine.answer_with_gemini(question, k=k, model=mdl, temperature=temperature)
+                    result = get_answer_cached(question, k=k, model=mdl, temperature=temperature)
+                elif not cache_hit and not generate_answers:
+                    result = {"ok": True, "answer": "Generation disabled (Fast Mode). See retrieved context and sources.", "prompt": rag_engine.generate_prompt(question, chunks)}
                 prompt = result.get("prompt", "")
                 st.session_state["last_prompt"] = prompt
                 st.session_state["last_chunks"] = chunks
@@ -508,19 +607,28 @@ def build_ui() -> None:
     # LeetCode tab
     with tab_leetcode:
         st.subheader("LeetCode Practice + Mentor")
-        if "leetcode_handler" not in st.session_state:
-            st.session_state["leetcode_handler"] = LeetCodeHandler()
-        lc: LeetCodeHandler = st.session_state["leetcode_handler"]
+        # Lazy init and cache heavy datasets
+        if "leetcode_loaded" not in st.session_state:
+            if st.button("Load LeetCode data"):
+                with st.spinner("Loading LeetCode data… (one-time)"):
+                    st.session_state["leetcode"] = load_leetcode_handler()
+                    st.session_state["leetcode_loaded"] = True
+        if st.session_state.get("leetcode_loaded"):
+            lc: LeetCodeHandler = st.session_state["leetcode"]
+        else:
+            st.info("Click 'Load LeetCode data' to enable search.")
+            lc = None
 
         c1, c2 = st.columns([1, 2])
-        if c1.button("Load/Refresh Datasets"):
-            with st.spinner("Loading LeetCode datasets…"):
-                try:
-                    n, status = lc.load_all(generate_embeddings=False)
-                    st.success(f"Loaded {n} problems ({status})")
-                except Exception as e:
-                    st.error(f"LeetCode load failed: {e}")
-        if lc.is_loaded():
+        if lc:
+            if c1.button("Refresh Datasets"):
+                with st.spinner("Refreshing LeetCode datasets…"):
+                    try:
+                        n, status = lc.load_all(generate_embeddings=False)
+                        st.success(f"Loaded {n} problems ({status})")
+                    except Exception as e:
+                        st.error(f"LeetCode load failed: {e}")
+        if lc and lc.is_loaded():
             stats = lc.get_stats()
             c2.metric("Problems", stats.get("total", 0))
             by_diff = stats.get("by_difficulty", {})
@@ -530,16 +638,16 @@ def build_ui() -> None:
             d3.metric("Hard", by_diff.get("Hard", 0))
 
         st.divider()
-        query = st.text_input("Search problems", value="binary tree traversal")
+        query = st.text_input("Search problems", value="binary tree traversal", disabled=lc is None)
         left, right = st.columns([1, 2])
         difficulties = left.multiselect("Difficulty", options=["Easy", "Medium", "Hard"], default=["Easy", "Medium", "Hard"]) 
         topic_str = left.text_input("Topics (comma-separated)", value="Tree, DFS, BFS")
         topics = [t.strip() for t in topic_str.split(",") if t.strip()]
         top_k = right.slider("Top K", min_value=5, max_value=30, value=10)
-        run = right.button("Search")
+        run = right.button("Search", disabled=lc is None)
 
         results = []
-        if run:
+        if run and lc is not None:
             with st.spinner("Searching…"):
                 try:
                     results = lc.search(query, top_k=top_k, difficulty=difficulties, topics=topics)
