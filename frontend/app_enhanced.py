@@ -11,6 +11,167 @@ import streamlit as st
 # Must be the first Streamlit command in this script
 st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
 
+# Global visual polish (animated gradient, glassmorphism, glowing metrics, tabs, inputs)
+st.markdown(
+    """
+    <style>
+      /* Animated gradient background */
+      .stApp {
+        background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #1a1a2e);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+      }
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      /* Subtle glass surfaces (responsive-safe) */
+      [data-testid="stMetric"], [data-testid="stExpander"], .stAlert {
+        background: rgba(255, 255, 255, 0.04) !important;
+        backdrop-filter: blur(6px) !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25) !important;
+      }
+      .block-container {
+        max-width: 1200px;
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+
+      /* Glowing stats */
+      [data-testid="stMetricValue"] {
+        font-size: clamp(1.5rem, 3.2vw, 2.6rem) !important;
+        font-weight: 800 !important;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        text-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+        animation: glow 2s ease-in-out infinite;
+      }
+      @keyframes glow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+      }
+
+      /* Buttons */
+      .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: none !important;
+        border-radius: 25px !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 600 !important;
+        color: white !important;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+        transition: all 0.3s ease !important;
+      }
+      .stButton > button:hover {
+        transform: translateY(-2px) scale(1.03) !important;
+        box-shadow: 0 6px 22px rgba(102, 126, 234, 0.55) !important;
+      }
+
+      /* Tabs */
+      .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+      .stTabs [data-baseweb="tab"] {
+        border-radius: 15px;
+        padding: 12px 24px;
+        background: rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+      }
+      .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+      }
+
+      /* Inputs */
+      .stTextArea textarea, .stTextInput input {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(102, 126, 234, 0.3) !important;
+        border-radius: 15px !important;
+        color: white !important;
+        padding: 1rem !important;
+        transition: all 0.3s ease !important;
+      }
+      .stTextArea textarea:focus, .stTextInput input:focus {
+        border-color: #667eea !important;
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.4) !important;
+      }
+
+      /* Example question buttons (pill style) */
+      div[data-testid="column"] .stButton > button {
+        border-radius: 50px !important;
+        padding: 0.5rem 1.5rem !important;
+        font-size: 0.9rem !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(102, 126, 234, 0.3) !important;
+      }
+
+      /* Pipeline visualization */
+      .pipeline-step {
+        display: inline-block;
+        padding: 8px 16px;
+        background: rgba(102, 126, 234, 0.2);
+        border-radius: 20px;
+        margin: 0 5px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+
+      /* Header title gradient */
+      h1 {
+        font-size: 3.5rem !important;
+        font-weight: 900 !important;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea);
+        background-size: 200% auto;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        animation: shine 3s linear infinite;
+      }
+      @keyframes shine { to { background-position: 200% center; } }
+
+      /* Context cards */
+      .context-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-left: 4px solid #667eea;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
+      }
+      .context-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      /* Loading spinner */
+      .stSpinner > div {
+        border-color: #667eea transparent transparent transparent !important;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* Sidebar styling */
+      [data-testid="stSidebar"] {
+        background: rgba(0, 0, 0, 0.3) !important;
+        backdrop-filter: blur(10px) !important;
+      }
+
+      /* Reduced motion preference */
+      @media (prefers-reduced-motion: reduce) {
+        .stApp { animation: none !important; }
+        .stButton > button, .stTabs [data-baseweb="tab"] { transition: none !important; }
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
