@@ -34,6 +34,10 @@ from backend.advanced_ai import (
     math_solve,
 )
 from frontend.components import inject_assets, command_palette_hint, lottie_animation
+try:
+    from frontend.demo_module import render_demo_app
+except Exception:
+    render_demo_app = None
 from backend.leetcode_handler import LeetCodeHandler
 import random
 import functools
@@ -266,6 +270,16 @@ def build_ui() -> None:
 
     # Sidebar settings
     with st.sidebar:
+        demo_mode = st.checkbox("Demo Mode", value=False, help="Switch to instant, cached demo experience")
+        if demo_mode and render_demo_app:
+            st.success("Demo Mode active — instant responses and mock analytics")
+            if st.button("Switch back to Normal Mode"):
+                st.session_state["__force_normal__"] = True
+                demo_mode = False
+            else:
+                # Render demo view and exit early
+                render_demo_app()
+                return
         st.header("Settings")
         k = st.slider("Top-k context chunks", min_value=1, max_value=8, value=3, step=1)
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=float(os.getenv("GEMINI_TEMPERATURE", 0.2)), step=0.05)
@@ -538,7 +552,8 @@ def build_ui() -> None:
                             st.code(snippet + ("..." if len(c.get("text") or "") > 500 else ""))
                         extra.append(url)
                     label = doc or (url or src_type)
-                    suffix = f" ({'; '.join(extra)})" if extra else ""
+                    parts2 = [str(p) for p in extra if p is not None and str(p) != ""]
+                    suffix = f" ({'; '.join(parts2)})" if parts2 else ""
                     st.markdown(f"- {label}{suffix}")
 
             if show_prompt and (prompt := st.session_state.get("last_prompt")):
