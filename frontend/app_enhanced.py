@@ -28,6 +28,7 @@ from backend.advanced_ai import (
     adaptive_explain,
     math_solve,
 )
+from frontend.components import inject_assets, command_palette_hint, lottie_animation
 
 
 def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
@@ -84,6 +85,7 @@ def chunk_card(chunk: Dict[str, Any]) -> None:
 
 def build_ui() -> None:
     st.set_page_config(page_title="AI Study Mentor — Intelligent Tutor", layout="wide")
+    inject_assets()
     st.title("AI Study Mentor — Intelligent Tutor (Gemini Cloud)")
     st.caption("Ask questions, generate concept maps, compare sources, and learn with adaptive tutoring.")
 
@@ -176,13 +178,14 @@ def build_ui() -> None:
                 st.experimental_rerun()
 
     # Main layout: Advanced Tutor Tabs
-    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math = st.tabs([
+    tab_ask, tab_map, tab_socratic, tab_synthesis, tab_adaptive, tab_math, tab_viz = st.tabs([
         "Ask",
         "Concept Map",
         "Socratic Tutor",
         "Synthesis",
         "Adaptive Tutor",
         "Math",
+        "3D Viz",
     ])
 
     # Ask tab (RAG Q&A)
@@ -215,6 +218,15 @@ def build_ui() -> None:
                     st.code(prompt)
 
                 st.session_state["last_result"] = result
+                # Animated pipeline feedback
+                st.info("Animating pipeline…")
+                lottie_animation({
+                    "v":"5.7.4","fr":30,"ip":0,"op":60,"w":600,"h":180,"nm":"bar",
+                    "ddd":0,"assets":[],"layers":[{"ddd":0,"ty":4,"nm":"bar","sr":1,
+                    "ks":{"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":0,"k":[300,90,0]},"a":{"a":0,"k":[0,0,0]},
+                    "s":{"a":1,"k":[{"t":0,"s":[10,100,100]},{"t":60,"s":[100,100,100]}]}},
+                    "shapes":[{"ty":"rc","d":1,"s":{"a":0,"k":[600,20]},"p":{"a":0,"k":[0,0]},"r":{"a":0,"k":8}},
+                    {"ty":"fl","c":{"a":0,"k":[0.486,0.227,0.929,1]},"o":{"a":0,"k":90}}]}] }, width=600, height=180, loop=False)
 
         with col_right:
             st.subheader("Answer")
@@ -335,16 +347,20 @@ def build_ui() -> None:
         aq = st.text_area("Question to explain", placeholder="e.g., Explain dynamic programming.")
         run_adapt = st.button("Explain at selected level")
         if run_adapt and aq.strip():
-            res = adaptive_explain(aq, level=level, temperature=temperature)
-            if res.get("ok"):
-                st.write(res.get("answer"))
-                st.divider()
-                st.caption("Context used:")
-                eng = RAGEngine(auto_embeddings=False)
-                for c in res.get("chunks", []):
-                    chunk_card(c)
-            else:
-                st.error(res.get("error", "Could not generate explanation"))
+            with st.spinner("Generating adaptive explanation…"):
+                try:
+                    res = adaptive_explain(aq, level=level, temperature=temperature)
+                    if res.get("ok"):
+                        st.write(str(res.get("answer", "")))
+                        st.divider()
+                        st.caption("Context used:")
+                        eng = RAGEngine(auto_embeddings=False)
+                        for c in res.get("chunks", []):
+                            chunk_card(c)
+                    else:
+                        st.error(res.get("error", "Could not generate explanation"))
+                except Exception as e:
+                    st.error(f"Adaptive Tutor error: {e}")
 
     # Math tab
     with tab_math:
@@ -352,15 +368,72 @@ def build_ui() -> None:
         expr = st.text_input("Math prompt", value="differentiate sin(x)")
         run_math = st.button("Compute")
         if run_math and expr.strip():
-            res = math_solve(expr)
-            if res.get("ok"):
-                if res.get("latex"):
-                    st.latex(res.get("latex"))
-                st.markdown("**Steps**")
-                for s in res.get("steps", []):
-                    st.markdown(f"- {s}")
+            with st.spinner("Computing…"):
+                try:
+                    res = math_solve(expr)
+                    if res.get("ok"):
+                        if res.get("latex"):
+                            st.latex(res.get("latex"))
+                        st.markdown("**Steps**")
+                        for s in res.get("steps", []):
+                            st.markdown(f"- {s}")
+                    else:
+                        err = res.get("error", "Math engine error")
+                        st.error(err)
+                        if "sympy" in err.lower():
+                            st.info("Tip: install `sympy` for full math features: `pip install sympy`. ")
+                except Exception as e:
+                    st.error(f"Math error: {e}")
+
+    # 3D Embedding Visualization tab
+    with tab_viz:
+        st.subheader("Embedding Space (3D)")
+        st.caption("Rotate, zoom, click points to inspect chunk text.")
+        try:
+            import numpy as np
+            try:
+                import plotly.express as px
+            except Exception:
+                px = None
+            items = RAGEngine(auto_embeddings=False)._docstore_iter()
+            # Sample to keep the viz lightweight
+            max_points = st.slider("Max points", 50, 500, 200)
+            items = items[:max_points]
+            texts = [it.get("text","") for it in items]
+            labels = [it.get("doc","") for it in items]
+            # Safe, deterministic pseudo-embeddings (no SentenceTransformer to avoid segfaults)
+            import hashlib
+            vecs = []
+            for t in texts:
+                h = hashlib.sha256(t.encode('utf-8')).digest()
+                vecs.append(np.frombuffer(h[:96], dtype=np.uint8).astype(np.float32))
+            mat = np.stack(vecs, axis=0) if vecs else np.zeros((0,96), dtype=np.float32)
+            # Dimensionality reduction
+            try:
+                from sklearn.manifold import TSNE
+                # Ensure perplexity is valid (< n_samples)
+                n = max(1, len(texts))
+                perplex = max(2, min(30, n - 1))
+                pts = TSNE(n_components=3, init='pca', perplexity=perplex, learning_rate='auto').fit_transform(mat)
+            except Exception:
+                # PCA fallback
+                if mat.shape[0] and mat.shape[1] >= 3:
+                    U, S, Vt = np.linalg.svd(mat - mat.mean(0), full_matrices=False)
+                    pts = (mat - mat.mean(0)) @ Vt[:3].T
+                else:
+                    pts = np.zeros((len(texts), 3))
+            if px is None:
+                st.warning("Plotly not installed; install plotly to enable interactive 3D scatter.")
             else:
-                st.error(res.get("error", "Math engine error"))
+                import pandas as pd
+                df = pd.DataFrame({"x": pts[:,0], "y": pts[:,1], "z": pts[:,2], "label": labels, "text": [t[:160] for t in texts]})
+                fig = px.scatter_3d(df, x="x", y="y", z="z", color="label", hover_name="label", hover_data={"text": True})
+                st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"3D visualization error: {e}")
+
+    # Global keyboard shortcut hints
+    command_palette_hint()
 
 
 if __name__ == "__main__":
