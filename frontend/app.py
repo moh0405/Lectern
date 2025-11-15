@@ -33,6 +33,7 @@ from backend.llm_config import GeminiClient
 from backend.document_processor import list_chunks_from_dir
 from backend.export_utils import markdown_to_pdf, markdown_to_html
 from backend.advanced_ai import build_concept_map, concept_map_to_dot
+from backend.leetcode_handler import LeetCodeHandler
 import random
 import pandas as pd
 
@@ -501,8 +502,8 @@ def build_ui():
     if times:
         st.line_chart(pd.DataFrame({"response_time": times}))
 
-    # Extra tabs: Concept Map and Analytics
-    tab_map, tab_analytics = st.tabs(["Concept Map", "Analytics"])
+    # Extra tabs: Concept Map, LeetCode, and Analytics
+    tab_map, tab_leetcode, tab_analytics = st.tabs(["Concept Map", "LeetCode", "Analytics"])
 
     # Concept Map tab
     with tab_map:
@@ -536,6 +537,85 @@ def build_ui():
                     st.error(result.get("error", "Could not build map"))
             except Exception as e:
                 st.error(f"Concept map error: {e}")
+
+    # LeetCode tab
+    with tab_leetcode:
+        st.subheader("LeetCode Practice + Mentor")
+        # Ensure handler in session
+        if "leetcode_handler" not in st.session_state:
+            st.session_state["leetcode_handler"] = LeetCodeHandler()
+        lc: LeetCodeHandler = st.session_state["leetcode_handler"]
+
+        c1, c2 = st.columns([1, 2])
+        if c1.button("Load/Refresh Datasets"):
+            with st.spinner("Loading LeetCode datasets…"):
+                try:
+                    n, status = lc.load_all()
+                    st.success(f"Loaded {n} problems ({status})")
+                except Exception as e:
+                    st.error(f"LeetCode load failed: {e}")
+        if lc.is_loaded():
+            stats = lc.get_stats()
+            c2.metric("Problems", stats.get("total", 0))
+            by_diff = stats.get("by_difficulty", {})
+            d1, d2, d3 = st.columns(3)
+            d1.metric("Easy", by_diff.get("Easy", 0))
+            d2.metric("Medium", by_diff.get("Medium", 0))
+            d3.metric("Hard", by_diff.get("Hard", 0))
+
+        st.divider()
+        query = st.text_input("Search problems", value="binary tree traversal")
+        left, right = st.columns([1, 2])
+        difficulties = left.multiselect("Difficulty", options=["Easy", "Medium", "Hard"], default=["Easy", "Medium", "Hard"]) 
+        topic_str = left.text_input("Topics (comma-separated)", value="Tree, DFS, BFS")
+        topics = [t.strip() for t in topic_str.split(",") if t.strip()]
+        top_k = right.slider("Top K", min_value=5, max_value=30, value=10)
+        run = right.button("Search")
+
+        results = []
+        if run:
+            with st.spinner("Searching…"):
+                try:
+                    results = lc.search(query, top_k=top_k, difficulty=difficulties, topics=topics)
+                except Exception as e:
+                    st.error(f"Search failed: {e}")
+
+        if results:
+            st.caption(f"Showing {len(results)} matches")
+            for r in results:
+                with st.expander(f"{r['title']} [{r['difficulty']}] — score {r['score']:.3f}"):
+                    meta_cols = st.columns(4)
+                    meta_cols[0].write(f"PID: {r['pid']}")
+                    meta_cols[1].write(f"Likes: {r.get('likes') or '-'}")
+                    meta_cols[2].write(f"Acceptance: {r.get('acceptance') or '-'}")
+                    if r.get("url"):
+                        meta_cols[3].write(f"[Open]({r['url']})")
+
+                    # Explain button
+                    exp_c1, exp_c2 = st.columns([1, 1])
+                    if exp_c1.button("Explain & Guide", key=f"exp_{r['pid']}"):
+                        with st.spinner("Generating study guide…"):
+                            try:
+                                out = lc.explain_problem(r["pid"], temperature=temperature, model=model)
+                                if out.get("ok"):
+                                    st.markdown(out.get("markdown") or "")
+                                else:
+                                    st.error(out.get("error"))
+                            except Exception as e:
+                                st.error(f"Explanation failed: {e}")
+
+                    # Track analytics
+                    try:
+                        st.session_state["analytics"]["events"].append({
+                            "ts": time.time(),
+                            "q": f"LeetCode search: {query}",
+                            "avg_sim": float(r.get("score", 0.0)),
+                            "latency_ms": 0,
+                            "tokens_prompt": None,
+                            "tokens_answer": None,
+                        })
+                    except Exception:
+                        pass
 
     # Analytics tab
     with tab_analytics:
