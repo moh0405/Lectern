@@ -632,12 +632,22 @@ def build_ui() -> None:
                 import plotly.express as px
             except Exception:
                 px = None
+            # Load chunk metadata; if engine docstore is empty, fall back to direct scan
             items = RAGEngine(auto_embeddings=False)._docstore_iter()
+            if not items:
+                try:
+                    from backend.document_processor import list_chunks_from_dir
+                    items = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+                except Exception:
+                    items = []
             # Sample to keep the viz lightweight
             max_points = st.slider("Max points", 50, 500, 200)
             items = items[:max_points]
             texts = [it.get("text","") for it in items]
             labels = [it.get("doc","") for it in items]
+            if not texts:
+                st.info("No chunks available to visualize. Use Upload/Refresh to populate sources.")
+                raise RuntimeError("No chunk texts for 3D viz")
             # Safe, deterministic pseudo-embeddings (no SentenceTransformer to avoid segfaults)
             import hashlib
             vecs = []
@@ -659,12 +669,19 @@ def build_ui() -> None:
                     pts = (mat - mat.mean(0)) @ Vt[:3].T
                 else:
                     pts = np.zeros((len(texts), 3))
+            # Sanitize points for plotting and avoid degenerate all-zero cases
+            pts = np.nan_to_num(pts, nan=0.0, posinf=0.0, neginf=0.0)
+            if not np.any(pts) and len(texts) > 0:
+                rng = np.random.default_rng(42)
+                pts = pts + 1e-3 * rng.standard_normal(size=pts.shape)
             if px is None:
                 st.warning("Plotly not installed; install plotly to enable interactive 3D scatter.")
             else:
                 import pandas as pd
                 df = pd.DataFrame({"x": pts[:,0], "y": pts[:,1], "z": pts[:,2], "label": labels, "text": [t[:160] for t in texts]})
                 fig = px.scatter_3d(df, x="x", y="y", z="z", color="label", hover_name="label", hover_data={"text": True})
+                fig.update_traces(marker=dict(size=4, opacity=0.85))
+                fig.update_layout(margin=dict(l=0, r=0, b=0, t=0), template='plotly_dark', scene=dict(bgcolor='rgba(0,0,0,0)'))
                 st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
             st.error(f"3D visualization error: {e}")

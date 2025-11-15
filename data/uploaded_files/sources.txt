@@ -1,3 +1,9 @@
 https://www.youtube.com/watch?v=8jLOx1hD3_o
 https://docs.python.org/3/tutorial/index.html
 https://github.com/pypa/sampleproject
+https://github.com/dsc-iem/TheAlgorithms
+https://github.com/akshitagit/Python
+https://github.com/mitcc/AlgoSolutions
+https://youtube.com/playlist?list=PLVlQHNRLflP_OxF1QJoGBwH_TnZszHR_j&si=qYw_nlRZePKNiaup
+https://github.com/alfaarghya/alfa-leetcode-api
+
