@@ -286,6 +286,57 @@ class RAGEngine:
                 "Describe Dijkstra vs Bellman-Ford",
             ]
 
+    def summarize_chat(self, history: List[Dict[str, Any]], model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
+        """
+        Produce concise study notes and summary bullets from the chat history.
+        Uses Gemini if available; otherwise returns a heuristic Markdown summary.
+        """
+        # Build compact transcript
+        transcript = []
+        for item in history[-20:]:  # last 20 turns
+            q = (item.get("q") or "").strip()
+            a = (item.get("answer") or "").strip()
+            if q:
+                transcript.append(f"Q: {q}")
+            if a:
+                transcript.append(f"A: {a}")
+        joined = "\n\n".join(transcript) or "No chat history yet."
+
+        prompt = (
+            "You are a study note generator. Convert the following Q&A transcript "
+            "into helpful study notes in Markdown: include a short summary, 6–10 key bullets, "
+            "and a short 'Next questions' section. Use concise phrasing and preserve code blocks if present.\n\n"
+            f"Transcript:\n{joined}\n\n"
+        )
+        try:
+            from .llm_config import GeminiClient
+            client = GeminiClient(model=model, temperature=temperature)
+            res = client.generate(prompt, temperature=temperature)
+            text = (res.get("answer") or res.get("text") or "").strip()
+            if text:
+                return {"ok": True, "markdown": text}
+        except Exception as e:
+            # Fall through to heuristic
+            pass
+
+        # Fallback: simple heuristic summary
+        bullets = []
+        for item in history[-10:]:
+            q = (item.get("q") or "").strip()
+            if q:
+                bullets.append(f"- {q}")
+        md = [
+            "# Study Notes\n",
+            "## Summary\n",
+            "This session covered multiple topics. Consider reviewing the items below.\n",
+            "## Key Questions\n",
+            *bullets,
+            "\n## Next Questions\n",
+            "- Explain time complexity tradeoffs\n",
+            "- Contrast BFS vs DFS on weighted graphs\n",
+        ]
+        return {"ok": True, "markdown": "\n".join(md)}
+
     def multi_source_synthesis(self, question: str, k_per_doc: int = 2, model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
         """Compare answers across sources and highlight agreements/conflicts.
 
