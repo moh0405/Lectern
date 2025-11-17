@@ -108,19 +108,10 @@ class GeminiClient:
 
     def generate(self, prompt: str, temperature: Optional[float] = None) -> Dict[str, Any]:
         temp = self.temperature if temperature is None else float(temperature)
-        # Try primary then a sequence of common, compatible fallbacks.
+        # Try primary model, then one fast fallback to reduce long timeout chains.
         candidates = [
             self.model,
-            # Prefer non-1.5 aliases for wider availability
             "gemini-flash-latest",
-            "gemini-pro-latest",
-            # Then 1.5 variants
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-flash-001",
-            "gemini-1.5-pro-latest",
-            "gemini-1.5-pro-001",
-            # Legacy
-            "gemini-1.0-pro",
         ]
         last_err = None
         for name in candidates:
@@ -139,8 +130,7 @@ class GeminiClient:
                     pass
             except Exception as e:
                 last_err = str(e)
-                # Continue to next candidate on 404/unsupported errors
+                # Break early on non-compat errors (auth/network), avoid long fallback chains
                 if not any(s in last_err for s in ["not found", "supported for generateContent", "404", "No model"]):
-                    # If it's a non-compat error (e.g., auth), break early
                     break
         return {"ok": False, "error": last_err or "Unknown generation error"}

@@ -46,8 +46,9 @@ class RAGEngine:
         # If neither exists, build a lightweight meta-only store from inputs directory
         if obj is None:
             try:
-                from .document_processor import list_chunks_from_dir
-                chunks = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+                # Prefer local-only scan to avoid slow network calls on startup
+                from .document_processor import list_chunks_from_dir_local
+                chunks = list_chunks_from_dir_local(str(Path("data/uploaded_files").resolve()))
                 obj = {"metadata": chunks}
             except Exception:
                 obj = {"metadata": []}
@@ -87,15 +88,29 @@ class RAGEngine:
             return np.load(str(emb_path))
         items = self._docstore_iter()
         texts = [it.get("text", "") for it in items]
-        vecs = []
-        for t in texts:
-            if self.embedder is None:
-                self._load_embedder()
-            v = self.embedder.encode([t], normalize_embeddings=True, batch_size=1, show_progress_bar=False)
-            vecs.append(np.asarray(v[0], dtype=np.float32))
-        if not vecs:
+        if not texts:
             raise RuntimeError("No texts available to embed from vector store.")
-        arr = np.stack(vecs, axis=0)
+        if self.embedder is None:
+            self._load_embedder()
+        # Batch encode all texts at once for significant speedup
+        # Use a conservative batch size to avoid high memory usage
+        try:
+            arr = self.embedder.encode(
+                texts,
+                normalize_embeddings=True,
+                batch_size=32,
+                show_progress_bar=False,
+            )
+            arr = np.asarray(arr, dtype=np.float32)
+        except Exception:
+            # Fallback to smaller batches if environment is constrained
+            chunks: list[np.ndarray] = []
+            bs = 8
+            for i in range(0, len(texts), bs):
+                batch = texts[i:i+bs]
+                v = self.embedder.encode(batch, normalize_embeddings=True, batch_size=bs, show_progress_bar=False)
+                chunks.append(np.asarray(v, dtype=np.float32))
+            arr = np.concatenate(chunks, axis=0)
         np.save(str(emb_path), arr)
         return arr
 

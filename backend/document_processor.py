@@ -122,7 +122,12 @@ def embed_texts(texts: List[str], model_name: str = "sentence-transformers/all-M
     if SentenceTransformer is None:
         raise RuntimeError("sentence-transformers is not installed. Install requirements first.")
     model = SentenceTransformer(model_name, device="cpu")
-    emb = model.encode(texts, show_progress_bar=False, normalize_embeddings=True, batch_size=1)
+    # Use batched encoding for significant speedup on large corpora
+    try:
+        emb = model.encode(texts, show_progress_bar=False, normalize_embeddings=True, batch_size=32)
+    except Exception:
+        # Fallback to smaller batch size to accommodate constrained environments
+        emb = model.encode(texts, show_progress_bar=False, normalize_embeddings=True, batch_size=8)
     return np.asarray(emb, dtype=np.float32)
 
 
@@ -189,6 +194,25 @@ def list_chunks_from_dir(input_dir: str) -> List[Dict[str, Any]]:
                     inputs.append(url)
         except Exception:
             pass
+    all_chunks: List[Dict[str, Any]] = []
+    for inp in inputs:
+        try:
+            all_chunks.extend(build_chunks_from_input(inp))
+        except Exception:
+            continue
+    return all_chunks
+
+
+def list_chunks_from_dir_local(input_dir: str) -> List[Dict[str, Any]]:
+    """Collect chunks only from local files to avoid slow network sources.
+
+    Scans PDFs and audio/video files, skipping `sources.txt` URLs.
+    """
+    input_path = Path(input_dir)
+    inputs: List[str] = []
+    inputs.extend([str(p) for p in sorted(input_path.glob("*.pdf"))])
+    for ext in ["*.mp3", "*.mp4", "*.wav", "*.m4a"]:
+        inputs.extend([str(p) for p in sorted(input_path.glob(ext))])
     all_chunks: List[Dict[str, Any]] = []
     for inp in inputs:
         try:
