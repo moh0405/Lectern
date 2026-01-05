@@ -430,17 +430,15 @@ def build_ui() -> None:
     )
 
     # Sidebar settings
+    demo_mode_active = False
     with st.sidebar:
         demo_mode = st.checkbox("Demo Mode", value=False, help="Switch to instant, cached demo experience")
         if demo_mode and render_demo_app:
             st.success("Demo Mode active — instant responses and mock analytics")
             if st.button("Switch back to Normal Mode"):
                 st.session_state["__force_normal__"] = True
-                demo_mode = False
             else:
-                # Render demo view and exit early
-                render_demo_app()
-                return
+                demo_mode_active = True
         st.header("Settings")
         k = st.slider("Top-k context chunks", min_value=1, max_value=8, value=3, step=1)
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=float(os.getenv("GEMINI_TEMPERATURE", 0.2)), step=0.05)
@@ -560,6 +558,11 @@ def build_ui() -> None:
                 st.experimental_rerun()
             except Exception:
                 st.experimental_rerun()
+
+    # If Demo Mode is active, render in main content and exit early
+    if demo_mode_active and (render_demo_app is not None):
+        render_demo_app()
+        return
 
     # Stats dashboard
     stats = doc_stats(None)
