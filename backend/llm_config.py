@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Optional, Dict, Any
 
 try:
@@ -117,17 +118,39 @@ class GeminiClient:
         for name in candidates:
             try:
                 m = genai.GenerativeModel(name)
-                resp = m.generate_content(prompt, generation_config={"temperature": temp})
-                text = getattr(resp, "text", "")
-                if text:
-                    return {"ok": True, "model": name, "answer": text}
-                # Some SDK responses put text in parts; extract defensively
-                try:
-                    parts = getattr(resp, "candidates", [])[0].content.parts
-                    if parts and getattr(parts[0], "text", ""):
-                        return {"ok": True, "model": name, "answer": parts[0].text}
-                except Exception:
-                    pass
+                # Transient retry/backoff to handle 503/Unavailable/timeout conditions
+                attempts = 2
+                for i in range(attempts):
+                    try:
+                        resp = m.generate_content(prompt, generation_config={"temperature": temp})
+                        text = getattr(resp, "text", "")
+                        if text:
+                            return {"ok": True, "model": name, "answer": text}
+                        # Some SDK responses put text in parts; extract defensively
+                        try:
+                            parts = getattr(resp, "candidates", [])[0].content.parts
+                            if parts and getattr(parts[0], "text", ""):
+                                return {"ok": True, "model": name, "answer": parts[0].text}
+                        except Exception:
+                            pass
+                        # If empty output, don't retry; proceed to next candidate
+                        break
+                    except Exception as inner:
+                        err_str = str(inner)
+                        transient_markers = [
+                            "Service Unavailable",
+                            "503",
+                            "temporarily",
+                            "Rate limit",
+                            "rate limit",
+                            "Timeout",
+                            "timeout",
+                        ]
+                        if any(t in err_str for t in transient_markers) and i < attempts - 1:
+                            time.sleep(0.8 * (i + 1))
+                            continue
+                        # Propagate to outer handling on final/non-transient error
+                        raise
             except Exception as e:
                 last_err = str(e)
                 # Break early on non-compat errors (auth/network), avoid long fallback chains
