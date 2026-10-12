@@ -1,39 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  BarChart3,
-  BookOpen,
-  Brain,
-  Code2,
-  FolderOpen,
-  MessageSquare,
-  Orbit,
-  Sigma,
-  type LucideIcon,
-} from "lucide-react";
+import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { CommandPalette } from "@/components/command-palette";
+import { NAV } from "@/lib/nav";
 import { api, unwrap } from "@/lib/api";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}
-
-export const NAV: NavItem[] = [
-  { href: "/ask", label: "Ask", icon: MessageSquare },
-  { href: "/sources", label: "Sources", icon: FolderOpen },
-  { href: "/leetcode", label: "LeetCode", icon: Code2 },
-  { href: "/tutor", label: "Tutor tools", icon: Brain },
-  { href: "/math", label: "Math", icon: Sigma },
-  { href: "/visualize", label: "Embedding map", icon: Orbit },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-];
 
 function ApiStatus() {
   const { data, isError, isPending } = useQuery({
@@ -70,6 +46,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2 px-4 py-4">
           <BookOpen className="h-5 w-5 text-accent-2" />
           <span className="font-semibold tracking-tight">AI Study Mentor</span>
+        </div>
+        <div className="hidden px-3 pb-3 md:block">
+          <CommandPalette />
         </div>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible md:pb-0">
           {NAV.map(({ href, label, icon: Icon }) => {
