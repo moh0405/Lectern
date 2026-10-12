@@ -29,8 +29,8 @@ def render_report(corpus_name: str, questions: List[Dict[str, Any]], runs: List[
             "",
             "## Summary",
             "",
-            "| config | setup | chunks | " + " | ".join(f"hit@{k}" for k in KS) + " | MRR | cov@5 | AUROC | ms/query |",
-            "|---|---|---:|" + "---:|" * (len(KS) + 4),
+            "| config | setup | chunks | " + " | ".join(f"hit@{k}" for k in KS) + " | MRR | cov@5 | strict hit@3 | AUROC | ms/query |",
+            "|---|---|---:|" + "---:|" * (len(KS) + 5),
         ]
         for r in runs:
             s = r["summary"]
@@ -38,7 +38,7 @@ def render_report(corpus_name: str, questions: List[Dict[str, Any]], runs: List[
             lines.append(
                 f"| **{r['config'].name}** | {r['config'].describe()} | {r['chunks']} | "
                 + " | ".join(pct(s.hit[k]) for k in KS)
-                + f" | {s.mrr:.3f} | {pct(s.coverage_at_5)} | {auc} | {r['query_ms']:.1f} |"
+                + f" | {s.mrr:.3f} | {pct(s.coverage_at_5)} | {pct(s.strict_hit[3])} | {auc} | {r['query_ms']:.1f} |"
             )
         lines += ["", "## hit@3 by question type", ""]
         cats = sorted({c for r in runs for c in r["summary"].by_category})

@@ -225,6 +225,8 @@ class RAGEngine:
             "text": item.get("text", ""),
             "doc": item.get("doc", ""),
             "page": item.get("page", None),
+            # set when a passage runs onto the next page of a PDF
+            "end_page": (item.get("extra") or {}).get("end_page"),
             "score": float(score),
             "url": item.get("url"),
             # Deep link when the source has one (e.g. a YouTube URL with &t=SECONDS)
