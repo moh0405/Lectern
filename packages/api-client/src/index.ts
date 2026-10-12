@@ -1,0 +1,77 @@
+import createClient, { type Client } from "openapi-fetch";
+import type { components, paths } from "./schema";
+import { readSse } from "./sse";
+
+export type { components, paths } from "./schema";
+export { readSse } from "./sse";
+export type { SseFrame } from "./sse";
+
+type Schemas = components["schemas"];
+export type AskRequest = Schemas["AskRequest"];
+export type Chunk = Schemas["Chunk"];
+export type ErrorResponse = Schemas["ErrorResponse"];
+
+/** Events emitted by POST /api/v1/ask/stream, in order: meta, token*, then done or error. */
+export type AskStreamEvent =
+  | { event: "meta"; data: Schemas["SseMeta"] }
+  | { event: "token"; data: Schemas["SseToken"] }
+  | { event: "done"; data: Schemas["SseDone"] }
+  | { event: "error"; data: Schemas["SseError"] };
+
+export interface ApiClientOptions {
+  /** e.g. "http://localhost:8000" */
+  baseUrl: string;
+  /** Sent as X-API-Key when the server has API_KEY set. */
+  apiKey?: string;
+  fetch?: typeof fetch;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public details?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export interface AiStudyMentorClient {
+  /** Typed openapi-fetch client: `api.http.GET("/api/v1/stats")`, `api.http.POST("/api/v1/ask", { body })`, ... */
+  http: Client<paths>;
+  /** Stream an answer. Yields typed events; throws ApiError for HTTP-level failures (4xx/5xx before streaming starts). */
+  askStream(body: AskRequest, signal?: AbortSignal): AsyncGenerator<AskStreamEvent>;
+}
+
+export function createApiClient(options: ApiClientOptions): AiStudyMentorClient {
+  const baseUrl = options.baseUrl.replace(/\/$/, "");
+  const doFetch = options.fetch ?? fetch;
+  const headers: Record<string, string> = options.apiKey ? { "X-API-Key": options.apiKey } : {};
+  const http = createClient<paths>({ baseUrl, headers, fetch: doFetch });
+
+  async function* askStream(body: AskRequest, signal?: AbortSignal): AsyncGenerator<AskStreamEvent> {
+    const res = await doFetch(`${baseUrl}/api/v1/ask/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...headers },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok || !res.body) throw await toApiError(res);
+    for await (const frame of readSse(res.body)) {
+      yield { event: frame.event, data: JSON.parse(frame.data) } as AskStreamEvent;
+    }
+  }
+
+  return { http, askStream };
+}
+
+async function toApiError(res: Response): Promise<ApiError> {
+  try {
+    const { error } = (await res.json()) as ErrorResponse;
+    return new ApiError(res.status, error.code, error.message, error.details);
+  } catch {
+    return new ApiError(res.status, "http_error", `${res.status} ${res.statusText}`);
+  }
+}

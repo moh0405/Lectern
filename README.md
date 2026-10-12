@@ -65,7 +65,7 @@ These live in the earlier UI (`frontend/app.py`); the backend functions are also
 - **Chat export** (Markdown).
 
 ### Engineering extras
-- **FastAPI backend** with Swagger/ReDoc docs, CORS, request logging, a simple in-memory rate limiter (60 requests/min/IP), and optional Server-Sent-Events streaming.
+- **FastAPI backend** (`/api/v1`) with Swagger/ReDoc docs, a typed error format, restricted CORS, an in-memory rate limiter, optional API key, background indexing jobs, real token streaming over Server-Sent-Events streaming.
 - **Resilient Gemini client**: auto-resolves a model that supports `generateContent`, retries transient errors (503/timeout/rate-limit) with backoff, and falls back to `gemini-flash-latest`.
 - **Local caching**: `embeddings.npy` and vector-store files are cached so the app starts instantly after preprocessing.
 - **Demo Mode**: an instant, canned-response experience that needs no API key or index.
@@ -93,7 +93,7 @@ These live in the earlier UI (`frontend/app.py`); the backend functions are also
  Prompt builder (mode: default / eli5 / technical / interview / summary)
         │
         ▼
- Gemini (google-generativeai)  ──►  answer + citations  ──►  Streamlit UI / FastAPI / CLI
+ Gemini (google-genai)  ──►  answer + citations  ──►  Streamlit UI / FastAPI / CLI
 ```
 
 1. **Ingest**: each input is routed to a source handler by type (see [Core concepts](#core-concepts-and-internals)).
@@ -122,7 +122,7 @@ flowchart LR
     ADV --> LLM
     LC[LeetCodeHandler] --> LLM
     LLM --> UI[Streamlit UI<br/>frontend/app_enhanced.py]
-    RAG --> API[FastAPI<br/>backend/api.py]
+    RAG --> API[FastAPI<br/>backend/api/]
     RAG --> CLI[CLIs]
     classDef s fill:#eef,stroke:#88a;
 ```
@@ -140,7 +140,8 @@ flowchart LR
 ```
 AI-study-mentor-/
 ├── backend/
-│   ├── api.py                  # FastAPI app (upload, documents, stats, search, query + SSE)
+│   ├── api/                    # FastAPI app: app.py, settings, errors, deps, jobs, schemas, routers/
+│   ├── safe_math.py            # Whitelisted SymPy parser + worker process with timeout
 │   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes, synthesis
 │   ├── embeddings.py           # Sentence-transformers and dependency-free hashing embedders
 │   ├── vector_store.py         # Pickle-free on-disk store: add, dedupe, remove, search (NumPy or FAISS)
@@ -198,7 +199,7 @@ AI-study-mentor-/
 | Language | Python 3.10+ (uses `X \| None` type syntax) |
 | UI | Streamlit, Plotly, Graphviz (via `st.graphviz_chart`), custom CSS/JS |
 | API | FastAPI, Uvicorn, Pydantic, python-multipart |
-| LLM | Google Gemini (`google-generativeai`), default model `gemini-flash-latest` |
+| LLM | Google Gemini via the `google-genai` SDK, default model `gemini-3.8-flash` |
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
 | Vector search | Exact cosine similarity: NumPy by default, optional FAISS (`faiss-cpu`) |
 | Ingestion | `pypdf`, `youtube-transcript-api`, `requests`, `beautifulsoup4`, `readability-lxml`, `gitpython`, `openai` (Whisper) |
@@ -273,6 +274,11 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
 | `VECTOR_BACKEND` | No | `numpy` | `numpy` or `faiss` (see "Search backend") |
+| `CORS_ORIGINS` | No | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed by CORS |
+| `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
+| `MAX_UPLOAD_MB` | No | `50` | Per-file upload limit |
+| `RATE_LIMIT_PER_MIN` | No | `60` | Per-IP request limit for `/api/v1` |
+| `UPLOAD_DIR`, `STORE_DIR`, `ANALYTICS_DB` | No | `data/uploaded_files`, `data/vector_store`, `data/analytics.db` | Where the API keeps files, the index and analytics |
 | `OPENAI_API_KEY` | Only for audio | none | Whisper transcription of `.mp3/.mp4/.wav/.m4a` (read by the audio source) |
 
 Never commit `.env`. It is already in `.gitignore`.
@@ -285,7 +291,7 @@ Everything lives under `data/uploaded_files/`.
 
 | Type | How to add it |
 |---|---|
-| **PDF** | Drop `.pdf` files into `data/uploaded_files/`, or use the sidebar uploader / `POST /api/upload`. |
+| **PDF** | Drop `.pdf` files into `data/uploaded_files/`, or use the sidebar uploader / `POST /api/v1/sources/files`. |
 | **Audio / video** | Drop `.mp3`, `.mp4`, `.wav` or `.m4a` into the folder, or use the sidebar "Upload audio" expander. Requires `OPENAI_API_KEY`. |
 | **URLs** | Add one URL per line to `data/uploaded_files/sources.txt` (or edit it in the sidebar "Add URLs" expander). Supported: YouTube videos, GitHub repos, and generic web articles. |
 
@@ -396,27 +402,66 @@ Interactive docs: <http://localhost:8000/docs> (Swagger) and <http://localhost:8
 
 ## REST API
 
-Base URL: `http://localhost:8000`. All endpoints except the docs pages are rate-limited to **60 requests/minute per IP** (HTTP 429 when exceeded).
+Start it with `uvicorn backend.api:app --reload --port 8000`. Interactive docs: <http://localhost:8000/docs> (Swagger) and `/redoc`; the schema is at `/openapi.json`.
+
+All `/api/v1` routes are rate limited per IP (`RATE_LIMIT_PER_MIN`, default 60). If the server sets `API_KEY`, clients must send it as `X-API-Key`. CORS allows only `CORS_ORIGINS` (default: `http://localhost:3000`).
+
+**Errors** always look like `{"error": {"code": "...", "message": "...", "details": ...}}`. Codes include `validation_error` (422), `not_found`, `rate_limited` (429), `unauthorized` (401), `payload_too_large` (413), `llm_unavailable` (503, no `GEMINI_API_KEY`), `llm_error` (502, upstream failure) and `math_error` (422). Internal exception text is never returned.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness check. Returns `{"status": "ok", "uptime_sec": ...}`. |
-| `POST` | `/api/upload` | Upload one or more PDFs (`multipart/form-data`, field `files`). Only `.pdf` is accepted. Returns per-file results. |
-| `GET` | `/api/documents` | List the unique document names found in the corpus. |
-| `DELETE` | `/api/documents/{doc}` | Delete an uploaded file by name. Does not rebuild the index. |
-| `GET` | `/api/stats` | Document count, chunk count, min/max page. |
-| `GET` | `/api/search?query=...&k=5` | Retrieval only: top-k chunks with scores. |
-| `POST` | `/api/query` | RAG query. Body: `{question, k=3, model?, temperature=0.2, stream=false}`. Returns `{prompt, chunks, answer, ok, model, error}`. With `stream=true`, returns `text/event-stream` with `meta`, `token`, and `done` events. |
-
-Example:
+| `GET` | `/health` | Liveness, version, chunk count, whether semantic search is ready. |
+| `POST` | `/api/v1/sources/files` | Upload PDFs or audio (`multipart`, field `files`). Validates type, PDF signature, size (`MAX_UPLOAD_MB`, default 50) and count; sanitizes file names. Returns **202** with a `job_id`. |
+| `POST` | `/api/v1/sources/urls` | Add YouTube / GitHub / web URLs (`{"urls": [...]}`). Returns **202** with a `job_id`. |
+| `GET` | `/api/v1/jobs/{id}` | Background job status: `queued`, `running`, `done` or `failed`, with progress messages and the indexing report. |
+| `GET` | `/api/v1/documents` | Indexed sources with chunk counts. |
+| `DELETE` | `/api/v1/sources?key=...` | Remove a source (file name or URL) from disk, `sources.txt` and the index. |
+| `GET` | `/api/v1/stats` | Documents, chunks, page range, embedder, whether search is semantic. |
+| `POST` | `/api/v1/ask` | Answer a question. Body: `{question, k=3, mode?, model?, temperature=0.2, include_prompt=false}`. Returns `{answer, chunks, model, prompt?}`. |
+| `POST` | `/api/v1/ask/stream` | Same input, streamed as Server-Sent Events: `meta` (retrieved chunks), `token` (text fragments), then `done` or `error`. |
+| `GET` | `/api/v1/search?query=&k=` | Retrieval only (no model call). |
+| `GET` | `/api/v1/suggestions?n=` | Study questions suggested from your material. |
+| `POST` | `/api/v1/concept-map` | `{topic}` → nodes, edges and Graphviz DOT. |
+| `POST` | `/api/v1/socratic` | `{question, depth}` → guiding questions and hints. |
+| `POST` | `/api/v1/synthesis` | `{topic}` → how documents agree and differ. |
+| `POST` | `/api/v1/adaptive` | `{question, level}` → explanation at ELI5 … Expert level. |
+| `POST` | `/api/v1/math` | `{input}` → LaTeX and steps (see Safety below). |
+| `GET` | `/api/v1/leetcode/stats`, `/search`, `/problems/{pid}` | Browse and search the problem bank. |
+| `POST` | `/api/v1/leetcode/problems/{pid}/explain` | AI study guide for a problem. |
+| `POST` | `/api/v1/notes` | Q&A history → Markdown study notes. |
+| `POST` | `/api/v1/export` | Markdown → downloadable `pdf`, `html` or `md`. |
+| `GET` / `DELETE` | `/api/v1/analytics` | Persistent usage stats (SQLite) for asked questions; delete to reset. |
 
 ```bash
-curl -X POST http://localhost:8000/api/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is a linked list?", "k": 3}'
+# add a PDF, wait for indexing, then ask
+curl -F "files=@notes.pdf" http://localhost:8000/api/v1/sources/files        # -> {"job_id": "..."}
+curl http://localhost:8000/api/v1/jobs/<job_id>                               # -> {"status": "done", ...}
+curl -X POST http://localhost:8000/api/v1/ask -H "Content-Type: application/json" \
+  -d '{"question": "What is a linked list?", "k": 3, "mode": "technical"}'
+
+# stream the answer
+curl -N -X POST http://localhost:8000/api/v1/ask/stream -H "Content-Type: application/json" \
+  -d '{"question": "What is a linked list?"}'
 ```
 
-Validation: `question` must be at least 3 characters, `k` is 1–20, and `temperature` is 0.0–1.0.
+**Safety.** Math input is validated against a whitelist and computed in a separate worker process with a 5 s timeout (no `eval` of user text). Exported HTML passes through an allow-list sanitizer, so scripts and event handlers in model output cannot execute. Retrieval and indexing run in worker threads, so a slow request does not block the server.
+
+### TypeScript client
+
+`packages/api-client` is generated from the API's OpenAPI schema (`openapi.json`) and is what the Next.js app will use:
+
+```ts
+import { createApiClient } from "@ai-study-mentor/api-client";
+
+const api = createApiClient({ baseUrl: "http://localhost:8000" });
+const { data, error } = await api.http.POST("/api/v1/ask", { body: { question: "What is a heap?" } });
+
+for await (const ev of api.askStream({ question: "What is a heap?" })) {
+  if (ev.event === "token") process.stdout.write(ev.data.text);   // fully typed per event
+}
+```
+
+After changing an endpoint or schema, regenerate: `python scripts/export_openapi.py && (cd packages/api-client && npm run generate)`. CI fails if the committed schema or generated types are out of date.
 
 ---
 
@@ -471,8 +516,8 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 
 ### `GeminiClient` (`backend/llm_config.py`)
 1. Reads `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TEMPERATURE`.
-2. `_resolve_model`: uses the requested model if it supports `generateContent`; otherwise tries `gemini-flash-latest`, `gemini-pro-latest`, then `1.5` variants, then the first supported model.
-3. `generate`: tries the chosen model, then `gemini-flash-latest`. Each model gets up to 2 attempts, with backoff on 503, timeout and rate-limit errors. Non-compatibility errors (auth, network) stop the chain early.
+2. `_resolve_model`: uses the requested model if it supports `generateContent`; otherwise the first available of `gemini-3.8-flash`, `3.7`, `3.6`, `gemini-flash-latest`, `gemini-pro-latest`, else any supported model. The result is cached per key, so models are not listed on every call.
+3. `generate`: tries the chosen model, then the default. Transient errors (429, 5xx, timeouts) are retried up to 3 times with backoff; auth errors fail fast. `json_mode=True` requests a JSON response. `stream()` yields text deltas, retrying only before the first one.
 
 ### Advanced AI (`backend/advanced_ai.py`)
 - `build_concept_map` and `concept_map_to_dot`: JSON graph from Gemini; falls back to a keyword-frequency chain.
@@ -558,19 +603,12 @@ Documented honestly so you know what to expect. These come from reading the code
 
 - **Test coverage is thin**: there is a smoke-test suite and CI (Phase 0), but no retrieval-quality evaluation yet (Phase 4). One strict `xfail` test documents the keyword-score bug.
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
-- **Deprecated Gemini SDK**: `google-generativeai` no longer receives updates (Phase 2 migrates to `google-genai`).
-- **Raw HTML passes through exports**: `markdown_to_html` does not strip raw HTML from the input.
 - **Retrieval quality is unmeasured**: semantic search works, but ambiguous acronyms can mislead it (for example, "BFS vs DFS" retrieved "distributed file system" passages). Hybrid retrieval and an evaluation set are Phase 4.
 - **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.
 - **3D Viz is not semantic**: points are projected from SHA-256 hashes of the text (chosen to avoid macOS segfaults), so distances do not reflect meaning.
-- **Fake streaming**: `/api/query?stream=true` generates the full answer first, then replays it word by word.
-- **Query modes in the API**: the study `mode` is not exposed on `/api/query`.
-- **Performance**: the API creates a new `RAGEngine` per request. Without a prebuilt vector store, that re-parses every local PDF each time.
-- **Security (demo-grade)**:
-  - CORS allows all origins and the rate limiter is in-memory per process.
-  - Uploaded filenames are used as-is, so path-traversal sequences in a filename are not rejected.
-  - The vector store metadata is loaded with `pickle`, so only load stores you built yourself.
-  - The math tool passes user input to SymPy's `sympify`, which evaluates expressions, so do not expose it to untrusted users.
+- **Security is portfolio-grade, not hardened**: the rate limiter is in-memory per process (and keyed by the connecting IP, so it needs adjusting behind a proxy), there are no user accounts (just an optional shared `API_KEY`), and uploads are not virus-scanned. Remaining Phase 6 work: spend caps and deployment hardening.
+- **Background jobs are in memory**: job records are lost on restart (the index itself is persisted), and indexing runs one job at a time.
+- **PDF export** uses ReportLab's built-in font, so non-Latin characters may not render.
 - **Git history**: the textbook PDFs and `.DS_Store` files are no longer tracked, but they remain in earlier commits, so the repo is still large to clone.
 - **Source quirks**: YouTube playlist URLs (as in the sample `sources.txt`) have no `v=` video id and are skipped. Python files from GitHub repos are indexed as comments/docstrings only, not code.
 - **Stale hackathon numbers**: figures like "977 docs / 12K chunks" and "2000+ problems" in the demo script and context file describe the hackathon corpus. The shipped LeetCode file has 1,825 problems.

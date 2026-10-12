@@ -72,14 +72,16 @@ Builds on the open work in PR #1 (FAISS document-processing pipeline).
 Found while verifying on the real corpus: retrieval works (4–26 ms/query) but ambiguous acronyms mislead it ("BFS vs DFS" returned distributed-file-system passages). That is Phase 4 material (hybrid retrieval, eval set).
 
 ## Phase 2: API v1 for a TypeScript client (about 1 week)
-- [ ] Endpoints for every feature: `/ask` (with `mode`), `/concept-map`, `/socratic`, `/synthesis`, `/adaptive`, `/math`, `/leetcode/search`, `/leetcode/{id}/explain`, `/suggestions`, `/notes`, `/export`, `/analytics`.
-- [ ] Real streaming from Gemini over SSE with typed events (`meta`, `token`, `done`, `error`).
-- [ ] Ingestion as jobs: `POST /sources` returns a job id; `GET /jobs/{id}` reports progress.
-- [ ] Security: sanitize upload filenames, enforce size/type limits, restrict CORS to the frontend origin, replace `sympify` with a restricted parser run with a timeout, consistent error schema.
-- [ ] Migrate to the current Google Gen AI SDK behind `GeminiClient`; default model `gemini-3.8-flash`.
-- [ ] Publish the OpenAPI schema and generate `packages/api-client`.
+- [x] Endpoints for every feature (under `/api/v1`; see README for the final list): `/ask` (with `mode`), `/concept-map`, `/socratic`, `/synthesis`, `/adaptive`, `/math`, `/leetcode/search`, `/leetcode/{id}/explain`, `/suggestions`, `/notes`, `/export`, `/analytics`.
+- [x] Real streaming from Gemini over SSE (`POST /ask/stream`) with typed events (`meta`, `token`, `done`, `error`), verified through the TS client against a live server.
+- [x] Ingestion as jobs: `POST /sources/files` and `/sources/urls` return 202 + job id; `GET /jobs/{id}` reports progress and the indexing report.
+- [x] Security: sanitized upload filenames, allow-listed types + PDF signature + size/count limits, CORS restricted to configured origins, optional `X-API-Key`, math moved to a whitelisted parser in a timed worker process, HTML export sanitized, one error schema with no internal exception text.
+- [x] Migrated to `google-genai` behind `GeminiClient`; default model `gemini-3.8-flash`; streaming, JSON mode, cached model resolution.
+- [x] OpenAPI schema committed (`packages/api-client/openapi.json`), typed client + SSE reader generated/built in `packages/api-client`; CI checks the schema and generated types are up to date.
 
 **Done when:** every Streamlit capability is reachable from the API and the schema generates a clean TS client.
+
+Bugs found and fixed while testing this phase: tutor tools used a different engine than the API (so adaptive explanations saw no material), the suggestions fallback ignored `n`, and `/search` echoed internal exception text.
 
 ## Phase 3: TypeScript frontend (about 2–3 weeks)
 Layout: `apps/web` (Next.js) and `packages/api-client` (generated); `backend/` stays as is.

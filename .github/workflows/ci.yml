@@ -28,3 +28,26 @@ jobs:
         continue-on-error: true
       - name: Tests
         run: pytest
+      - name: OpenAPI schema is up to date
+        if: matrix.python-version == '3.12'
+        run: python scripts/export_openapi.py --check
+
+  api-client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/api-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/api-client/package-lock.json
+      - run: npm ci
+      - name: Generated types match openapi.json
+        run: |
+          npm run generate
+          git diff --exit-code src/schema.d.ts
+      - run: npm run typecheck
+      - run: npm test
