@@ -4,16 +4,6 @@ from typing import Dict, Any, List, Optional
 
 import json
 
-try:
-    import sympy as sp  # optional
-except Exception:
-    sp = None
-
-try:
-    import matplotlib.pyplot as plt  # optional
-except Exception:
-    plt = None
-
 from .rag_engine import RAGEngine
 from .llm_config import GeminiClient
 
@@ -254,53 +244,13 @@ def adaptive_explain(question: str, level: str = "Undergrad", temperature: float
 # -----------------------------
 
 def math_solve(user_input: str) -> Dict[str, Any]:
-    """Attempt symbolic math; render LaTeX and steps. Optional plot if available.
+    """Symbolic math with LaTeX output and short steps.
 
-    Accepts expressions like:
-    - simplify: "simplify (x^2 + 2x + 1)"
-    - differentiate: "differentiate sin(x)"
-    - integrate: "integrate x^2"
-    - solve: "solve x^2 = 4 for x"
+    Accepts: "simplify (x^2 + 2x + 1)", "differentiate sin(x)", "integrate x^2",
+    "expand (x+1)^3", "factor x^2 - 1", "solve x^2 = 4 for x", or a bare expression.
+    Input is validated against a whitelist and computed in a worker process with
+    a timeout (see backend/safe_math.py); it never reaches `eval` unchecked.
     """
-    if sp is None:
-        return {"ok": False, "error": "sympy not installed", "steps": ["Install sympy for full math features."]}
+    from .safe_math import solve_request
 
-    s = user_input.strip()
-    try:
-        if s.lower().startswith("simplify"):
-            expr_str = s[len("simplify"):].strip()
-            x = sp.symbols('x')
-            expr = sp.sympify(expr_str)
-            simp = sp.simplify(expr)
-            return {"ok": True, "kind": "simplify", "latex": sp.latex(simp), "steps": ["Parsed expression", "Applied algebraic simplification"]}
-        if s.lower().startswith("differentiate") or s.lower().startswith("derivative"):
-            expr_str = s.split(" ", 1)[1].strip()
-            x = sp.symbols('x')
-            expr = sp.sympify(expr_str)
-            deriv = sp.diff(expr, x)
-            return {"ok": True, "kind": "differentiate", "latex": sp.latex(deriv), "steps": ["Parsed expression", "Differentiated with respect to x"]}
-        if s.lower().startswith("integrate"):
-            expr_str = s[len("integrate"):].strip()
-            x = sp.symbols('x')
-            expr = sp.sympify(expr_str)
-            integ = sp.integrate(expr, x)
-            return {"ok": True, "kind": "integrate", "latex": sp.latex(integ) + "+ C", "steps": ["Parsed expression", "Integrated with respect to x"]}
-        if s.lower().startswith("solve"):
-            body = s[len("solve"):].strip()
-            x = sp.symbols('x')
-            if " for " in body:
-                expr_str, var = body.split(" for ", 1)
-                var_sym = sp.symbols(var.strip())
-            else:
-                expr_str, var_sym = body, x
-            if "=" in expr_str:
-                left, right = expr_str.split("=", 1)
-                sol = sp.solve(sp.Eq(sp.sympify(left), sp.sympify(right)), var_sym)
-            else:
-                sol = sp.solve(sp.sympify(expr_str), var_sym)
-            return {"ok": True, "kind": "solve", "latex": sp.latex(sol), "steps": ["Parsed equation", "Solved for variable"]}
-        # Fallback attempt: just render LaTeX of the expression
-        expr = sp.sympify(s)
-        return {"ok": True, "kind": "expr", "latex": sp.latex(expr), "steps": ["Parsed expression", "Rendered LaTeX"]}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "steps": ["Could not parse expression."]}
+    return solve_request(user_input)

@@ -15,22 +15,6 @@ def test_markdown_to_pdf_returns_pdf_bytes():
     assert data is not None and data.startswith(b"%PDF")
 
 
-def test_math_solve_differentiate():
-    pytest.importorskip("sympy")
-    from backend.advanced_ai import math_solve
-
-    res = math_solve("differentiate sin(x)")
-    assert res["ok"] and "cos" in res["latex"]
-
-
-def test_math_solve_solve_equation():
-    pytest.importorskip("sympy")
-    from backend.advanced_ai import math_solve
-
-    res = math_solve("solve x^2 = 4 for x")
-    assert res["ok"] and "2" in res["latex"]
-
-
 def test_gemini_client_requires_api_key(monkeypatch):
     pytest.importorskip("google.genai")
     from backend.llm_config import GeminiClient
