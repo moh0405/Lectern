@@ -94,5 +94,4 @@ ignore = [
 python_version = "3.10"
 ignore_missing_imports = true
 check_untyped_defs = false
-warn_unused_ignores = true
 files = ["backend"]
