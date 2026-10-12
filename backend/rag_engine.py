@@ -237,18 +237,9 @@ class RAGEngine:
         prompt = self.generate_prompt(question, chunks, mode=mode)
         return {"prompt": prompt, "chunks": chunks}
 
-    def answer_with_ollama(self, question: str, k: int = 3, model: str = "llama3", temperature: float = 0.2, mode: str | None = None) -> Dict[str, Any]:
-        chunks = self.retrieve_context(question, k=k)
-        prompt = self.generate_prompt(question, chunks, mode=mode)
-        from .llm_ollama import OllamaClient
-        client = OllamaClient(model=model, temperature=temperature)
-        result = client.generate(prompt)
-        return {"prompt": prompt, "chunks": chunks, **result}
-
     def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2, mode: str | None = None) -> Dict[str, Any]:
         """Answer using Google Gemini API (cloud inference only).
 
-        - Keeps retrieval and prompt formatting identical to Ollama path
         - Reads API key from environment; fails gracefully with clear error
         """
         chunks = self.retrieve_context(question, k=k)
