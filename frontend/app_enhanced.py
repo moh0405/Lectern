@@ -185,7 +185,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.rag_engine import RAGEngine
 from backend.llm_config import GeminiClient
-from backend.document_processor import list_chunks_from_dir
+from backend.document_processor import discover_inputs, list_chunks_from_dir
 from backend.advanced_ai import (
     build_concept_map,
     concept_map_to_dot,
@@ -206,7 +206,7 @@ import random
 def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
     try:
         if engine is None:
-            engine = RAGEngine(auto_embeddings=False)
+            engine = RAGEngine.shared()
         items = engine._docstore_iter()
     except Exception:
         # Fallback: scan uploaded sources directly (no FAISS required)
@@ -303,24 +303,10 @@ def init_analytics():
 # Performance: cached resources and data-level caches
 # -----------------------------------------------------
 @st.cache_resource
-def load_rag_engine(version: int = 2) -> RAGEngine:
-    """Load once and keep in memory; prefer precomputed embeddings if available.
-
-    If `data/vector_store/embeddings.npy` exists, enable `auto_embeddings` so the engine
-    loads them without importing heavy libraries. Otherwise, avoid auto-embedding to
-    prevent startup crashes on environments where `sentence-transformers` or `torch`
-    are unavailable.
-    """
-    try:
-        emb_path = Path("data/vector_store/embeddings.npy").resolve()
-        auto = emb_path.exists()
-    except Exception:
-        auto = False
-    try:
-        return RAGEngine(auto_embeddings=auto)
-    except Exception:
-        # Fallback to meta-only; retrieval will use keyword overlap
-        return RAGEngine(auto_embeddings=False)
+def load_rag_engine(version: int = 3) -> RAGEngine:
+    """The process-wide engine. Semantic search is used when a vector store exists
+    (build one with `python scripts/preprocess_all_documents.py`); otherwise keyword retrieval."""
+    return RAGEngine.shared()
 
 
 @st.cache_resource
@@ -551,8 +537,8 @@ def build_ui() -> None:
 
         if st.button("Refresh stats"):
             try:
-                # Warm metadata by scanning sources so stats update immediately
-                list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
+                # Index new/changed sources incrementally so stats update immediately
+                load_rag_engine().add_sources(discover_inputs(str(Path("data/uploaded_files").resolve())))
                 st.experimental_rerun()
             except Exception:
                 st.experimental_rerun()
@@ -927,7 +913,7 @@ def build_ui() -> None:
             st.session_state["socratic_depth"] = 0
         if more_help and q.strip():
             # Use RAG context for grounding
-            eng = RAGEngine(auto_embeddings=False)
+            eng = RAGEngine.shared()
             chunks = eng.retrieve_context(q, k=k)
             out = socratic_tutor(q, chunks, depth=st.session_state["socratic_depth"], temperature=temperature)
             if out.get("ok"):
@@ -977,7 +963,7 @@ def build_ui() -> None:
                         st.write(str(res.get("answer", "")))
                         st.divider()
                         st.caption("Context used:")
-                        eng = RAGEngine(auto_embeddings=False)
+                        eng = RAGEngine.shared()
                         for c in res.get("chunks", []):
                             chunk_card(c)
                     else:
@@ -1019,7 +1005,7 @@ def build_ui() -> None:
             except Exception:
                 px = None
             # Load chunk metadata; if engine docstore is empty, fall back to direct scan
-            items = RAGEngine(auto_embeddings=False)._docstore_iter()
+            items = RAGEngine.shared()._docstore_iter()
             if not items:
                 try:
                     items = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))

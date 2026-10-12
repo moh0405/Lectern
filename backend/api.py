@@ -14,19 +14,55 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, UploadFile, File, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .rag_engine import RAGEngine
-from .document_processor import list_chunks_from_dir
 
 
 # ----------------------------------------------------------------------------
 # App setup
 # ----------------------------------------------------------------------------
-app = FastAPI(title="AI Study Mentor API", version="1.0.0", description="Full‑stack RAG API for hackathon demo")
+# Locations are module-level so tests (and deployments) can point them elsewhere.
+UPLOAD_DIR = Path("data/uploaded_files").resolve()
+STORE_DIR = Path("data/vector_store").resolve()
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _make_engine() -> RAGEngine:
+    return RAGEngine(store_dir=str(STORE_DIR), input_dir=str(UPLOAD_DIR))
+
+
+def get_engine(request: Request) -> RAGEngine:
+    """The one engine for this process (created at startup, or lazily if startup did not run)."""
+    engine = getattr(request.app.state, "engine", None)
+    if engine is None:
+        engine = request.app.state.engine = _make_engine()
+    return engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.engine = _make_engine()
+    try:
+        # Load the embedding model now so the first query is not slow.
+        await run_in_threadpool(app.state.engine.warm)
+    except Exception as e:  # semantic search is optional; keyword fallback still works
+        logger.warning("Embedder warm-up failed: %s", e)
+    yield
+
+
+app = FastAPI(
+    title="AI Study Mentor API",
+    version="1.0.0",
+    description="Full‑stack RAG API for hackathon demo",
+    lifespan=lifespan,
+)
 
 # CORS: allow all for demo purposes
 app.add_middleware(
@@ -74,6 +110,7 @@ class UploadResult(BaseModel):
     filename: str
     size_bytes: int
     ok: bool
+    chunks_indexed: int = 0
     error: Optional[str] = None
 
 
@@ -113,19 +150,8 @@ class StatsResponse(BaseModel):
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
-UPLOAD_DIR = Path("data/uploaded_files").resolve()
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-def _doc_stats() -> Dict[str, Any]:
-    try:
-        engine = RAGEngine(auto_embeddings=False)
-        items = engine._docstore_iter()
-    except Exception:
-        # Fallback to scanning uploaded PDFs without FAISS
-        try:
-            items = list_chunks_from_dir(str(UPLOAD_DIR))
-        except Exception:
-            items = []
+def _doc_stats(engine: RAGEngine) -> Dict[str, Any]:
+    items = engine._docstore_iter()
     docs = sorted({it.get("doc", "") for it in items if it.get("doc")})
     pages = [it.get("page") for it in items if it.get("page") is not None]
     return {
@@ -150,83 +176,115 @@ async def api_upload(
     request: Request,
     files: List[UploadFile] = File(..., description="PDF files to upload"),
     deps: None = Depends(rate_limit),
+    engine: RAGEngine = Depends(get_engine),
 ):
     results: List[UploadResult] = []
+    saved: List[Path] = []
     for f in files:
         try:
-            name = (f.filename or "uploaded.pdf").strip()
+            name = Path((f.filename or "uploaded.pdf").strip()).name  # drop any directory part
             if not name.lower().endswith(".pdf"):
                 raise ValueError("Only .pdf files are supported")
             data = await f.read()
             dest = UPLOAD_DIR / name
             dest.write_bytes(data)
+            saved.append(dest)
             results.append(UploadResult(filename=name, size_bytes=len(data), ok=True))
             logger.info("Uploaded %s (%d bytes)", name, len(data))
         except Exception as e:
             results.append(UploadResult(filename=f.filename or "", size_bytes=0, ok=False, error=str(e)))
-    # Warm metadata for downstream queries
-    try:
-        list_chunks_from_dir(str(UPLOAD_DIR))
-    except Exception as e:
-        logger.warning("Metadata warm failed: %s", e)
+    if saved:
+        # Update the live index incrementally (only new/changed files are processed).
+        report = await run_in_threadpool(engine.add_sources, [str(p) for p in saved])
+        for r in results:
+            if not r.ok:
+                continue
+            if r.filename in report.failed:
+                r.ok = False
+                r.error = f"indexing failed: {report.failed[r.filename]}"
+            else:
+                r.chunks_indexed = engine.store.sources.get(r.filename, {}).get("chunks", 0)
     return UploadResponse(count=len(results), results=results)
 
 
 @app.get("/api/documents", response_model=DocumentsResponse)
-def api_documents(request: Request, deps: None = Depends(rate_limit)) -> DocumentsResponse:
-    stats = _doc_stats()
+def api_documents(
+    request: Request, deps: None = Depends(rate_limit), engine: RAGEngine = Depends(get_engine)
+) -> DocumentsResponse:
+    stats = _doc_stats(engine)
     return DocumentsResponse(documents=stats["unique_docs"])
 
 
 @app.delete("/api/documents/{doc}")
-def api_delete_document(doc: str, request: Request, deps: None = Depends(rate_limit)) -> Dict[str, Any]:
-    # Delete from uploaded_files; index maintenance is out of scope for demo
+def api_delete_document(
+    doc: str, request: Request, deps: None = Depends(rate_limit), engine: RAGEngine = Depends(get_engine)
+) -> Dict[str, Any]:
+    """Delete an uploaded file and remove its chunks from the index."""
     target = UPLOAD_DIR / doc
-    if not target.exists():
+    in_index = doc in engine.store.sources
+    if not target.exists() and not in_index:
         raise HTTPException(status_code=404, detail="Document not found")
     try:
-        target.unlink()
-        logger.info("Deleted document %s", doc)
-        return {"ok": True, "deleted": doc}
+        if target.exists():
+            target.unlink()
+        removed = engine.remove_source(doc)
+        logger.info("Deleted document %s (%d chunks)", doc, removed)
+        return {"ok": True, "deleted": doc, "chunks_removed": removed}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
 
 
 @app.get("/api/stats", response_model=StatsResponse)
-def api_stats(request: Request, deps: None = Depends(rate_limit)) -> StatsResponse:
-    s = _doc_stats()
+def api_stats(
+    request: Request, deps: None = Depends(rate_limit), engine: RAGEngine = Depends(get_engine)
+) -> StatsResponse:
+    s = _doc_stats(engine)
     return StatsResponse(documents=s["documents"], chunks=s["chunks"], min_page=s["min_page"], max_page=s["max_page"])
 
 
 @app.get("/api/search")
-def api_search(query: str, k: int = 5, request: Request = None, deps: None = Depends(rate_limit)) -> Dict[str, Any]:
+def api_search(
+    query: str,
+    request: Request,
+    k: int = 5,
+    deps: None = Depends(rate_limit),
+    engine: RAGEngine = Depends(get_engine),
+) -> Dict[str, Any]:
     if not query or len(query) < 2:
         raise HTTPException(status_code=400, detail="Query must be provided")
     try:
-        engine = RAGEngine(auto_embeddings=False)
-        chunks = engine.retrieve_context(query, k=k)
-        return {"chunks": chunks}
+        return {"chunks": engine.retrieve_context(query, k=k)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/query")
-async def api_query(req: QueryRequest, request: Request, deps: None = Depends(rate_limit)):
+async def api_query(
+    req: QueryRequest,
+    request: Request,
+    deps: None = Depends(rate_limit),
+    engine: RAGEngine = Depends(get_engine),
+):
     """RAG query with optional SSE streaming.
 
     - If `stream=false` (default), returns JSON with prompt, chunks, answer.
     - If `stream=true`, returns `text/event-stream` SSE with tokens as they are produced.
     """
-    engine = RAGEngine(auto_embeddings=False)
     try:
-        chunks = engine.retrieve_context(req.question, k=req.k)
+        chunks = await run_in_threadpool(engine.retrieve_context, req.question, req.k)
         prompt = engine.generate_prompt(req.question, chunks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Retrieval failed: {e}")
 
+    def generate() -> Dict[str, Any]:
+        # Reuse the chunks retrieved above instead of retrieving a second time.
+        return engine.answer_with_gemini(
+            req.question, k=req.k, model=req.model, temperature=req.temperature, chunks=chunks
+        )
+
     if not req.stream:
         # Non-streaming: attempt Gemini, fall back gracefully
-        result = engine.answer_with_gemini(req.question, k=req.k, model=req.model, temperature=req.temperature)
+        result = await run_in_threadpool(generate)
         out = AnswerResponse(
             prompt=prompt,
             chunks=[Chunk(**c) for c in result.get("chunks", chunks)],
@@ -242,7 +300,7 @@ async def api_query(req: QueryRequest, request: Request, deps: None = Depends(ra
         meta = {"event": "meta", "prompt": prompt, "chunks": chunks}
         yield f"data: {json.dumps(meta)}\n\n"
         # Generate answer (Gemini or fallback) and stream tokens
-        result = engine.answer_with_gemini(req.question, k=req.k, model=req.model, temperature=req.temperature)
+        result = await run_in_threadpool(generate)
         text = result.get("answer") or ""
         if not text:
             # Fallback: stream the formatted prompt as a placeholder
