@@ -1,6 +1,6 @@
 # AI Study Mentor
 
-> A domain-specific **Retrieval-Augmented Generation (RAG)** tutor for Computer Science learning, built with Python, Streamlit, FastAPI, sentence-transformers, FAISS and Google Gemini.
+> A domain-specific **Retrieval-Augmented Generation (RAG)** tutor for Computer Science learning, built with Python, FastAPI, Next.js (TypeScript), sentence-transformers (with optional FAISS) and Google Gemini.
 
 AI Study Mentor was my first project for learning AI engineering, and it grew into a hackathon-style demo. You feed it study material (textbook PDFs, YouTube lectures, web articles, GitHub repos, audio recordings). It chunks and indexes that material, then answers questions **only from your sources, with citations**. On top of Q&A it adds tutoring tools (concept maps, a Socratic tutor, adaptive explanations, math solving) and a searchable LeetCode problem bank with AI-generated study guides.
 
@@ -23,7 +23,7 @@ AI Study Mentor was my first project for learning AI engineering, and it grew in
 13. [Core concepts and internals](#core-concepts-and-internals)
 14. [LeetCode module](#leetcode-module)
 15. [Datasets and data directory](#datasets-and-data-directory)
-16. [Demo mode](#demo-mode)
+16. [Trying it without an API key](#trying-it-without-an-api-key)
 17. [Documentation in this repo](#documentation-in-this-repo)
 18. [Project history and status](#project-history-and-status)
 19. [Known limitations](#known-limitations)
@@ -35,41 +35,40 @@ AI Study Mentor was my first project for learning AI engineering, and it grew in
 ## Features
 
 ### Core RAG
-- **Multi-source ingestion**: PDFs, YouTube transcripts, web articles, GitHub repos (READMEs, docs and Python docstrings/comments), and audio/video files transcribed with Whisper.
+- **Multi-source ingestion**: PDFs, YouTube transcripts, web articles, GitHub repos (READMEs, docs and Python docstrings/comments), and audio/video files transcribed with Whisper. Indexing is incremental: only new or changed files are processed.
 - **Semantic retrieval** with `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-d, normalized, cosine similarity), with an automatic **keyword-coverage fallback** when ML libraries are unavailable.
-- **Grounded answers**: prompts instruct Gemini to use only the retrieved context and cite sources (document name and page, or video timestamp).
-- **Four study modes** that change the prompt style: *ELI5*, *Technical*, *Interview Prep*, *Quick Summary*.
-- **Visual RAG**: retrieved chunks are shown as cards with relevance scores (green/amber/red) and highlighted query keywords.
+- **Grounded answers**: prompts tell Gemini to use only the retrieved context and to cite it. Answers **stream** token by token and can be stopped.
+- **Visible evidence**: every answer shows its sources as citation chips, with expandable passages, relevance scores and highlighted query terms. YouTube citations link to the exact timestamp.
+- **Four study modes** that change the prompt style: *ELI5*, *Technical*, *Interview prep*, *Quick summary*. Optionally show the exact prompt sent to the model, pick the model, or skip the model and just list matching passages.
 
-### Tutoring tools (Gemini-powered, each with an offline fallback)
+### Tutoring tools
+A missing `GEMINI_API_KEY` is explained in the UI (retrieval keeps working), and built-in offline fallbacks are labelled as such.
+
 | Tool | What it does |
 |---|---|
-| **Concept Map** | Generates a `{nodes, edges}` graph for a topic, rendered with Graphviz. Export as JSON or DOT. |
-| **Socratic Tutor** | Returns 3–5 guiding questions plus a 3-step hint ladder without revealing the answer. |
-| **Multi-Document Synthesis** | Compares how each document explains a topic and returns similarities, conflicts, a unified synthesis and citations. |
-| **Adaptive Tutor** | Explains a question at one of five levels (ELI5, ELI10, Undergrad, Grad, Expert) and ends with 3 quiz questions. |
-| **Math** | Symbolic simplify, differentiate, integrate and solve via SymPy, with LaTeX output and short steps. |
-| **3D Viz** | Interactive Plotly 3D scatter of chunks, coloured by document (see [limitations](#known-limitations)). |
-| **Analytics** | Per-session dashboard: queries, average similarity, latency, token estimates, document usage, streak. Export a Markdown study report or CSV. |
+| **Concept map** | A graph of how a topic's ideas connect (React Flow). Click a concept to highlight its neighbours; export JSON or Graphviz DOT. |
+| **Socratic tutor** | Guiding questions plus a hint ladder revealed one hint at a time; never the answer up front. |
+| **Compare sources** | How each of your documents explains a topic: agreements, differences, a combined explanation and who said what. |
+| **Explain at my level** | The same answer at ELI5, ELI10, undergraduate, graduate or expert level, with sources. |
+| **Math** | Differentiate, integrate, simplify, expand, factor or solve, typeset with KaTeX. Input is whitelisted and computed in a sandboxed worker with a timeout. |
+| **Embedding map** | Your passages in 3D, projected with PCA from the real embeddings (with the variance each axis keeps, and a warning when the index is not semantic). |
+| **Analytics** | Persistent usage stats: questions, relevance, response time, most-used sources, streak; export a report or CSV. |
 
-### LeetCode Practice + Mentor
-- Unified loader for three public LeetCode datasets (HuggingFace + two Kaggle), normalized into one JSONL file.
-- Semantic (or keyword) search with difficulty and topic filters.
-- One-click AI study guide: key observations, step-by-step approach, complexity, pitfalls, progressive hints, and a clean Python solution.
+### LeetCode practice + mentor
+- A normalized bank of 1,825 problems with 43 topics, merged from public datasets.
+- Search by idea (title-weighted keyword ranking, semantic when embeddings are cached) with difficulty and topic filters; the filters live in the URL so a view can be shared.
+- One-click AI study guide: observations, approach, complexity, pitfalls, hints and a Python solution.
 
 ### Study aids and export
-These live in the earlier UI (`frontend/app.py`); the backend functions are also available to any client.
-- **Query suggestions** generated from your own corpus.
-- **Chat → study notes** summarizer (Markdown), with PDF (via ReportLab) and HTML export.
-- **Flashcards** export (CSV).
-- **Chat export** (Markdown).
+- **Question suggestions** generated from your own material.
+- **Study notes** from a session, downloadable as Markdown, HTML (sanitized) or PDF.
+- **Flashcards** as a front/back CSV (importable into Anki).
 
-### Engineering extras
-- **FastAPI backend** (`/api/v1`) with Swagger/ReDoc docs, a typed error format, restricted CORS, an in-memory rate limiter, optional API key, background indexing jobs, real token streaming over Server-Sent-Events streaming.
-- **Resilient Gemini client**: auto-resolves a model that supports `generateContent`, retries transient errors (503/timeout/rate-limit) with backoff, and falls back to `gemini-flash-latest`.
-- **Local caching**: `embeddings.npy` and vector-store files are cached so the app starts instantly after preprocessing.
-- **Demo Mode**: an instant, canned-response experience that needs no API key or index.
-- **Polished UI**: animated gradient theme, glassmorphism cards, a Cmd/Ctrl+K command palette, toasts and confetti.
+### Engineering
+- **FastAPI backend** (`/api/v1`): OpenAPI docs, one typed error format, restricted CORS, rate limiting, optional API key, background indexing jobs and Server-Sent-Events streaming.
+- **Next.js frontend** (`apps/web`): strict TypeScript, Tailwind, TanStack Query, and a client generated from the API's OpenAPI schema so the two cannot drift. Keyboard-first (Ctrl/⌘ + K palette), responsive, and checked for WCAG A/AA with axe.
+- **Resilient Gemini client**: picks a model the key can use, retries only transient errors, streams, and supports JSON mode.
+- **Tested end to end**: Python unit tests, Vitest, and Playwright against the real API in a real browser.
 
 ---
 
@@ -93,7 +92,7 @@ These live in the earlier UI (`frontend/app.py`); the backend functions are also
  Prompt builder (mode: default / eli5 / technical / interview / summary)
         │
         ▼
- Gemini (google-genai)  ──►  answer + citations  ──►  Streamlit UI / FastAPI / CLI
+ Gemini (google-genai)  ──►  answer + citations  ──►  Next.js UI / FastAPI / CLI
 ```
 
 1. **Ingest**: each input is routed to a source handler by type (see [Core concepts](#core-concepts-and-internals)).
@@ -121,7 +120,7 @@ flowchart LR
     ADV[advanced_ai<br/>concept map, Socratic, synthesis, adaptive, math] --> RAG
     ADV --> LLM
     LC[LeetCodeHandler] --> LLM
-    LLM --> UI[Streamlit UI<br/>frontend/app_enhanced.py]
+    LLM --> UI[Next.js app<br/>apps/web]
     RAG --> API[FastAPI<br/>backend/api/]
     RAG --> CLI[CLIs]
     classDef s fill:#eef,stroke:#88a;
@@ -158,15 +157,13 @@ AI-study-mentor-/
 │       ├── web_source.py       # requests + readability-lxml + BeautifulSoup
 │       ├── github_source.py    # README via API, else clone; .md/.rst/.txt/.py
 │       └── audio_source.py     # OpenAI Whisper transcription with segment timestamps
-├── frontend/
-│   ├── app_enhanced.py         # Main Streamlit app (9 tabs, sidebar settings, source management)
-│   ├── app.py                  # Earlier Streamlit hackathon UI (sidebar + Ask/Map/LeetCode/Analytics)
-│   ├── demo_app.py             # Standalone canned-response demo
-│   ├── demo_module.py          # Demo UI embedded into the main app's Demo Mode
-│   ├── components.py           # CSS/JS injection, Lottie helper, shortcut hint
-│   ├── pages/00_Hero.py        # Landing/hero page
-│   ├── static/{style.css,app.js}   # Glassmorphism theme, command palette, toast, confetti
-│   └── styles.css              # Extra dark theme (cards, badges, pipeline)
+├── apps/web/                   # Next.js app (App Router, strict TypeScript, Tailwind)
+│   ├── app/                    # routes: /ask /sources /leetcode /tutor /math /visualize /analytics
+│   ├── features/               # one folder per feature (ask, sources, leetcode, tutor, math, visualize, analytics)
+│   ├── components/             # shell, command palette, markdown, UI primitives
+│   ├── lib/                    # typed API helpers, URL state, formatting
+│   └── e2e/                    # Playwright specs (incl. axe accessibility checks)
+├── packages/api-client/        # generated TypeScript client + SSE reader (from openapi.json)
 ├── scripts/
 │   ├── preprocess_all_documents.py  # Build the vector store once for fast startup
 │   └── prepare_leetcode_data.py     # Download/normalize LeetCode datasets
@@ -197,7 +194,7 @@ AI-study-mentor-/
 | Area | Tools |
 |---|---|
 | Language | Python 3.10+ (uses `X \| None` type syntax) |
-| UI | Streamlit, Plotly, Graphviz (via `st.graphviz_chart`), custom CSS/JS |
+| Frontend | Next.js 16, React 19, TypeScript (strict), Tailwind v4, TanStack Query, React Flow, Plotly (3D), KaTeX, cmdk |
 | API | FastAPI, Uvicorn, Pydantic, python-multipart |
 | LLM | Google Gemini via the `google-genai` SDK, default model `gemini-3.8-flash` |
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
@@ -243,7 +240,6 @@ Dependencies are declared in `pyproject.toml` as a small core plus optional extr
 | `leetcode` | pandas, huggingface_hub, kaggle |
 | `math` | SymPy |
 | `export` | ReportLab, markdown |
-| `ui` | Streamlit, Plotly, scikit-learn (the current UI; being replaced by Next.js) |
 | `dev` | pytest, ruff, mypy, pre-commit, httpx |
 
 Example for backend development without the heavy ML stack: `pip install -e ".[api,sources,leetcode,math,export,dev]"`.
@@ -334,25 +330,9 @@ Without a prebuilt store, the engine falls back to scanning **local files only**
 
 ## Running the app
 
-### Streamlit UI (main experience)
+You run two processes: the API and the web app. You need Node.js 20 or newer for the web app.
 
-```bash
-streamlit run frontend/app_enhanced.py
-```
-
-The earlier hackathon UI is also available:
-
-```bash
-streamlit run frontend/app.py --server.port=8504
-```
-
-A standalone canned-response demo that needs no API key:
-
-```bash
-streamlit run frontend/demo_app.py
-```
-
-### FastAPI backend
+### 1. API
 
 ```bash
 uvicorn backend.api:app --reload --port 8000
@@ -360,34 +340,43 @@ uvicorn backend.api:app --reload --port 8000
 
 Interactive docs: <http://localhost:8000/docs> (Swagger) and <http://localhost:8000/redoc>.
 
+### 2. Web app
+
+```bash
+npm install                                        # once, at the repo root (npm workspaces)
+cp apps/web/.env.example apps/web/.env.local       # NEXT_PUBLIC_API_URL, default http://localhost:8000
+npm run web:dev                                    # http://localhost:3000
+```
+
+The API must list the web origin in `CORS_ORIGINS` (the default already includes `http://localhost:3000`).
+
+Production build: `npm run web:build && npm run start -w apps/web`. Note that `NEXT_PUBLIC_API_URL` is baked in at build time.
+
+### Tests
+
+```bash
+make check                      # Python: ruff + pytest
+npm run web:test                # Vitest unit/component tests
+npm run web:typecheck && npm run web:lint
+cd apps/web && npx playwright install chromium
+E2E_PYTHON=$(which python) npx playwright test     # browser tests against the real API (scripted model, no key needed)
+```
+
 ---
 
 ## Using the UI
 
-### Sidebar (`app_enhanced.py`)
-- **Demo Mode** toggle: instant canned experience; "Switch back to Normal Mode" to return.
-- **Settings**: Top-k context chunks (1–8), temperature (0.0–1.0), model (optionally load the supported-model list from the API), *Generate answers (Gemini)* (turn off for retrieval-only), *Show final prompt*.
-- **Document Stats**: documents, chunks and page range, with a **Refresh stats** button after adding sources.
-- **Demo Warm-Up**: pre-runs popular queries to fill caches.
-- **Add Sources**: save URLs to `sources.txt`, upload audio files.
-
-### Tabs
-
-| Tab | Usage |
+| Page | What you do there |
 |---|---|
-| **Ask** | Type a question or click an example. See retrieved context cards with scores and highlights, the generated answer, and optionally the prompt. (Chat export, study notes and flashcards are in the older `frontend/app.py`.) |
-| **Concept Map** | Enter a topic and click *Generate Concept Map*. Inspect individual concepts and download JSON or DOT. |
-| **Socratic Tutor** | Ask a question and click *Guide me* for guiding questions and a hint ladder. |
-| **Synthesis** | Enter a topic and click *Compare & Synthesize* to compare how your documents explain it. |
-| **Adaptive Tutor** | Pick a level (ELI5 → Expert), ask a question, and get a tailored explanation plus a mini quiz. |
-| **Math** | Prompts such as `differentiate sin(x)`, `integrate x^2`, `simplify (x^2 + 2x + 1)`, `solve x^2 = 4 for x`. |
-| **3D Viz** | Rotate and zoom a 3D scatter of up to 500 chunks. |
-| **LeetCode** | Load the dataset, search with filters, and generate a mentor-style study guide for a chosen problem. |
-| **Analytics** | Session metrics and charts; download a Markdown study report or a CSV. |
+| **Ask** | Type a question (or click a suggestion) and watch the answer stream in, with its sources underneath. *Advanced* has temperature, model, "only show matching passages" and "show the prompt". Your session is remembered in the browser; generate study notes or flashcards from it. |
+| **Sources** | Drop PDFs or audio, paste YouTube/GitHub/web links, watch indexing progress, delete sources. |
+| **LeetCode** | Search the problem bank, filter by difficulty and topic, read a problem, generate a study guide. |
+| **Tutor tools** | Concept map, Socratic tutor, compare sources, explain at my level (tabs). |
+| **Math** | Type or click an example such as `differentiate sin(x)`, `solve x^2 - 5x + 6 = 0`, `factor x^3 - x`. |
+| **Embedding map** | Rotate and zoom your passages in 3D; click a point to read it. |
+| **Analytics** | See what you asked and which sources answered; export a report or CSV. |
 
-### Keyboard shortcuts
-- `Cmd/Ctrl + K`: open the command palette
-- `Cmd/Ctrl + /`: toggle the sidebar
+**Keyboard:** `Ctrl/⌘ + K` opens the command palette (pages, tutor tools, shortcuts); `Ctrl/⌘ + Enter` sends a question.
 
 ### Study modes (Ask tab / `RAGEngine`)
 | Mode | Output style |
@@ -507,7 +496,7 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 
 ### `RAGEngine` (`backend/rag_engine.py`)
 - `retrieve_context(query, k)`: exact cosine search over the store's embeddings; if they are unavailable, ranks chunks by the share of query terms they contain (stopwords ignored). Every result carries its own score.
-- `RAGEngine.shared()`: one engine per store directory, used by the API and the Streamlit app. `add_sources()` / `remove_source()` update the live index and persist it.
+- `RAGEngine.shared()`: one engine per store directory, used by the API. `add_sources()` / `remove_source()` update the live index and persist it.
 - `generate_prompt(question, chunks, mode)`: builds the mode-specific prompt.
 - `answer_with_gemini(...)`: retrieve → prompt → Gemini. `generate_answer(...)` synthesizes from caller-supplied context.
 - `generate_query_suggestions(...)`: proposes study questions from the corpus (static fallback list on failure).
@@ -570,20 +559,25 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 
 ---
 
-## Demo mode
+## Trying it without an API key
 
-For presentations (and as a backup if the network or API fails):
-- **Demo Mode checkbox** in the main app's sidebar switches to a cached experience (`frontend/demo_module.py`).
-- **`frontend/demo_app.py`** runs standalone with canned answers for *Explain dynamic programming*, *What is a hash table?* and *Solve Two Sum*, plus Ask, LeetCode, Analytics and About tabs.
-- **`docs/demo_guide.md`** has a 3-minute script: stats → LeetCode search → multi-source answer → analytics.
-- **`Emergency Hackathon Context.md`** holds the planning notes, timeline, checklist and pitch from the hackathon day.
+The model is only needed to *write* things. Without `GEMINI_API_KEY`:
+
+- **Works fully**: adding sources, search and retrieval (Ask → Advanced → "only show matching passages"), LeetCode search and browsing, Math, the Embedding map, Analytics.
+- **Explained, not broken**: Ask, the tutor tools and study guides show a notice that the server has no key, and Ask still lists the passages it found.
+- **Offline fallbacks**: some tutor tools return a basic built-in result, clearly labelled as a fallback.
+
+The browser tests run the real API with a scripted stand-in for the model (`tests/e2e_server.py`), which is also a handy way to explore the UI offline.
+
+The canned-answer "Demo Mode" from the original Streamlit app was not carried over. `docs/demo_guide.md` has a short script for presenting the project, and `Emergency Hackathon Context.md` holds the planning notes from the hackathon day.
 
 ---
 
 ## Documentation in this repo
 
 - [`docs/LEARNING_GUIDE.md`](docs/LEARNING_GUIDE.md): a step-by-step RAG tutorial that maps each concept (ingestion, chunking, embeddings, vector stores, retrieval, prompting, LLM integration, evaluation) to code in this repository.
-- [`docs/demo_guide.md`](docs/demo_guide.md): the demo script.
+- [`docs/demo_guide.md`](docs/demo_guide.md): a short script for presenting the project.
+- [`docs/PLAN.md`](docs/PLAN.md): the completion plan and what was decided along the way.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): placeholder (empty). The architecture is documented above.
 
 ---
@@ -605,7 +599,7 @@ Documented honestly so you know what to expect. These come from reading the code
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
 - **Retrieval quality is unmeasured**: semantic search works, but ambiguous acronyms can mislead it (for example, "BFS vs DFS" retrieved "distributed file system" passages). Hybrid retrieval and an evaluation set are Phase 4.
 - **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.
-- **3D Viz is not semantic**: points are projected from SHA-256 hashes of the text (chosen to avoid macOS segfaults), so distances do not reflect meaning.
+- **The embedding map is only as semantic as the index**: with the fallback `hashing` embedder, closeness reflects shared words. The page warns when that is the case.
 - **Security is portfolio-grade, not hardened**: the rate limiter is in-memory per process (and keyed by the connecting IP, so it needs adjusting behind a proxy), there are no user accounts (just an optional shared `API_KEY`), and uploads are not virus-scanned. Remaining Phase 6 work: spend caps and deployment hardening.
 - **Background jobs are in memory**: job records are lost on restart (the index itself is persisted), and indexing runs one job at a time.
 - **PDF export** uses ReportLab's built-in font, so non-Latin characters may not render.
