@@ -179,3 +179,24 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# macOS
+.DS_Store
+
+# Generated data (rebuild with scripts/preprocess_all_documents.py)
+data/vector_store/
+data/repos/
+data/leetcode/embeddings.npy
+data/leetcode/hf_kaysss/
+
+# Copyrighted study material: add your own PDFs locally (see data/README.md)
+data/uploaded_files/*.pdf
+data/uploaded_files/*.mp3
+data/uploaded_files/*.mp4
+data/uploaded_files/*.wav
+data/uploaded_files/*.m4a
+
+# Frontend (Next.js)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
