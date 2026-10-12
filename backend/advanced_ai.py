@@ -51,7 +51,7 @@ def build_concept_map(topic: str, context_override: Optional[str] = None, temper
 
     try:
         client = GeminiClient(temperature=temperature)
-        resp = client.generate(prompt)
+        resp = client.generate(prompt, json_mode=True)
         if resp.get("ok"):
             text = resp.get("answer", "").strip()
             # Defensive JSON extraction
@@ -113,7 +113,7 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
     )
     try:
         client = GeminiClient(temperature=temperature)
-        resp = client.generate(template)
+        resp = client.generate(template, json_mode=True)
         if resp.get("ok"):
             text = (resp.get("answer") or "").strip()
             start = text.find("{")
@@ -170,7 +170,7 @@ def multi_document_synthesis(topic: str, k_per_doc: int = 2, temperature: float 
     )
     try:
         client = GeminiClient(temperature=temperature)
-        resp = client.generate(prompt)
+        resp = client.generate(prompt, json_mode=True)
         if resp.get("ok"):
             text = resp.get("answer", "")
             start = text.find("{")

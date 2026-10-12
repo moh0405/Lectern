@@ -131,13 +131,17 @@ class RAGEngine:
     # ------------------------------------------------------------------
     # Indexing (used by the API)
     # ------------------------------------------------------------------
-    def add_sources(self, inputs: List[str], refresh_urls: bool = False, save: bool = True):
+    def add_sources(self, inputs: List[str], refresh_urls: bool = False, save: bool = True, progress=None):
         """Index files/URLs into the live store and persist it. Returns an IndexReport."""
         from .indexer import index_inputs
 
-        report = index_inputs(self.store, inputs, embedder=self._embedder, refresh_urls=refresh_urls)
+        report = index_inputs(
+            self.store, inputs, embedder=self._embedder, refresh_urls=refresh_urls, progress=progress
+        )
         self._fallback_items = None
         self._embedder_failed = False
+        if len(self.store):
+            self._get_embedder()  # indexing just loaded it; bind it so semantic search is ready
         if save:
             self.store.save()
         return report
