@@ -37,6 +37,8 @@ class FakeGemini:
         if json_mode and "synthesizer" in prompt.lower():
             return json.dumps({"similarities": ["both define it"], "conflicts": [], "synthesis": "Unified view.",
                                "citations": [{"doc": "a.pdf", "point": "defines it"}, "loose citation"]})
+        if FakeGemini.echo_context and "algorithms mentor" in prompt:
+            return "## Approach\n\n- Use a hash map from value to index.\n\n```python\ndef solve(nums):\n    return nums\n```"
         if FakeGemini.echo_context and "study corpus" in prompt:
             return "1. What is a binary heap?\n2. How does insert work in a heap?\n3. What is a priority queue?"
         if FakeGemini.echo_context:

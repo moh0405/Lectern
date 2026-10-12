@@ -69,3 +69,26 @@ def test_shipped_dataset_has_topics():
     rows = [json.loads(line) for line in NORMALIZED.read_text(encoding="utf-8").splitlines()]
     with_topics = sum(1 for r in rows if r["topics"])
     assert with_topics > 0.8 * len(rows)
+
+
+def test_exact_title_ranks_first(handler):
+    titles = [r["title"] for r in handler.search("two sum", top_k=5)]
+    assert titles[0] == "Two Sum"
+    assert "Combine Two Tables" not in titles[:1]
+
+
+def test_query_with_no_matching_terms_returns_nothing(handler):
+    assert handler.search("zzzzzzqqqq") == []
+
+
+def test_empty_query_browses_in_dataset_order_with_filters(handler):
+    first = handler.search("", top_k=3)
+    assert [r["pid"] for r in first] == [p.pid for p in handler._problems[:3]]
+    hard_trees = handler.search("", top_k=50, difficulty=["Hard"], topics=["Tree"])
+    assert hard_trees and all(r["difficulty"] == "Hard" and "Tree" in r["topics"] for r in hard_trees)
+
+
+def test_filters_combine_with_a_query(handler):
+    res = handler.search("binary tree", top_k=10, difficulty=["Medium"], topics=["Tree"])
+    assert res and all(r["difficulty"] == "Medium" for r in res)
+    assert res[0]["score"] >= res[-1]["score"]

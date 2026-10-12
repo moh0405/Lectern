@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/page-header";
+import { Suspense } from "react";
+import { LeetCodeView } from "@/features/leetcode/leetcode-view";
 
 export const metadata: Metadata = { title: "LeetCode" };
 
 export default function Page() {
-  return <PageHeader title="LeetCode" description="Coming up in this phase." />;
+  // useSearchParams (URL-backed filters) needs a Suspense boundary.
+  return (
+    <Suspense>
+      <LeetCodeView />
+    </Suspense>
+  );
 }

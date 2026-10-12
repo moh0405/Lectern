@@ -186,20 +186,26 @@ class LeetCodeHandler:
             req = {t.strip().lower() for t in topics}
             idxs = [i for i in idxs if req.intersection({t.lower() for t in (self._problems[i].topics or [])})]
 
-        texts = [f"{self._problems[i].title}\n\n{self._problems[i].description}" for i in idxs]
-
-        scores: List[float] = []
-        if self._embeddings is not None:
-            try:
-                q = embed_texts([query], model_name=self.model_name)[0]
-                mat = self._embeddings[idxs]
-                scores = (mat @ q).tolist()
-            except Exception:
-                scores = self._keyword_scores(query, texts)
+        q = (query or "").strip()
+        if not q:
+            # Browse: no query means dataset order (filters still apply), nothing to score.
+            scores: List[float] = [0.0] * len(idxs)
+            order = list(range(len(idxs)))
         else:
-            scores = self._keyword_scores(query, texts)
-
-        order = np.argsort(-np.asarray(scores)).tolist()
+            semantic = False
+            scores = []
+            if self._embeddings is not None:
+                try:
+                    qv = embed_texts([q], model_name=self.model_name)[0]
+                    scores = (self._embeddings[idxs] @ qv).tolist()
+                    semantic = True
+                except Exception:
+                    semantic = False
+            if not semantic:
+                scores = self._keyword_scores(q, [(self._problems[i].title, self._problems[i].description) for i in idxs])
+            order = np.argsort(-np.asarray(scores), kind="stable").tolist()
+            if not semantic:
+                order = [j for j in order if scores[j] > 0]  # no term in common: not a match
         results: List[Dict[str, Any]] = []
         for j in order[:top_k]:
             i = idxs[j]
@@ -331,15 +337,25 @@ class LeetCodeHandler:
         np.save(str(emb_path), arr)
         self._embeddings = arr
 
-    def _keyword_scores(self, query: str, texts: List[str]) -> List[float]:
-        toks = lambda s: set(re.findall(r"\b\w+\b", s.lower()))
-        q = toks(query)
-        scores = []
-        for t in texts:
-            tt = toks(t)
-            inter = len(q & tt)
-            union = len(q | tt) or 1
-            scores.append(inter / union)
+    _STOP = frozenset("a an the of in on at to for from by with and or is are be it this that given return find".split())
+
+    def _terms(self, text: str) -> set:
+        return {t for t in re.findall(r"\w+", text.lower()) if t not in self._STOP}
+
+    def _keyword_scores(self, query: str, docs: List[Tuple[str, str]]) -> List[float]:
+        """Rank (title, description) pairs: query-term coverage of the title counts triple,
+        an exact title match gets a bonus, and description coverage breaks ties."""
+        q = self._terms(query)
+        if not q:
+            return [0.0] * len(docs)
+        q_norm = " ".join(sorted(q))
+        scores: List[float] = []
+        for title, description in docs:
+            t = self._terms(title)
+            cov_title = len(q & t) / len(q)
+            cov_desc = len(q & self._terms(description)) / len(q)
+            exact = 1.0 if t and " ".join(sorted(t)) == q_norm else 0.0
+            scores.append(3.0 * cov_title + cov_desc + 2.0 * exact)
         return scores
 
     def _merge_problem(self, a: LCProblem, b: LCProblem) -> LCProblem:
