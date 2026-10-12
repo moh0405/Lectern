@@ -1,34 +1,22 @@
-import re
-from typing import List, Dict, Any
+"""Interactive retrieval CLI: prints the retrieved context and the final prompt.
+
+    python chat_cli.py            # semantic retrieval when a vector store exists
+    python chat_cli.py --keyword  # keyword retrieval only (no ML libraries needed)
+"""
+import argparse
 
 from backend.rag_engine import RAGEngine
 
 
-def tokenize(text: str) -> List[str]:
-    return re.findall(r"\b\w+\b", text.lower())
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--keyword", action="store_true", help="skip embeddings, use keyword overlap")
+    ap.add_argument("-k", type=int, default=3, help="number of chunks to retrieve")
+    args = ap.parse_args()
 
-
-def keyword_retrieve(engine: RAGEngine, query: str, k: int = 3) -> List[Dict[str, Any]]:
-    items = engine._docstore_iter()
-    q_tokens = set(tokenize(query))
-    scored = []
-    for it in items:
-        t_tokens = set(tokenize(it.get("text", "")))
-        inter = len(q_tokens & t_tokens)
-        union = len(q_tokens | t_tokens) or 1
-        score = inter / union
-        scored.append((score, it))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    out = []
-    for s, it in scored[:k]:
-        out.append({"text": it.get("text", ""), "doc": it.get("doc", ""), "page": it.get("page", None), "score": float(s)})
-    return out
-
-
-def main():
-    print("Initializing RAG engine (embedding may be skipped if environment issues)...")
-    engine = RAGEngine()
-    print("Ready. Type questions, 'quit' to exit.")
+    engine = RAGEngine(use_embeddings=not args.keyword)
+    mode = "semantic" if engine.warm() else "keyword"
+    print(f"Ready ({mode} retrieval, {len(engine._docstore_iter())} chunks). Type questions, 'quit' to exit.")
     while True:
         try:
             q = input("You: ").strip()
@@ -36,10 +24,7 @@ def main():
             break
         if not q or q.lower() in {"quit", "exit"}:
             break
-        try:
-            chunks = engine.retrieve_context(q, k=3)
-        except Exception:
-            chunks = keyword_retrieve(engine, q, k=3)
+        chunks = engine.retrieve_context(q, k=args.k)
         prompt = engine.generate_prompt(q, chunks)
         print("\nContext:")
         for c in chunks:

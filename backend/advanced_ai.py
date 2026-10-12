@@ -28,7 +28,7 @@ def _collect_context(max_chars: int = 4000) -> str:
     Uses a hardened RAGEngine path that does not require FAISS indexes.
     """
     try:
-        eng = RAGEngine(auto_embeddings=False)
+        eng = RAGEngine.shared()
         items = eng._docstore_iter()
     except Exception:
         items = []
@@ -156,7 +156,7 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
 
 def multi_document_synthesis(topic: str, k_per_doc: int = 2, temperature: float = 0.2) -> Dict[str, Any]:
     """Compare how multiple documents explain a topic and synthesize a unified explanation."""
-    eng = RAGEngine(auto_embeddings=False)
+    eng = RAGEngine.shared()
     items = eng._docstore_iter()
     # Group texts by document
     by_doc: Dict[str, List[str]] = {}
@@ -218,7 +218,7 @@ def adaptive_explain(question: str, level: str = "Undergrad", temperature: float
 
     Falls back to a template-based rewrite if Gemini is unavailable.
     """
-    eng = RAGEngine(auto_embeddings=False)
+    eng = RAGEngine.shared()
     chunks = eng.retrieve_context(question, k=4)
     context = eng.format_context(chunks)
     instr = ELI_LEVELS.get(level, ELI_LEVELS["Undergrad"])

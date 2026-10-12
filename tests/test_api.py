@@ -11,9 +11,26 @@ from backend import api  # noqa: E402
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # keep the engine from scanning local PDFs
-    monkeypatch.setattr(api, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(api, "UPLOAD_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(api, "STORE_DIR", tmp_path / "store")
+    (tmp_path / "uploads").mkdir()
+    api.app.state.engine = None  # each test gets a fresh engine bound to tmp dirs
     api._rate_state.clear()
     return TestClient(api.app)
+
+
+def make_pdf(text: str) -> bytes:
+    reportlab = pytest.importorskip("reportlab.pdfgen.canvas")
+    import io
+
+    buf = io.BytesIO()
+    c = reportlab.Canvas(buf)
+    y = 800
+    for line in text.splitlines():
+        c.drawString(72, y, line)
+        y -= 20
+    c.save()
+    return buf.getvalue()
 
 
 def test_health(client):
@@ -43,3 +60,42 @@ def test_rate_limit(client, monkeypatch):
     assert client.get("/health").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/health").status_code == 429
+
+
+def test_lifespan_creates_shared_engine(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(api, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(api, "STORE_DIR", tmp_path / "store")
+    api.app.state.engine = None
+    with TestClient(api.app) as c:
+        engine = api.app.state.engine
+        assert engine is not None
+        c.get("/health")
+        assert api.app.state.engine is engine  # requests reuse it
+
+
+def test_upload_indexes_search_finds_and_delete_removes(client, monkeypatch):
+    monkeypatch.setenv("EMBEDDER", "hashing")
+    pdf = make_pdf("A binary heap is a complete binary tree used to implement a priority queue.")
+    res = client.post("/api/upload", files={"files": ("heaps.pdf", pdf, "application/pdf")})
+    body = res.json()
+    assert res.status_code == 200 and body["results"][0]["ok"], body
+    assert body["results"][0]["chunks_indexed"] >= 1
+
+    assert client.get("/api/documents").json()["documents"] == ["heaps.pdf"]
+    assert client.get("/api/stats").json()["chunks"] >= 1
+    hits = client.get("/api/search", params={"query": "priority queue heap", "k": 2}).json()["chunks"]
+    assert hits and hits[0]["doc"] == "heaps.pdf"
+
+    gone = client.delete("/api/documents/heaps.pdf").json()
+    assert gone["ok"] and gone["chunks_removed"] >= 1
+    assert client.get("/api/documents").json()["documents"] == []
+    assert client.get("/api/search", params={"query": "priority queue heap"}).json()["chunks"] == []
+
+
+def test_upload_strips_directory_components(client, monkeypatch):
+    monkeypatch.setenv("EMBEDDER", "hashing")
+    pdf = make_pdf("some text about graphs")
+    res = client.post("/api/upload", files={"files": ("../../evil.pdf", pdf, "application/pdf")})
+    assert res.json()["results"][0]["filename"] == "evil.pdf"
+    assert (api.UPLOAD_DIR / "evil.pdf").exists()

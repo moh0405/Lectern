@@ -60,14 +60,16 @@ Even then, try these first: better system prompts, few-shot examples, structured
 
 ## Phase 1: Retrieval core (about 1 week)
 Builds on the open work in PR #1 (FAISS document-processing pipeline).
-- [ ] Make FAISS the real retrieval path; fix the keyword fallback so each result reports its own score.
-- [ ] Replace pickle metadata with JSONL or Parquet next to `index.faiss`.
-- [ ] Incremental indexing: chunk hashing, embed only new chunks, support delete.
-- [ ] One shared engine at API startup (FastAPI lifespan) instead of one per request.
-- [ ] Fix the macOS segfault properly (pinned torch, or a lighter embedder such as ONNX or fastembed).
-- [ ] Tests: chunking, retrieval ranking, prompt modes, source handlers (mocked network), store round-trip.
+- [x] Retrieval goes through the new `VectorStore`; the keyword fallback now reports per-result scores (query-term coverage, stopwords ignored). **Deviation:** FAISS is an opt-in backend (`VECTOR_BACKEND=faiss`), not the default. On macOS, FAISS and torch each bundle an OpenMP runtime and the process aborts on the first multithreaded call whichever is imported first (reproduced with all four import-order/thread-count combinations). Exact NumPy search returns identical results in about a millisecond at this scale, so FAISS is refused automatically when torch is loaded.
+- [x] Replace pickle metadata with `chunks.jsonl` + `embeddings.npy` + `manifest.json` (no pickle anywhere).
+- [x] Incremental indexing: content-fingerprinted sources, chunk hashing, embed only new chunks, replace changed sources, prune removed ones, delete via the API.
+- [x] One shared engine at API startup (FastAPI lifespan); the API also runs blocking work in a threadpool and retrieves once per query.
+- [x] Fix the macOS segfault: root cause was faiss + torch OpenMP clash (see above), not torch alone; current sentence-transformers/torch run fine on their own.
+- [x] Tests: embedders, store round-trip/dedupe/remove/backends, indexer (incremental, prune, failure, rebuild), engine (semantic, keyword, fallback, reload), API (upload → index → search → delete).
 
 **Done when:** retrieval has tests and no request re-parses PDFs.
+
+Found while verifying on the real corpus: retrieval works (4–26 ms/query) but ambiguous acronyms mislead it ("BFS vs DFS" returned distributed-file-system passages). That is Phase 4 material (hybrid retrieval, eval set).
 
 ## Phase 2: API v1 for a TypeScript client (about 1 week)
 - [ ] Endpoints for every feature: `/ask` (with `mode`), `/concept-map`, `/socratic`, `/synthesis`, `/adaptive`, `/math`, `/leetcode/search`, `/leetcode/{id}/explain`, `/suggestions`, `/notes`, `/export`, `/analytics`.

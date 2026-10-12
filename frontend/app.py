@@ -30,7 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.rag_engine import RAGEngine
 from backend.llm_config import GeminiClient
-from backend.document_processor import list_chunks_from_dir
+from backend.document_processor import discover_inputs, list_chunks_from_dir
 from backend.export_utils import markdown_to_pdf, markdown_to_html
 from backend.advanced_ai import build_concept_map, concept_map_to_dot
 from backend.leetcode_handler import LeetCodeHandler
@@ -108,7 +108,7 @@ def toast(msg: str, kind: str = "info"):
 def stats_panel(engine: RAGEngine | None = None) -> Dict[str, Any]:
     try:
         if engine is None:
-            engine = RAGEngine(auto_embeddings=False)
+            engine = RAGEngine.shared()
         items = engine._docstore_iter()
     except Exception:
         try:
@@ -195,7 +195,8 @@ def build_ui():
                     if urls:
                         (out_dir / "sources.txt").write_text("\n".join(urls))
                     # Warm metadata + show summary
-                    chunks = list_chunks_from_dir(str(out_dir.resolve()))
+                    RAGEngine.shared().add_sources(discover_inputs(str(out_dir.resolve())))
+                    chunks = RAGEngine.shared()._docstore_iter()
                     by_doc = {}
                     for it in chunks:
                         d = it.get("doc") or "unknown"
@@ -212,7 +213,7 @@ def build_ui():
                     st.error(f"Ingest error: {e}")
 
     # Stats dashboard on top
-    engine = RAGEngine(auto_embeddings=False)
+    engine = RAGEngine.shared()
     stats = stats_panel(engine)
     c1, c2, c3 = st.columns(3)
     c1.metric("Documents", stats["documents"])
@@ -224,7 +225,7 @@ def build_ui():
     # Intelligent Query Suggestions
     st.caption("Smart Suggestions from your corpus")
     try:
-        suggestions = RAGEngine(auto_embeddings=False).generate_query_suggestions(max_questions=5, model=model, temperature=temperature)
+        suggestions = RAGEngine.shared().generate_query_suggestions(max_questions=5, model=model, temperature=temperature)
     except Exception:
         suggestions = [
             "Explain dynamic programming",
@@ -410,7 +411,7 @@ def build_ui():
         if st.button("Generate Study Notes (Markdown)"):
             with st.spinner("Summarizing session…"):
                 try:
-                    engine2 = RAGEngine(auto_embeddings=False)
+                    engine2 = RAGEngine.shared()
                     summ = engine2.summarize_chat(hist, model=model, temperature=temperature)
                     if summ.get("ok"):
                         notes_md = summ.get("markdown") or ""
@@ -479,7 +480,7 @@ def build_ui():
     if st.button("Compare sources"):
         with st.spinner("Synthesizing across sources…"):
             try:
-                res = RAGEngine(auto_embeddings=False).multi_source_synthesis(synth_q, k_per_doc=2, model=model, temperature=temperature)
+                res = RAGEngine.shared().multi_source_synthesis(synth_q, k_per_doc=2, model=model, temperature=temperature)
                 if res.get("ok"):
                     st.markdown(res.get("answer",""))
                     st.caption("Citations")

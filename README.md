@@ -36,7 +36,7 @@ AI Study Mentor was my first project for learning AI engineering, and it grew in
 
 ### Core RAG
 - **Multi-source ingestion**: PDFs, YouTube transcripts, web articles, GitHub repos (READMEs, docs and Python docstrings/comments), and audio/video files transcribed with Whisper.
-- **Semantic retrieval** with `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-d, normalized, cosine similarity), with an automatic **keyword-overlap (Jaccard) fallback** when ML libraries are unavailable.
+- **Semantic retrieval** with `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-d, normalized, cosine similarity), with an automatic **keyword-coverage fallback** when ML libraries are unavailable.
 - **Grounded answers**: prompts instruct Gemini to use only the retrieved context and cite sources (document name and page, or video timestamp).
 - **Four study modes** that change the prompt style: *ELI5*, *Technical*, *Interview Prep*, *Quick Summary*.
 - **Visual RAG**: retrieved chunks are shown as cards with relevance scores (green/amber/red) and highlighted query keywords.
@@ -82,12 +82,12 @@ These live in the earlier UI (`frontend/app.py`); the backend functions are also
  Chunking (800 chars, 160 overlap)  ──►  chunk dicts {text, doc, page, chunk_id, source_type, url, extra}
         │
         ▼
- Embeddings (all-MiniLM-L6-v2, normalized, cached to embeddings.npy)
+ Embeddings (all-MiniLM-L6-v2, normalized; chunks de-duplicated by hash)
         │
         ▼
- Vector store (FAISS IndexFlatIP + index.pkl metadata)
-        │                                   ┌── keyword Jaccard fallback if no embeddings
- Query ─► embed ─► cosine top-k  ◄──────────┘
+ Vector store (manifest.json + chunks.jsonl + embeddings.npy; no pickle)
+        │                                   ┌── keyword coverage fallback if embeddings unavailable
+ Query ─► embed ─► exact cosine top-k ◄─────┘   (NumPy by default, FAISS optional)
         │
         ▼
  Prompt builder (mode: default / eli5 / technical / interview / summary)
@@ -113,8 +113,9 @@ flowchart LR
         PDF[PDF]:::s --- YT[YouTube]:::s --- WEB[Web article]:::s --- GH[GitHub repo]:::s --- AU[Audio / Video]:::s
     end
     Sources --> SM[source handlers<br/>backend/sources/*]
-    SM --> DP[document_processor<br/>chunk + embed + FAISS]
-    DP --> VS[(data/vector_store<br/>index.faiss, index.pkl, embeddings.npy)]
+    SM --> DP[document_processor<br/>chunk + dedupe]
+    DP --> IX[indexer<br/>incremental, fingerprinted]
+    IX --> VS[(data/vector_store<br/>manifest.json, chunks.jsonl, embeddings.npy)]
     VS --> RAG[RAGEngine<br/>retrieve + prompt]
     RAG --> LLM[GeminiClient]
     ADV[advanced_ai<br/>concept map, Socratic, synthesis, adaptive, math] --> RAG
@@ -141,7 +142,10 @@ AI-study-mentor-/
 ├── backend/
 │   ├── api.py                  # FastAPI app (upload, documents, stats, search, query + SSE)
 │   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes, synthesis
-│   ├── document_processor.py   # PDF reading, chunking, source routing, embeddings, FAISS build/load
+│   ├── embeddings.py           # Sentence-transformers and dependency-free hashing embedders
+│   ├── vector_store.py         # Pickle-free on-disk store: add, dedupe, remove, search (NumPy or FAISS)
+│   ├── indexer.py              # Incremental indexing: fingerprints, skip unchanged, prune, CLI
+│   ├── document_processor.py   # PDF reading, chunking, source routing, input discovery
 │   ├── llm_config.py           # GeminiClient: model resolution, retry/backoff, fallback
 │   ├── advanced_ai.py          # Concept map, Socratic tutor, multi-doc synthesis, adaptive explain, math solver
 │   ├── leetcode_handler.py     # LeetCodeHandler: load/normalize/search/explain LeetCode problems
@@ -178,7 +182,6 @@ AI-study-mentor-/
 ├── .github/workflows/ci.yml    # CI: ruff + pytest on Python 3.10 and 3.12
 ├── .pre-commit-config.yaml
 ├── chat_cli.py                 # Interactive retrieval CLI (semantic with keyword fallback)
-├── keyword_cli.py              # Retrieval CLI using keyword overlap only
 ├── test_real_pdf.py            # Quick PDF text-extraction smoke test
 ├── Emergency Hackathon Context.md  # Hackathon-day planning notes and pitch
 ├── requirements.txt            # shim: installs .[all]
@@ -197,7 +200,7 @@ AI-study-mentor-/
 | API | FastAPI, Uvicorn, Pydantic, python-multipart |
 | LLM | Google Gemini (`google-generativeai`), default model `gemini-flash-latest` |
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
-| Vector search | FAISS (`faiss-cpu`) and NumPy cosine similarity |
+| Vector search | Exact cosine similarity: NumPy by default, optional FAISS (`faiss-cpu`) |
 | Ingestion | `pypdf`, `youtube-transcript-api`, `requests`, `beautifulsoup4`, `readability-lxml`, `gitpython`, `openai` (Whisper) |
 | Math | SymPy |
 | ML utils | scikit-learn (t-SNE/PCA for the 3D view) |
@@ -232,7 +235,8 @@ Dependencies are declared in `pyproject.toml` as a small core plus optional extr
 | Extra | Adds |
 |---|---|
 | *(core)* | numpy, pypdf, python-dotenv, requests, Gemini SDK |
-| `embeddings` | sentence-transformers + faiss-cpu (semantic retrieval; without it the engine uses keyword overlap) |
+| `embeddings` | sentence-transformers (semantic retrieval; without it the engine uses keyword overlap) |
+| `faiss` | Optional FAISS search backend (`VECTOR_BACKEND=faiss`); see the note below |
 | `api` | FastAPI, Uvicorn, python-multipart, Pydantic |
 | `sources` | YouTube, web, GitHub and audio ingestion |
 | `leetcode` | pandas, huggingface_hub, kaggle |
@@ -267,6 +271,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `GEMINI_API_KEY` | Yes, for generation | none | Google Gemini API key |
 | `GEMINI_MODEL` | No | `gemini-3.8-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
+| `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
+| `VECTOR_BACKEND` | No | `numpy` | `numpy` or `faiss` (see "Search backend") |
 | `OPENAI_API_KEY` | Only for audio | none | Whisper transcription of `.mp3/.mp4/.wav/.m4a` (read by the audio source) |
 
 Never commit `.env`. It is already in `.gitignore`.
@@ -290,18 +296,33 @@ The repo ships with:
 ### Build the index (recommended)
 
 ```bash
-python scripts/preprocess_all_documents.py
+python scripts/preprocess_all_documents.py      # same as: python -m backend.indexer
 ```
 
 This scans `data/uploaded_files/` and writes `data/vector_store/`:
 
-- `index.faiss`: FAISS inner-product index
-- `index.pkl`: chunk metadata
-- `embeddings.npy`: normalized embeddings used for fast NumPy retrieval
+| File | Contents |
+|---|---|
+| `manifest.json` | store version, embedder name/dimension, and a fingerprint per source |
+| `chunks.jsonl` | one JSON object per chunk (text, document, page, citation info, hash) |
+| `embeddings.npy` | normalized embedding matrix, row *i* belongs to chunk *i* |
+| `index.faiss` | only with `VECTOR_BACKEND=faiss` |
 
-Without a prebuilt store, the engine falls back to scanning **local files only** (PDFs and audio) at startup and uses keyword retrieval. That works but is slower and less accurate.
+The indexer is **incremental**:
+- A file's fingerprint is the SHA-256 of its content. Unchanged files are skipped, changed files are replaced, and files that were removed from the folder are pruned.
+- URLs from `sources.txt` are fetched once and then skipped (`--refresh-urls` re-fetches them).
+- Chunks are hashed, so text that is already stored is never embedded twice.
+- A source that fails to parse is reported and leaves its previously indexed chunks untouched.
 
-You can also run the module directly: `python -m backend.document_processor` (skips the rebuild if the store already exists).
+Useful flags: `--rebuild` (start over, needed if you change the embedder), `--no-prune`, `--embedder auto|sentence-transformers|hashing`.
+
+Measured on the three textbooks this project was developed with: 4,715 chunks, about 43 s for the first build (MiniLM on CPU), about 0.5 s for a no-change re-run, and 4–26 ms per query once the model is loaded.
+
+Without a prebuilt store, the engine falls back to scanning **local files only** (PDFs and audio) once and uses keyword retrieval. The API also indexes uploads automatically and removes a document's chunks when you delete it.
+
+**Search backend.** Retrieval is exact cosine similarity over normalized vectors. `VECTOR_BACKEND=numpy` (default) uses a NumPy matrix product; `VECTOR_BACKEND=faiss` uses a FAISS `IndexFlatIP` (install the `faiss` extra). Both return the same results, and NumPy takes about a millisecond at this scale. FAISS is refused automatically when torch is loaded in the same process, because on macOS the two bundle separate OpenMP runtimes and the process aborts on the first multithreaded call.
+
+**Embedders.** `EMBEDDER=auto` (default) uses sentence-transformers if it loads, else a dependency-free hashing embedder (not semantic, but better than keyword overlap). A store records which embedder built it; if that one cannot be loaded later, retrieval falls back to keywords instead of mixing incompatible vectors.
 
 ---
 
@@ -403,10 +424,9 @@ Validation: `question` must be at least 3 characters, `k` is 1–20, and `temper
 
 | Command | Description |
 |---|---|
-| `python chat_cli.py` | Interactive loop: prints retrieved context and the final prompt for each question. Uses semantic retrieval with a keyword fallback. |
-| `python keyword_cli.py` | Pure keyword-overlap retrieval (no ML libraries). Reads a LangChain-style `index.pkl`. |
+| `python chat_cli.py [--keyword] [-k N]` | Interactive loop: prints retrieved context and the final prompt for each question. Semantic retrieval with a keyword fallback; `--keyword` skips embeddings entirely. |
 | `python test_real_pdf.py` | Extracts and previews text from `data/uploaded_files/Dsa.pdf` to check PDF parsing. |
-| `python scripts/preprocess_all_documents.py` | Build the vector store. |
+| `python scripts/preprocess_all_documents.py` | Build or incrementally update the vector store (wrapper for `python -m backend.indexer`). |
 | `python scripts/prepare_leetcode_data.py` | Download and normalize LeetCode datasets. |
 | `python -m backend.rag_engine` | Prints a sample prompt and top chunks for "What is a linked list?". |
 | `python -m backend.leetcode_handler` | Loads the problem set, prints stats, and runs a sample search. |
@@ -441,13 +461,13 @@ All handlers extend `BaseSource` and return chunks in this schema:
 Source type is detected in `document_processor._detect_source` (and `source_manager.detect_source_type`): local `.pdf` → PDF, local audio extensions → audio, `youtube.com`/`youtu.be` → YouTube, `github.com` → GitHub, other `http(s)` → web.
 
 ### `RAGEngine` (`backend/rag_engine.py`)
-- `retrieve_context(query, k)`: cosine similarity over cached embeddings, or Jaccard keyword overlap if embeddings are unavailable.
+- `retrieve_context(query, k)`: exact cosine search over the store's embeddings; if they are unavailable, ranks chunks by the share of query terms they contain (stopwords ignored). Every result carries its own score.
+- `RAGEngine.shared()`: one engine per store directory, used by the API and the Streamlit app. `add_sources()` / `remove_source()` update the live index and persist it.
 - `generate_prompt(question, chunks, mode)`: builds the mode-specific prompt.
 - `answer_with_gemini(...)`: retrieve → prompt → Gemini. `generate_answer(...)` synthesizes from caller-supplied context.
 - `generate_query_suggestions(...)`: proposes study questions from the corpus (static fallback list on failure).
 - `summarize_chat(history)`: turns the last 20 Q&A turns into Markdown study notes (heuristic fallback).
 - `multi_source_synthesis(question)`: top chunks per document, then Gemini compares and cites.
-- Accepts both a LangChain-style `(docstore, index_to_id)` pickle (from the first prototype) and this project's `{"metadata": [...]}` pickle format.
 
 ### `GeminiClient` (`backend/llm_config.py`)
 1. Reads `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TEMPERATURE`.
@@ -500,7 +520,7 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 | `data/uploaded_files/` | `sources.txt` (tracked). PDFs and audio you add are gitignored. |
 | `data/leetcode/kaggle/` | Three raw Kaggle CSVs |
 | `data/leetcode/normalized_problems.jsonl` | 1,825 normalized problems |
-| `data/vector_store/` | *Generated.* FAISS index, metadata pickle, embeddings |
+| `data/vector_store/` | *Generated.* `manifest.json`, `chunks.jsonl`, `embeddings.npy` |
 | `data/repos/` | *Generated.* Cloned GitHub repos used as sources |
 
 ---
@@ -528,7 +548,7 @@ For presentations (and as a backup if the network or API fails):
 - **Origin**: the first AI-engineering project, started in October 2025 to learn RAG with LangChain, ChromaDB/FAISS and LLMs on CS material.
 - **Nov 2025**: pipeline working end to end without a UI, caching and preprocessing for fast startup, custom CSS, demo mode, batch-processing optimizations. Built under a hackathon deadline (see the context file).
 - **Jan 2026**: added transient retry logic to the Gemini client and re-applied the Demo Mode refactor.
-- **Open work**: [PR #1](https://github.com/moh0405/AI-study-mentor-/pull/1), "Add document processing pipeline with FAISS" (branch `feature/document-processing`, still open).
+- **Open work**: see the phase issues (#2–#9) and `docs/PLAN.md`. [PR #1](https://github.com/moh0405/AI-study-mentor-/pull/1) (an early FAISS pipeline) predates the current code and is superseded by the vector store.
 
 ---
 
@@ -540,8 +560,8 @@ Documented honestly so you know what to expect. These come from reading the code
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
 - **Deprecated Gemini SDK**: `google-generativeai` no longer receives updates (Phase 2 migrates to `google-genai`).
 - **Raw HTML passes through exports**: `markdown_to_html` does not strip raw HTML from the input.
-- **FAISS is built but not queried**: `RAGEngine` loads `index.faiss` but retrieval is done with NumPy over `embeddings.npy`.
-- **Keyword fallback scores**: in `retrieve_context`, every result in the keyword path reports the top result's score rather than its own.
+- **Retrieval quality is unmeasured**: semantic search works, but ambiguous acronyms can mislead it (for example, "BFS vs DFS" retrieved "distributed file system" passages). Hybrid retrieval and an evaluation set are Phase 4.
+- **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.
 - **3D Viz is not semantic**: points are projected from SHA-256 hashes of the text (chosen to avoid macOS segfaults), so distances do not reflect meaning.
 - **Fake streaming**: `/api/query?stream=true` generates the full answer first, then replays it word by word.
 - **Query modes in the API**: the study `mode` is not exposed on `/api/query`.
@@ -559,7 +579,6 @@ Documented honestly so you know what to expect. These come from reading the code
 
 ## Roadmap
 
-- Finish the FAISS document-processing pipeline (PR #1) and use the FAISS index for retrieval
 - Retrieval-quality evaluation and broader tests
 - Add a Dockerfile
 - Real token streaming from Gemini, and expose study modes in the API

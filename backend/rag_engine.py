@@ -1,118 +1,152 @@
+import logging
+import re
+import threading
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional
 
-import numpy as np
+from .embeddings import DEFAULT_MODEL, Embedder, get_embedder_by_name
+from .vector_store import VectorStore
 
-try:
-    import faiss
-except Exception:
-    faiss = None
+logger = logging.getLogger("ai-study-mentor.rag")
+
+_STOPWORDS = frozenset(
+    "a an the is are was were be been being of in on at to for from by with and or not as it its this that "
+    "these those what which who whom how why when where do does did can could should would will you your i we "
+    "they he she them his her our us about into than then so if".split()
+)
+
+
+def _tokens(text: str) -> set:
+    return {t for t in re.findall(r"\b\w+\b", text.lower()) if t not in _STOPWORDS}
+
+
+_shared: Dict[str, "RAGEngine"] = {}
+_shared_lock = threading.Lock()
 
 
 class RAGEngine:
-    def __init__(self, store_dir: str = "data/vector_store", model_name: str = "sentence-transformers/all-MiniLM-L6-v2", auto_embeddings: bool = False):
+    """Retrieval + prompt building + Gemini answers on top of a `VectorStore`.
+
+    Retrieval is semantic when the store has embeddings and the embedder that
+    produced them can be loaded; otherwise it falls back to keyword coverage
+    over the stored chunks (or over local PDFs when no store has been built).
+    """
+
+    def __init__(
+        self,
+        store_dir: str = "data/vector_store",
+        model_name: str = DEFAULT_MODEL,
+        auto_embeddings: bool = False,
+        use_embeddings: bool = True,
+        embedder: Optional[Embedder] = None,
+        input_dir: str = "data/uploaded_files",
+    ):
         self.store_dir = str(Path(store_dir).resolve())
+        self.input_dir = str(Path(input_dir).resolve())
         self.model_name = model_name
-        self.index, self.meta = self._load_vector_store()
-        self.embedder = None
-        self.embeddings = None
+        self.use_embeddings = use_embeddings
+        self._embedder = embedder
+        self._embedder_failed = False
+        self._fallback_items: Optional[List[Dict[str, Any]]] = None
+        self.store = VectorStore.load(self.store_dir)
         if auto_embeddings:
-            try:
-                self.embeddings = self._ensure_embeddings()
-            except Exception:
-                # Defer embedding generation; fallback retrieval will be used
-                self.embeddings = None
+            self.warm()
 
-    def _load_vector_store(self) -> Tuple[Any, Any]:
-        out_path = Path(self.store_dir)
-        index_path = out_path / "index.faiss"
-        meta_path = out_path / "index.pkl"
-        import pickle
-        index = None
-        obj = None
-        # Load metadata if present
-        if meta_path.exists():
-            try:
-                with open(meta_path, "rb") as f:
-                    obj = pickle.load(f)
-            except Exception:
-                obj = None
-        # Try to load FAISS index only if metadata loaded and faiss + file are present
-        if obj is not None and faiss is not None and index_path.exists():
-            try:
-                index = faiss.read_index(str(index_path))
-            except Exception:
-                index = None
-        # If neither exists, build a lightweight meta-only store from inputs directory
-        if obj is None:
-            try:
-                # Prefer local-only scan to avoid slow network calls on startup
-                from .document_processor import list_chunks_from_dir_local
-                chunks = list_chunks_from_dir_local(str(Path("data/uploaded_files").resolve()))
-                obj = {"metadata": chunks}
-            except Exception:
-                obj = {"metadata": []}
-        return index, obj
+    # ------------------------------------------------------------------
+    # Shared instance (one per store directory, e.g. for the API process)
+    # ------------------------------------------------------------------
+    @classmethod
+    def shared(cls, store_dir: str = "data/vector_store", **kwargs: Any) -> "RAGEngine":
+        key = str(Path(store_dir).resolve())
+        with _shared_lock:
+            eng = _shared.get(key)
+            if eng is None:
+                eng = _shared[key] = cls(store_dir=store_dir, **kwargs)
+            return eng
 
-    def _docstore_iter(self) -> List[Dict[str, Any]]:
-        if isinstance(self.meta, tuple) and len(self.meta) == 2:
-            docstore, index_to_id = self.meta
-            inner = getattr(docstore, "_dict", {})
-            items = []
-            for idx in sorted(index_to_id.keys()):
-                doc_id = index_to_id[idx]
-                doc = inner.get(doc_id)
-                if not doc:
-                    continue
-                text = getattr(doc, "page_content", "")
-                meta = getattr(doc, "metadata", {})
-                items.append({"text": text, "doc": Path(meta.get("source", "")).name, "page": meta.get("page", None)})
-            return items
-        elif isinstance(self.meta, dict):
-            return self.meta.get("metadata", [])
-        else:
-            return []
+    @classmethod
+    def clear_shared(cls) -> None:
+        with _shared_lock:
+            _shared.clear()
 
-    def _load_embedder(self):
-        if self.embedder is not None:
-            return
+    def reload(self) -> None:
+        """Re-read the store from disk (e.g. after the indexer script ran)."""
+        self.store = VectorStore.load(self.store_dir)
+        self._fallback_items = None
+        self._embedder_failed = False
+
+    # ------------------------------------------------------------------
+    # Embedder / semantic readiness
+    # ------------------------------------------------------------------
+    def _get_embedder(self) -> Optional[Embedder]:
+        """Embedder matching the store, or None if semantic search is unavailable."""
+        if not self.use_embeddings or not len(self.store) or self._embedder_failed:
+            return None
+        if self._embedder is not None:
+            if self._embedder.name != self.store.embedder_name:
+                logger.warning(
+                    "Store was built with '%s' but embedder is '%s'; using keyword retrieval",
+                    self.store.embedder_name,
+                    self._embedder.name,
+                )
+                self._embedder_failed = True
+                return None
+            return self._embedder
         try:
-            from sentence_transformers import SentenceTransformer  # lazy import to avoid segfaults
+            self._embedder = get_embedder_by_name(self.store.embedder_name or self.model_name)
         except Exception as e:
-            raise RuntimeError(f"sentence-transformers unavailable: {e}")
-        self.embedder = SentenceTransformer(self.model_name, device="cpu")
+            logger.warning("Semantic search unavailable (%s); using keyword retrieval", e)
+            self._embedder_failed = True
+            return None
+        return self._embedder
 
-    def _ensure_embeddings(self) -> np.ndarray:
-        emb_path = Path(self.store_dir) / "embeddings.npy"
-        if emb_path.exists():
-            return np.load(str(emb_path))
-        items = self._docstore_iter()
-        texts = [it.get("text", "") for it in items]
-        if not texts:
-            raise RuntimeError("No texts available to embed from vector store.")
-        if self.embedder is None:
-            self._load_embedder()
-        # Batch encode all texts at once for significant speedup
-        # Use a conservative batch size to avoid high memory usage
-        try:
-            arr = self.embedder.encode(
-                texts,
-                normalize_embeddings=True,
-                batch_size=32,
-                show_progress_bar=False,
-            )
-            arr = np.asarray(arr, dtype=np.float32)
-        except Exception:
-            # Fallback to smaller batches if environment is constrained
-            chunks: list[np.ndarray] = []
-            bs = 8
-            for i in range(0, len(texts), bs):
-                batch = texts[i:i+bs]
-                v = self.embedder.encode(batch, normalize_embeddings=True, batch_size=bs, show_progress_bar=False)
-                chunks.append(np.asarray(v, dtype=np.float32))
-            arr = np.concatenate(chunks, axis=0)
-        np.save(str(emb_path), arr)
-        return arr
+    def warm(self) -> bool:
+        """Load the embedder now so the first query is fast. Returns True if semantic search is ready."""
+        return self._get_embedder() is not None
+
+    @property
+    def semantic_ready(self) -> bool:
+        return self.use_embeddings and self._embedder is not None and not self._embedder_failed and bool(len(self.store))
+
+    # ------------------------------------------------------------------
+    # Corpus access
+    # ------------------------------------------------------------------
+    def _docstore_iter(self) -> List[Dict[str, Any]]:
+        """All chunks as dicts with at least text/doc/page.
+
+        Uses the vector store; if none has been built yet, falls back to
+        scanning local PDFs/audio once (the result is cached on the engine).
+        """
+        if len(self.store):
+            return self.store.chunks
+        if self._fallback_items is None:
+            try:
+                from .document_processor import list_chunks_from_dir_local
+
+                self._fallback_items = list_chunks_from_dir_local(self.input_dir)
+            except Exception:
+                self._fallback_items = []
+        return self._fallback_items
+
+    # ------------------------------------------------------------------
+    # Indexing (used by the API)
+    # ------------------------------------------------------------------
+    def add_sources(self, inputs: List[str], refresh_urls: bool = False, save: bool = True):
+        """Index files/URLs into the live store and persist it. Returns an IndexReport."""
+        from .indexer import index_inputs
+
+        report = index_inputs(self.store, inputs, embedder=self._embedder, refresh_urls=refresh_urls)
+        self._fallback_items = None
+        self._embedder_failed = False
+        if save:
+            self.store.save()
+        return report
+
+    def remove_source(self, source_key: str, save: bool = True) -> int:
+        removed = self.store.remove_source(source_key)
+        if save:
+            self.store.save()
+        return removed
 
     def _create_prompt_template(self) -> str:
         """Default prompt when no mode is specified."""
@@ -164,44 +198,41 @@ class RAGEngine:
             )
         return self._create_prompt_template()
 
-    def _embed_query(self, query: str) -> np.ndarray:
-        if self.embedder is None:
-            self._load_embedder()
-        emb = self.embedder.encode([query], normalize_embeddings=True, batch_size=1, show_progress_bar=False)
-        return np.asarray(emb, dtype=np.float32)
-
     def retrieve_context(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
-        items = self._docstore_iter()
-        if self.embeddings is None:
-            # Fallback: keyword overlap scoring
-            import re
-            def toks(s: str):
-                return set(re.findall(r"\b\w+\b", s.lower()))
-            q_tokens = toks(query)
-            scored = []
-            for i, it in enumerate(items):
-                t_tokens = toks(it.get("text", ""))
-                inter = len(q_tokens & t_tokens)
-                union = len(q_tokens | t_tokens) or 1
-                s = inter / union
-                scored.append((s, i))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            top = [i for _, i in scored[:k]]
-            results = []
-            for idx in top:
-                it = items[idx]
-                results.append({"text": it.get("text", ""), "doc": it.get("doc", ""), "page": it.get("page", None), "score": float(0 if not scored else scored[0][0])})
-            return results
-        # Embedding path
-        q = self._embed_query(query)[0]
-        mat = self.embeddings
-        sims = mat @ q  # cosine if normalized
-        top_idx = np.argsort(-sims)[:k]
-        results = []
-        for idx in top_idx:
-            it = items[idx]
-            results.append({"text": it.get("text", ""), "doc": it.get("doc", ""), "page": it.get("page", None), "score": float(sims[idx])})
-        return results
+        """Top-k chunks for a query, each with its own relevance score (0..1)."""
+        embedder = self._get_embedder()
+        if embedder is not None:
+            qv = embedder.encode([query])[0]
+            hits = self.store.search(qv, k)
+            return [self._result(self.store.chunks[i], score) for i, score in hits]
+        return self._keyword_retrieve(query, k)
+
+    @staticmethod
+    def _result(item: Dict[str, Any], score: float) -> Dict[str, Any]:
+        return {
+            "text": item.get("text", ""),
+            "doc": item.get("doc", ""),
+            "page": item.get("page", None),
+            "score": float(score),
+            "url": item.get("url"),
+        }
+
+    def _keyword_retrieve(self, query: str, k: int) -> List[Dict[str, Any]]:
+        """Fallback: rank by the share of query terms found in the chunk (stopwords ignored)."""
+        q = _tokens(query)
+        if not q:
+            return []
+        scored = []
+        for item in self._docstore_iter():
+            t = _tokens(item.get("text", ""))
+            inter = len(q & t)
+            if not inter:
+                continue
+            coverage = inter / len(q)
+            jaccard = inter / len(q | t)
+            scored.append((coverage, jaccard, item))
+        scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return [self._result(item, cov) for cov, _j, item in scored[:k]]
 
     def format_context(self, chunks: List[Dict[str, Any]]) -> str:
         lines = []
@@ -237,12 +268,14 @@ class RAGEngine:
         prompt = self.generate_prompt(question, chunks, mode=mode)
         return {"prompt": prompt, "chunks": chunks}
 
-    def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2, mode: str | None = None) -> Dict[str, Any]:
+    def answer_with_gemini(self, question: str, k: int = 3, model: str | None = None, temperature: float = 0.2, mode: str | None = None, chunks: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
         """Answer using Google Gemini API (cloud inference only).
 
+        - Pass `chunks` to reuse an earlier retrieval instead of retrieving again
         - Reads API key from environment; fails gracefully with clear error
         """
-        chunks = self.retrieve_context(question, k=k)
+        if chunks is None:
+            chunks = self.retrieve_context(question, k=k)
         prompt = self.generate_prompt(question, chunks, mode=mode)
         try:
             from .llm_config import GeminiClient
