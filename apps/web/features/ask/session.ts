@@ -10,13 +10,15 @@ export interface Turn {
   answer: string;
   chunks: Chunk[];
   model?: string;
+  /** The exact prompt sent to the model, when the user asked to see it. */
+  prompt?: string;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
 
 export type Action =
   | { type: "start"; id: string; question: string; mode?: Mode }
-  | { type: "meta"; id: string; chunks: Chunk[] }
+  | { type: "meta"; id: string; chunks: Chunk[]; prompt?: string }
   | { type: "token"; id: string; text: string }
   | { type: "done"; id: string; model?: string }
   | { type: "error"; id: string; code: string; message: string }
@@ -36,7 +38,7 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
         ...turns,
       ];
     case "meta":
-      return update(turns, action.id, (t) => ({ ...t, chunks: action.chunks }));
+      return update(turns, action.id, (t) => ({ ...t, chunks: action.chunks, prompt: action.prompt ?? t.prompt }));
     case "token":
       return update(turns, action.id, (t) => ({ ...t, answer: t.answer + action.text }));
     case "done":

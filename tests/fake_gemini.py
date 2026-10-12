@@ -55,6 +55,9 @@ class FakeGemini:
             raise FakeGemini.fail_with
         return (FakeGemini.handler or FakeGemini.default_reply)(prompt, json_mode)
 
+    def list_supported_models(self):
+        return ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
+
     def generate(self, prompt, temperature=None, json_mode=False):
         try:
             return {"ok": True, "model": self.model, "answer": self._reply(prompt, json_mode)}

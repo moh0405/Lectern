@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const askStream = vi.fn();
+const httpGet = vi.fn();
 vi.mock("@/lib/api", async () => {
   class ApiError extends Error {
     constructor(
@@ -14,8 +15,12 @@ vi.mock("@/lib/api", async () => {
     }
   }
   return {
-    api: { askStream: (...a: unknown[]) => askStream(...a) },
+    api: { askStream: (...a: unknown[]) => askStream(...a), http: { GET: (...a: unknown[]) => httpGet(...a) } },
     ApiError,
+    unwrap: (r: { data?: unknown; error?: unknown }) => {
+      if (r.error !== undefined || r.data === undefined) throw new ApiError(500, "x", "failed");
+      return r.data;
+    },
     errorMessage: (e: unknown) => (e instanceof Error ? e.message : "unknown"),
   };
 });
@@ -32,6 +37,7 @@ async function* events(...evs: object[]) {
 
 beforeEach(() => {
   askStream.mockReset();
+  httpGet.mockReset();
   localStorage.clear();
 });
 
@@ -137,6 +143,36 @@ describe("useAskSession", () => {
     const { result } = renderHook(() => useAskSession(), { wrapper: StrictMode });
     await waitFor(() => expect(result.current.turns.map((t) => t.id)).toEqual(["old"]));
     expect(JSON.parse(localStorage.getItem("asm.ask.turns.v1")!)).toHaveLength(1);
+  });
+
+  it("passes show-prompt through and stores the prompt from the stream", async () => {
+    askStream.mockImplementation(() => events({ event: "meta", data: { chunks: [], prompt: "PROMPT TEXT" } }, { event: "done", data: {} }));
+    const { result } = renderHook(() => useAskSession());
+    await act(async () => {
+      await result.current.ask({ ...params, showPrompt: true });
+    });
+    expect(askStream.mock.calls[0]![0]).toMatchObject({ include_prompt: true });
+    expect(result.current.turns[0]!.prompt).toBe("PROMPT TEXT");
+  });
+
+  it("retrieval-only mode lists passages without calling the model", async () => {
+    httpGet.mockResolvedValue({ data: { chunks: [chunk] }, response: { status: 200 } });
+    const { result } = renderHook(() => useAskSession());
+    await act(async () => {
+      await result.current.ask({ ...params, retrievalOnly: true });
+    });
+    expect(askStream).not.toHaveBeenCalled();
+    expect(httpGet).toHaveBeenCalledWith("/api/v1/search", expect.objectContaining({ params: { query: { query: "what is a heap", k: 3 } } }));
+    expect(result.current.turns[0]).toMatchObject({ status: "done", answer: "", chunks: [chunk] });
+  });
+
+  it("retrieval-only errors become an error turn", async () => {
+    httpGet.mockResolvedValue({ error: { error: { code: "x" } }, response: { status: 500 } });
+    const { result } = renderHook(() => useAskSession());
+    await act(async () => {
+      await result.current.ask({ ...params, retrievalOnly: true });
+    });
+    expect(result.current.turns[0]).toMatchObject({ status: "error" });
   });
 
   it("clear removes everything", async () => {

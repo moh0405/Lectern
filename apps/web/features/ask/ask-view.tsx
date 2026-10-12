@@ -32,11 +32,21 @@ export function AskView() {
   const [k, setK] = useState(3);
   const [temperature, setTemperature] = useState(0.2);
   const [model, setModel] = useState("");
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [retrievalOnly, setRetrievalOnly] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")),
+  });
+  const models = useQuery({
+    queryKey: ["models"],
+    queryFn: async () => unwrap(await api.http.GET("/api/v1/models")),
+    enabled: advancedOpen,
+    retry: false, // 503 without a server key: fall back to a free-text field
+    staleTime: 10 * 60_000,
   });
   const suggestions = useQuery({
     queryKey: ["suggestions"],
@@ -48,7 +58,7 @@ export function AskView() {
   const submit = (text: string) => {
     const q = text.trim();
     if (q.length < 3 || busy) return;
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined });
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly });
     setQuestion("");
   };
   const onSubmit = (e: FormEvent) => {
@@ -145,7 +155,7 @@ export function AskView() {
               </Button>
             </div>
           </div>
-          <details className="text-sm">
+          <details className="text-sm" onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
             <summary className="cursor-pointer text-muted hover:text-fg">Advanced</summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
@@ -162,9 +172,28 @@ export function AskView() {
                 />
               </div>
               <div>
-                <Label htmlFor="model">Model (optional)</Label>
-                <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="server default" />
+                <Label htmlFor="model">Model</Label>
+                {models.data ? (
+                  <Select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
+                    <option value="">Server default ({models.data.default})</option>
+                    {models.data.models.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="server default" />
+                )}
               </div>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={retrievalOnly} onChange={(e) => setRetrievalOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
+                Only show matching passages (skip the model)
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} disabled={retrievalOnly} className="accent-[var(--color-accent)]" />
+                Show the prompt sent to the model
+              </label>
             </div>
           </details>
           <p className="text-xs text-muted">Press Ctrl/⌘ + Enter to send.</p>

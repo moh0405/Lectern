@@ -49,6 +49,42 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
   await expect(heading).toHaveCount(0);
 });
 
+test("advanced options: pick a model, see the prompt, skip the model, export flashcards and notes", async ({ page }) => {
+  await page.goto("/ask");
+  await page.getByText("Advanced").click();
+
+  // model list comes from the API (scripted here)
+  const model = page.getByLabel("Model", { exact: true });
+  await expect(model.locator("option", { hasText: "gemini-3.7-flash" })).toHaveCount(1);
+  await model.selectOption("gemini-3.7-flash");
+
+  await page.getByLabel("Show the prompt sent to the model").check();
+  await page.getByLabel("Your question").fill("What is a priority queue?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const first = page.locator(".md-body").first();
+  await expect(first).toContainText("From your material", { timeout: 20_000 });
+  await expect(page.locator("span:text-is('gemini-3.7-flash')")).toBeVisible(); // the model badge on the answer
+  await page.locator("summary", { hasText: "Prompt sent to the model" }).click();
+  await expect(page.locator("pre").first()).toContainText("What is a priority queue?");
+
+  // retrieval only: passages, no model call, no answer text
+  await page.getByLabel("Only show matching passages (skip the model)").check();
+  await page.getByLabel("Your question").fill("binary heap complete tree");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const retrievalTurn = page.getByRole("heading", { name: "binary heap complete tree" }).locator("xpath=ancestor::div[contains(@class,'space-y-4')][1]");
+  await expect(retrievalTurn.getByText("Sources (1)")).toBeVisible();
+  await expect(retrievalTurn.locator(".md-body")).toHaveCount(0);
+
+  // exports
+  const cards = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Flashcards (CSV)" }).click();
+  expect((await cards).suggestedFilename()).toBe("flashcards.csv");
+  await page.getByRole("button", { name: /Generate from this session/ }).click();
+  const md = page.waitForEvent("download");
+  await page.getByRole("button", { name: "MD", exact: true }).click();
+  expect((await md).suggestedFilename()).toBe("study-notes.md");
+});
+
 test("a source can be deleted (with confirmation)", async ({ page }) => {
   await page.goto("/sources");
   await page.getByRole("button", { name: "Delete heaps.pdf" }).click();

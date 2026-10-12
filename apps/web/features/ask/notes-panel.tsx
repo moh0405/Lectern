@@ -8,6 +8,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { ErrorNotice, Spinner } from "@/components/ui/feedback";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
+import { toFlashcardsCsv } from "./flashcards";
 import type { Turn } from "./session";
 
 type Format = "pdf" | "html" | "md";
@@ -36,10 +37,20 @@ export function NotesPanel({ turns }: { turns: Turn[] }) {
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <CardTitle>Study notes</CardTitle>
-        <Button variant="secondary" size="sm" onClick={() => notes.mutate()} disabled={notes.isPending}>
-          {notes.isPending ? <Spinner /> : <NotebookPen className="h-4 w-4" />}
-          Generate from this session ({finished.length})
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadBlob(new Blob([toFlashcardsCsv(turns)], { type: "text/csv" }), "flashcards.csv")}
+          >
+            <Download className="h-4 w-4" />
+            Flashcards (CSV)
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => notes.mutate()} disabled={notes.isPending}>
+            {notes.isPending ? <Spinner /> : <NotebookPen className="h-4 w-4" />}
+            Generate from this session ({finished.length})
+          </Button>
+        </div>
       </div>
       {notes.isError ? <ErrorNotice>{errorMessage(notes.error)}</ErrorNotice> : null}
       {notes.data ? (

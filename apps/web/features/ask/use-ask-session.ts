@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { api, ApiError, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
 import { initialSession, loadTurns, saveTurns, sessionReducer, type Mode } from "./session";
 
 export interface AskParams {
@@ -10,6 +10,9 @@ export interface AskParams {
   k: number;
   temperature: number;
   model?: string;
+  showPrompt?: boolean;
+  /** Skip the model: just list the passages that match. */
+  retrievalOnly?: boolean;
 }
 
 let counter = 0;
@@ -39,9 +42,22 @@ export function useAskSession() {
     controllers.current.set(id, controller);
     dispatch({ type: "start", id, question: p.question, mode: p.mode });
     try {
-      const body = { question: p.question, k: p.k, mode: p.mode, temperature: p.temperature, model: p.model || undefined };
+      if (p.retrievalOnly) {
+        const res = unwrap(await api.http.GET("/api/v1/search", { params: { query: { query: p.question, k: p.k } }, signal: controller.signal }));
+        dispatch({ type: "meta", id, chunks: res.chunks });
+        dispatch({ type: "done", id });
+        return;
+      }
+      const body = {
+        question: p.question,
+        k: p.k,
+        mode: p.mode,
+        temperature: p.temperature,
+        model: p.model || undefined,
+        include_prompt: p.showPrompt || undefined,
+      };
       for await (const ev of api.askStream(body, controller.signal)) {
-        if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks });
+        if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks, prompt: ev.data.prompt ?? undefined });
         else if (ev.event === "token") dispatch({ type: "token", id, text: ev.data.text });
         else if (ev.event === "done") dispatch({ type: "done", id, model: ev.data.model ?? undefined });
         else dispatch({ type: "error", id, code: ev.data.code, message: ev.data.message });

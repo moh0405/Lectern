@@ -10,12 +10,12 @@ from typing import Any, Dict, Iterator, List
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from ...llm_config import GeminiClient
+from ...llm_config import DEFAULT_MODEL, GeminiClient
 from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
 from ..deps import common_dependencies, get_analytics, get_engine, raise_if_failed
 from ..errors import ERROR_RESPONSES, ApiError
-from ..schemas import AskRequest, AskResponse, Chunk, SearchResponse, Suggestions
+from ..schemas import AskRequest, AskResponse, Chunk, Models, SearchResponse, Suggestions
 
 logger = logging.getLogger("ai-study-mentor.api")
 
@@ -129,3 +129,12 @@ def search(
 @router.get("/suggestions", response_model=Suggestions, summary="Study questions suggested from your own material")
 def suggestions(n: int = Query(5, ge=1, le=10), engine: RAGEngine = Depends(get_engine)):
     return Suggestions(questions=engine.generate_query_suggestions(max_questions=n))
+
+
+@router.get("/models", response_model=Models, summary="Models the server can use (needs a Gemini key)")
+def models():
+    try:
+        client = GeminiClient()
+    except RuntimeError as e:
+        raise ApiError(503, str(e), code="llm_unavailable")
+    return Models(models=client.list_supported_models(), default=client.model or DEFAULT_MODEL)

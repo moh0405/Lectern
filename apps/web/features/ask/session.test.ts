@@ -61,3 +61,13 @@ describe("persistence", () => {
     expect(loadTurns().map((t) => t.id)).toEqual(["ok"]);
   });
 });
+
+describe("prompt display", () => {
+  it("stores the prompt that arrives with the sources", () => {
+    let s = reducer([], { type: "start", id: "a", question: "q" });
+    s = reducer(s, { type: "meta", id: "a", chunks: [], prompt: "You are a tutor..." });
+    expect(s[0]!.prompt).toBe("You are a tutor...");
+    s = reducer(s, { type: "meta", id: "a", chunks: [] }); // a later meta without prompt keeps it
+    expect(s[0]!.prompt).toBe("You are a tutor...");
+  });
+});

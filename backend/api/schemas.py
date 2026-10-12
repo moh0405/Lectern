@@ -100,6 +100,11 @@ class AskResponse(BaseModel):
     prompt: Optional[str] = None
 
 
+class Models(BaseModel):
+    models: List[str] = Field(description="Model names that can generate text for the configured key, newest Flash first")
+    default: str
+
+
 class SearchResponse(BaseModel):
     chunks: List[Chunk]
 

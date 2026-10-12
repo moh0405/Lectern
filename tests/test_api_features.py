@@ -222,3 +222,15 @@ def test_projection_returns_points_with_variance_and_honest_semantic_flag(indexe
 def test_projection_limit_is_validated(api):
     assert api.get("/api/v1/embeddings/projection", params={"limit": 5}).status_code == 422
     assert api.get("/api/v1/embeddings/projection", params={"limit": 5000}).status_code == 422
+
+
+# ----------------------------------------------------------------- models
+def test_models_lists_what_the_key_can_use(api, fake_gemini):
+    body = api.get("/api/v1/models").json()
+    assert body["models"][0] == "gemini-3.8-flash" and body["default"] == "fake-model"
+
+
+def test_models_without_a_key_is_503(api, fake_gemini):
+    fake_gemini.fail_with = RuntimeError("GEMINI_API_KEY is not set")
+    r = api.get("/api/v1/models")
+    assert r.status_code == 503 and r.json()["error"]["code"] == "llm_unavailable"

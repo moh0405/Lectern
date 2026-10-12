@@ -1,17 +1,10 @@
 import type { components } from "@ai-study-mentor/api-client";
+import { csvCell } from "@/lib/csv";
+
+export { csvCell };
 
 export type AnalyticsSummary = components["schemas"]["AnalyticsSummary"];
 export type AnalyticsEvent = components["schemas"]["AnalyticsEvent"];
-
-/**
- * CSV cell, RFC 4180 quoting. Cells starting with = + - @ (or tab/CR) are prefixed with an apostrophe
- * so a spreadsheet will not run a question like "=HYPERLINK(...)" as a formula.
- */
-export function csvCell(value: unknown): string {
-  let s = value === null || value === undefined ? "" : String(value);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 export function toCsv(events: AnalyticsEvent[]): string {
   const header = ["time", "question", "mode", "avg_score", "latency_ms", "tokens_prompt", "tokens_answer", "ok", "documents"];

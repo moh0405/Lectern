@@ -78,6 +78,13 @@ export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () =>
         </div>
       ) : null}
 
+      {turn.prompt ? (
+        <details>
+          <summary className="cursor-pointer select-none text-sm text-muted hover:text-fg">Prompt sent to the model</summary>
+          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg/60 p-3 font-mono text-xs">{turn.prompt}</pre>
+        </details>
+      ) : null}
+
       {turn.chunks.length > 0 ? (
         <details open={!turn.answer || turn.status === "error"} className="group">
           <summary className="cursor-pointer select-none list-none text-sm text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
