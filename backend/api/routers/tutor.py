@@ -39,7 +39,7 @@ def _strs(value: Any) -> List[str]:
 
 @router.post("/concept-map", response_model=ConceptMap, summary="Concept map (nodes, edges, Graphviz DOT) for a topic")
 async def concept_map(req: TopicRequest, engine: RAGEngine = Depends(get_engine)):
-    res = raise_if_failed(await run_in_threadpool(advanced_ai.build_concept_map, req.topic, None, req.temperature))
+    res = raise_if_failed(await run_in_threadpool(advanced_ai.build_concept_map, req.topic, None, req.temperature, engine))
     nodes: List[ConceptNode] = []
     seen = set()
     for n in res.get("nodes") or []:
@@ -68,7 +68,7 @@ async def socratic(req: SocraticRequest, engine: RAGEngine = Depends(get_engine)
 @router.post("/synthesis", response_model=Synthesis, summary="Compare how each document explains a topic")
 async def synthesis(req: SynthesisRequest, engine: RAGEngine = Depends(get_engine)):
     res = raise_if_failed(
-        await run_in_threadpool(advanced_ai.multi_document_synthesis, req.topic, req.k_per_doc, req.temperature)
+        await run_in_threadpool(advanced_ai.multi_document_synthesis, req.topic, req.k_per_doc, req.temperature, engine)
     )
     cites: List[SynthesisCitation] = []
     for c in res.get("citations") or []:
@@ -88,7 +88,7 @@ async def synthesis(req: SynthesisRequest, engine: RAGEngine = Depends(get_engin
 
 @router.post("/adaptive", response_model=Adaptive, summary="Explain at a chosen level (ELI5 to Expert) with a mini quiz")
 async def adaptive(req: AdaptiveRequest, engine: RAGEngine = Depends(get_engine)):
-    res = raise_if_failed(await run_in_threadpool(advanced_ai.adaptive_explain, req.question, req.level, req.temperature))
+    res = raise_if_failed(await run_in_threadpool(advanced_ai.adaptive_explain, req.question, req.level, req.temperature, engine))
     return Adaptive(
         answer=res.get("answer") or "",
         chunks=[Chunk(**c) for c in res.get("chunks") or []],

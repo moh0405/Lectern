@@ -27,7 +27,7 @@ class FakeGemini:
 
     @staticmethod
     def default_reply(prompt: str, json_mode: bool) -> str:
-        if json_mode and "concept" in prompt.lower():
+        if json_mode and "study map" in prompt.lower():
             return json.dumps({
                 "nodes": [{"id": "list", "label": "Linked list"}, {"id": "node", "label": "Node"},
                           {"id": "list", "label": "dup"}],

@@ -200,3 +200,4 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
+data/analytics.db

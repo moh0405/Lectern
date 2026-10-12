@@ -12,13 +12,13 @@ from .llm_config import GeminiClient
 # Concept Map Generator
 # -----------------------------
 
-def _collect_context(max_chars: int = 4000) -> str:
+def _collect_context(max_chars: int = 4000, engine: Optional[RAGEngine] = None) -> str:
     """Collect a concatenated context string from the docstore for prompting.
 
     Uses a hardened RAGEngine path that does not require FAISS indexes.
     """
     try:
-        eng = RAGEngine.shared()
+        eng = engine or RAGEngine.shared()
         items = eng._docstore_iter()
     except Exception:
         items = []
@@ -35,12 +35,13 @@ def _collect_context(max_chars: int = 4000) -> str:
     return "\n\n".join(texts)
 
 
-def build_concept_map(topic: str, context_override: Optional[str] = None, temperature: float = 0.2) -> Dict[str, Any]:
+def build_concept_map(topic: str, context_override: Optional[str] = None, temperature: float = 0.2,
+                      engine: Optional[RAGEngine] = None) -> Dict[str, Any]:
     """Generate a concept map JSON {nodes, edges} using Gemini if available.
 
     Fallback: simple hierarchical outline built from keyword clustering.
     """
-    ctx = context_override or _collect_context()
+    ctx = context_override or _collect_context(engine=engine)
     prompt = (
         "You are an expert study map generator. Given the TOPIC and CONTEXT, "
         "return a clean JSON with fields 'nodes' and 'edges'. Each node: {id, label}. "
@@ -144,9 +145,10 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
 # Multi-Document Synthesis
 # -----------------------------
 
-def multi_document_synthesis(topic: str, k_per_doc: int = 2, temperature: float = 0.2) -> Dict[str, Any]:
+def multi_document_synthesis(topic: str, k_per_doc: int = 2, temperature: float = 0.2,
+                             engine: Optional[RAGEngine] = None) -> Dict[str, Any]:
     """Compare how multiple documents explain a topic and synthesize a unified explanation."""
-    eng = RAGEngine.shared()
+    eng = engine or RAGEngine.shared()
     items = eng._docstore_iter()
     # Group texts by document
     by_doc: Dict[str, List[str]] = {}
@@ -203,12 +205,13 @@ ELI_LEVELS = {
 }
 
 
-def adaptive_explain(question: str, level: str = "Undergrad", temperature: float = 0.2) -> Dict[str, Any]:
+def adaptive_explain(question: str, level: str = "Undergrad", temperature: float = 0.2,
+                     engine: Optional[RAGEngine] = None) -> Dict[str, Any]:
     """Generate an explanation tailored to the requested ELI level, using RAG context and Gemini.
 
     Falls back to a template-based rewrite if Gemini is unavailable.
     """
-    eng = RAGEngine.shared()
+    eng = engine or RAGEngine.shared()
     chunks = eng.retrieve_context(question, k=4)
     context = eng.format_context(chunks)
     instr = ELI_LEVELS.get(level, ELI_LEVELS["Undergrad"])
