@@ -511,7 +511,7 @@ For presentations (and as a backup if the network or API fails):
 - **Origin**: the first AI-engineering project, started in October 2025 to learn RAG with LangChain, ChromaDB/FAISS and LLMs on CS material.
 - **Nov 2025**: pipeline working end to end without a UI, caching and preprocessing for fast startup, custom CSS, demo mode, batch-processing optimizations. Built under a hackathon deadline (see the context file).
 - **Jan 2026**: added transient retry logic to the Gemini client and re-applied the Demo Mode refactor.
-- **Open work**: [issue #1](https://github.com/moh0405/AI-study-mentor-/issues/1), "Add document processing pipeline with FAISS" (branch `feature/document-processing`).
+- **Open work**: [PR #1](https://github.com/moh0405/AI-study-mentor-/pull/1), "Add document processing pipeline with FAISS" (branch `feature/document-processing`, still open).
 
 ---
 
@@ -540,7 +540,7 @@ Documented honestly so you know what to expect. These come from reading the code
 
 ## Roadmap
 
-- Finish the FAISS document-processing pipeline (issue #1) and use the FAISS index for retrieval
+- Finish the FAISS document-processing pipeline (PR #1) and use the FAISS index for retrieval
 - Add real tests (chunking, retrieval, prompt modes, API) and CI
 - Complete `requirements.txt` and add a Dockerfile
 - Real token streaming from Gemini, and expose study modes in the API
