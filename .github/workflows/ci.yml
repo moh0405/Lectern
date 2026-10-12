@@ -52,3 +52,36 @@ jobs:
       - run: npm run web:lint
       - run: npm run web:test
       - run: npm run web:build
+
+  e2e:
+    # Real browser + real API (scripted model, temporary storage): upload, index, ask, cited answer.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[api,sources,leetcode,math,export]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Build the web app against the e2e API address (NEXT_PUBLIC_* is inlined at build time)
+        run: npm run web:build
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8100
+      - run: npx playwright test
+        working-directory: apps/web
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/web/test-results

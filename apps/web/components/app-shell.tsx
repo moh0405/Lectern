@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { api, unwrap } from "@/lib/api";
+import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -51,7 +52,7 @@ function ApiStatus() {
         )}
       />
       {state === "online" && data
-        ? `${data.chunks.toLocaleString()} chunks · ${data.semantic_search ? "semantic" : "keyword"} search`
+        ? `${plural(data.chunks, "chunk")} · ${data.semantic_search ? "semantic" : "keyword"} search`
         : state === "offline"
           ? "API offline"
           : "Connecting…"}

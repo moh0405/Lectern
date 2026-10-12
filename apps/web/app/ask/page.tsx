@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/page-header";
+import { AskView } from "@/features/ask/ask-view";
 
 export const metadata: Metadata = { title: "Ask" };
 
 export default function Page() {
-  return <PageHeader title="Ask" description="Coming up in this phase." />;
+  return <AskView />;
 }

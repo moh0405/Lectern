@@ -431,14 +431,14 @@ export interface components {
              * @default Undergrad
              * @enum {string}
              */
-            level: "ELI5" | "ELI10" | "Undergrad" | "Grad" | "Expert";
+            level?: "ELI5" | "ELI10" | "Undergrad" | "Grad" | "Expert";
             /** Question */
             question: string;
             /**
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
         };
         /** AnalyticsEvent */
         AnalyticsEvent: {
@@ -490,13 +490,13 @@ export interface components {
              * Include Prompt
              * @default false
              */
-            include_prompt: boolean;
+            include_prompt?: boolean;
             /**
              * K
              * @description Number of chunks to retrieve
              * @default 3
              */
-            k: number;
+            k?: number;
             /** Mode */
             mode?: ("eli5" | "technical" | "interview" | "summary") | null;
             /** Model */
@@ -507,7 +507,7 @@ export interface components {
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
         };
         /** AskResponse */
         AskResponse: {
@@ -530,17 +530,20 @@ export interface components {
         };
         /** Chunk */
         Chunk: {
+            /**
+             * Citation Url
+             * @description Deep link to the cited spot (for example a YouTube timestamp) when available
+             * @default null
+             */
+            citation_url?: string | null;
             /** Doc */
             doc: string;
             /**
              * Page
              * @default null
              */
-            page: number | null;
-            /**
-             * Score
-             * @default 0
-             */
+            page?: number | null;
+            /** Score */
             score: number;
             /** Text */
             text: string;
@@ -548,14 +551,11 @@ export interface components {
              * Url
              * @default null
              */
-            url: string | null;
+            url?: string | null;
         };
         /** Cleared */
         Cleared: {
-            /**
-             * Ok
-             * @default true
-             */
+            /** Ok */
             ok: boolean;
             /** Removed */
             removed: number;
@@ -601,10 +601,7 @@ export interface components {
             chunks_removed: number;
             /** Deleted */
             deleted: string;
-            /**
-             * Ok
-             * @default true
-             */
+            /** Ok */
             ok: boolean;
         };
         /** DocumentInfo */
@@ -634,7 +631,7 @@ export interface components {
              * Details
              * @default null
              */
-            details: unknown | null;
+            details?: unknown | null;
             /** Message */
             message: string;
         };
@@ -655,13 +652,13 @@ export interface components {
              * Filename
              * @default study-notes
              */
-            filename: string;
+            filename?: string;
             /**
              * Format
              * @default pdf
              * @enum {string}
              */
-            format: "pdf" | "html" | "md";
+            format?: "pdf" | "html" | "md";
             /** Markdown */
             markdown: string;
         };
@@ -677,7 +674,7 @@ export interface components {
              * Size Bytes
              * @default 0
              */
-            size_bytes: number;
+            size_bytes?: number;
         };
         /** Health */
         Health: {
@@ -690,7 +687,6 @@ export interface components {
             semantic_search: boolean;
             /**
              * Status
-             * @default ok
              * @constant
              */
             status: "ok";
@@ -703,7 +699,7 @@ export interface components {
              * Answer
              * @default
              */
-            answer: string;
+            answer?: string;
             /** Q */
             q: string;
         };
@@ -719,10 +715,7 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
-            /**
-             * Progress
-             * @default []
-             */
+            /** Progress */
             progress: string[];
             /** Result */
             result?: {
@@ -767,7 +760,7 @@ export interface components {
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
         };
         /** Problem */
         Problem: {
@@ -789,10 +782,7 @@ export interface components {
             source?: string | null;
             /** Title */
             title: string;
-            /**
-             * Topics
-             * @default []
-             */
+            /** Topics */
             topics: string[];
             /** Url */
             url?: string | null;
@@ -834,10 +824,7 @@ export interface components {
             source?: string | null;
             /** Title */
             title: string;
-            /**
-             * Topics
-             * @default []
-             */
+            /** Topics */
             topics: string[];
             /** Url */
             url?: string | null;
@@ -865,36 +852,30 @@ export interface components {
              * @description Higher means the student has struggled more
              * @default 0
              */
-            depth: number;
+            depth?: number;
             /**
              * K
              * @default 3
              */
-            k: number;
+            k?: number;
             /** Question */
             question: string;
             /**
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
         };
         /** SourcesAccepted */
         SourcesAccepted: {
-            /**
-             * Files
-             * @default []
-             */
+            /** Files */
             files: components["schemas"]["FileResult"][];
             /**
              * Job Id
              * @description Poll GET /api/v1/jobs/{job_id}; null if nothing was accepted
              */
             job_id?: string | null;
-            /**
-             * Urls
-             * @default []
-             */
+            /** Urls */
             urls: string[];
         };
         /** SseDone */
@@ -903,7 +884,7 @@ export interface components {
              * Model
              * @default null
              */
-            model: string | null;
+            model?: string | null;
         };
         /** SseError */
         SseError: {
@@ -923,7 +904,7 @@ export interface components {
              * Prompt
              * @default null
              */
-            prompt: string | null;
+            prompt?: string | null;
         };
         /** SseToken */
         SseToken: {
@@ -978,12 +959,12 @@ export interface components {
              * K Per Doc
              * @default 2
              */
-            k_per_doc: number;
+            k_per_doc?: number;
             /**
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
             /** Topic */
             topic: string;
         };
@@ -993,7 +974,7 @@ export interface components {
              * Temperature
              * @default 0.2
              */
-            temperature: number;
+            temperature?: number;
             /** Topic */
             topic: string;
         };

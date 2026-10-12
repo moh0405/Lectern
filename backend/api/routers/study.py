@@ -49,4 +49,4 @@ def analytics_summary(limit: int = Query(20, ge=0, le=200), analytics: Analytics
 
 @router.delete("/analytics", response_model=Cleared, summary="Delete all recorded analytics")
 def analytics_clear(analytics: AnalyticsStore = Depends(get_analytics)):
-    return Cleared(removed=analytics.clear())
+    return Cleared(ok=True, removed=analytics.clear())

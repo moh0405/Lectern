@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import json
 import shutil
 from pathlib import Path
 
@@ -12,51 +11,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
-class FakeGemini:
-    """Stand-in for GeminiClient. Override `FakeGemini.handler` in a test to script replies."""
-
-    handler = None  # callable(prompt, json_mode) -> str
-    fail_with = None  # set to an Exception to make every call fail
-    calls: list = []
-
-    def __init__(self, model=None, temperature=0.2, **kw):
-        if FakeGemini.fail_with is not None and isinstance(FakeGemini.fail_with, RuntimeError):
-            raise FakeGemini.fail_with
-        self.model = model or "fake-model"
-        self.temperature = temperature
-
-    @staticmethod
-    def default_reply(prompt: str, json_mode: bool) -> str:
-        if json_mode and "study map" in prompt.lower():
-            return json.dumps({
-                "nodes": [{"id": "list", "label": "Linked list"}, {"id": "node", "label": "Node"},
-                          {"id": "list", "label": "dup"}],
-                "edges": [{"from": "list", "to": "node", "label": "has"}, {"from": "list", "to": "ghost"}],
-            })
-        if json_mode and "socratic" in prompt.lower():
-            return json.dumps({"questions": ["What is a node?", "How are nodes linked?"], "hints": ["h1", "h2", "h3"]})
-        if json_mode and "synthesizer" in prompt.lower():
-            return json.dumps({"similarities": ["both define it"], "conflicts": [], "synthesis": "Unified view.",
-                               "citations": [{"doc": "a.pdf", "point": "defines it"}, "loose citation"]})
-        return "A linked list is a chain of nodes. [heaps.pdf (page 1)]"
-
-    def _reply(self, prompt, json_mode):
-        FakeGemini.calls.append(prompt)
-        if FakeGemini.fail_with is not None:
-            raise FakeGemini.fail_with
-        return (FakeGemini.handler or FakeGemini.default_reply)(prompt, json_mode)
-
-    def generate(self, prompt, temperature=None, json_mode=False):
-        try:
-            return {"ok": True, "model": self.model, "answer": self._reply(prompt, json_mode)}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-
-    def stream(self, prompt, temperature=None, json_mode=False):
-        text = self._reply(prompt, json_mode)
-        words = text.split(" ")
-        for i, w in enumerate(words):
-            yield w + ("" if i == len(words) - 1 else " ")
+from .fake_gemini import FakeGemini  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

@@ -16,12 +16,13 @@ class Chunk(BaseModel):
     text: str
     doc: str
     page: Optional[int] = None
-    score: float = 0.0
+    score: float
     url: Optional[str] = None
+    citation_url: Optional[str] = Field(None, description="Deep link to the cited spot (for example a YouTube timestamp) when available")
 
 
 class Health(BaseModel):
-    status: Literal["ok"] = "ok"
+    status: Literal["ok"]
     version: str
     semantic_search: bool = Field(description="True when the embedder matching the index is loaded")
     chunks: int
@@ -37,8 +38,8 @@ class FileResult(BaseModel):
 
 class SourcesAccepted(BaseModel):
     job_id: Optional[str] = Field(None, description="Poll GET /api/v1/jobs/{job_id}; null if nothing was accepted")
-    files: List[FileResult] = []
-    urls: List[str] = []
+    files: List[FileResult]
+    urls: List[str]
 
 
 class UrlsRequest(BaseModel):
@@ -49,7 +50,7 @@ class Job(BaseModel):
     id: str
     kind: str
     status: JobStatus
-    progress: List[str] = []
+    progress: List[str]
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     created_at: float
@@ -77,7 +78,7 @@ class Stats(BaseModel):
 
 
 class DeleteResult(BaseModel):
-    ok: bool = True
+    ok: bool
     deleted: str
     chunks_removed: int
 
@@ -197,7 +198,7 @@ class ProblemSummary(BaseModel):
     pid: str
     title: str
     difficulty: str
-    topics: List[str] = []
+    topics: List[str]
     acceptance: Optional[float] = None
     likes: Optional[int] = None
     dislikes: Optional[int] = None
@@ -272,7 +273,7 @@ class AnalyticsSummary(BaseModel):
 
 
 class Cleared(BaseModel):
-    ok: bool = True
+    ok: bool
     removed: int
 
 

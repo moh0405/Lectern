@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/page-header";
+import { SourcesView } from "@/features/sources/sources-view";
 
 export const metadata: Metadata = { title: "Sources" };
 
 export default function Page() {
-  return <PageHeader title="Sources" description="Coming up in this phase." />;
+  return <SourcesView />;
 }

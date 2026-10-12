@@ -227,6 +227,8 @@ class RAGEngine:
             "page": item.get("page", None),
             "score": float(score),
             "url": item.get("url"),
+            # Deep link when the source has one (e.g. a YouTube URL with &t=SECONDS)
+            "citation_url": (item.get("extra") or {}).get("citation_url") or item.get("url"),
         }
 
     def _keyword_retrieve(self, query: str, k: int) -> List[Dict[str, Any]]:

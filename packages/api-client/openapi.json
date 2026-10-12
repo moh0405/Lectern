@@ -338,6 +338,19 @@
       },
       "Chunk": {
         "properties": {
+          "citation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deep link to the cited spot (for example a YouTube timestamp) when available",
+            "title": "Citation Url"
+          },
           "doc": {
             "title": "Doc",
             "type": "string"
@@ -355,7 +368,6 @@
             "title": "Page"
           },
           "score": {
-            "default": 0.0,
             "title": "Score",
             "type": "number"
           },
@@ -378,7 +390,8 @@
         },
         "required": [
           "text",
-          "doc"
+          "doc",
+          "score"
         ],
         "title": "Chunk",
         "type": "object"
@@ -386,7 +399,6 @@
       "Cleared": {
         "properties": {
           "ok": {
-            "default": true,
             "title": "Ok",
             "type": "boolean"
           },
@@ -396,6 +408,7 @@
           }
         },
         "required": [
+          "ok",
           "removed"
         ],
         "title": "Cleared",
@@ -512,12 +525,12 @@
             "type": "string"
           },
           "ok": {
-            "default": true,
             "title": "Ok",
             "type": "boolean"
           }
         },
         "required": [
+          "ok",
           "deleted",
           "chunks_removed"
         ],
@@ -721,7 +734,6 @@
           },
           "status": {
             "const": "ok",
-            "default": "ok",
             "title": "Status",
             "type": "string"
           },
@@ -731,6 +743,7 @@
           }
         },
         "required": [
+          "status",
           "version",
           "semantic_search",
           "chunks"
@@ -795,7 +808,6 @@
             "type": "string"
           },
           "progress": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -829,6 +841,7 @@
           "id",
           "kind",
           "status",
+          "progress",
           "created_at"
         ],
         "title": "Job",
@@ -1002,7 +1015,6 @@
             "type": "string"
           },
           "topics": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1025,6 +1037,7 @@
           "pid",
           "title",
           "difficulty",
+          "topics",
           "description"
         ],
         "title": "Problem",
@@ -1147,7 +1160,6 @@
             "type": "string"
           },
           "topics": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1169,7 +1181,8 @@
         "required": [
           "pid",
           "title",
-          "difficulty"
+          "difficulty",
+          "topics"
         ],
         "title": "ProblemSummary",
         "type": "object"
@@ -1276,7 +1289,6 @@
       "SourcesAccepted": {
         "properties": {
           "files": {
-            "default": [],
             "items": {
               "$ref": "#/components/schemas/FileResult"
             },
@@ -1296,7 +1308,6 @@
             "title": "Job Id"
           },
           "urls": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1304,6 +1315,10 @@
             "type": "array"
           }
         },
+        "required": [
+          "files",
+          "urls"
+        ],
         "title": "SourcesAccepted",
         "type": "object"
       },

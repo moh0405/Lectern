@@ -1,0 +1,105 @@
+"use client";
+
+import { Check, Copy, Square, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChunkCard } from "@/components/chunk-card";
+import { Markdown } from "@/components/markdown";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
+import type { Turn } from "./session";
+
+const MODE_LABEL = { eli5: "ELI5", technical: "Technical", interview: "Interview", summary: "Summary" } as const;
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Copy answer"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable */
+        }
+      }}
+    >
+      {copied ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
+    </Button>
+  );
+}
+
+export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () => void; onRemove: () => void }) {
+  const streaming = turn.status === "streaming";
+  const noKey = turn.error?.code === "llm_unavailable";
+  return (
+    <Card className="space-y-4" aria-busy={streaming}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold leading-snug">{turn.question}</h2>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {turn.mode ? <Badge>{MODE_LABEL[turn.mode]}</Badge> : null}
+            {turn.model ? <Badge>{turn.model}</Badge> : null}
+            {turn.status === "stopped" ? <Badge>stopped</Badge> : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          {streaming ? (
+            <Button variant="secondary" size="sm" onClick={onStop}>
+              <Square className="h-3.5 w-3.5" /> Stop
+            </Button>
+          ) : (
+            <>
+              {turn.answer ? <CopyButton text={turn.answer} /> : null}
+              <Button variant="ghost" size="icon" aria-label="Remove" onClick={onRemove}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {noKey ? (
+        <Notice>
+          The server has no <code>GEMINI_API_KEY</code>, so it cannot write an answer. Retrieval still works: the sources
+          below are the passages it found.
+        </Notice>
+      ) : turn.error ? (
+        <ErrorNotice>{turn.error.message}</ErrorNotice>
+      ) : null}
+
+      {turn.answer || streaming ? (
+        <div aria-live="polite">
+          {turn.answer ? <Markdown streaming={streaming}>{turn.answer}</Markdown> : <p className="text-sm text-muted">Thinking…</p>}
+        </div>
+      ) : null}
+
+      {turn.chunks.length > 0 ? (
+        <details open={!turn.answer || turn.status === "error"} className="group">
+          <summary className="cursor-pointer select-none list-none text-sm text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
+            <span className="mr-2">Sources ({turn.chunks.length})</span>
+            <span className="inline-flex flex-wrap gap-1.5 align-middle">
+              {turn.chunks.map((c, i) => (
+                <Badge key={i} title={`Relevance ${c.score.toFixed(2)}`} className="font-mono">
+                  [{i + 1}] {c.doc}
+                  {c.page ? ` · p.${c.page}` : ""}
+                </Badge>
+              ))}
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {turn.chunks.map((c, i) => (
+              <ChunkCard key={i} chunk={c} query={turn.question} index={i} />
+            ))}
+          </div>
+        </details>
+      ) : turn.status !== "streaming" && !turn.error ? (
+        <p className="text-sm text-muted">No matching passages were found in your sources.</p>
+      ) : null}
+    </Card>
+  );
+}
