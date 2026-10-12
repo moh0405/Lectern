@@ -62,9 +62,15 @@ export function ProblemDetail({ pid, onClose }: { pid: string; onClose: () => vo
             </div>
           </div>
 
-          <Markdown breaks className="max-h-[22rem] overflow-y-auto rounded-lg border border-border bg-bg/40 p-4 text-sm">
-            {problem.data.description}
-          </Markdown>
+          {/* Scrollable, so it must be reachable by keyboard (WCAG 2.1.1) */}
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Problem statement"
+            className="max-h-[22rem] overflow-y-auto rounded-lg border border-border bg-bg/40 p-4 text-sm"
+          >
+            <Markdown breaks>{problem.data.description}</Markdown>
+          </div>
 
           <div>
             <Button onClick={() => guide.mutate()} disabled={guide.isPending}>
