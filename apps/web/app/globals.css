@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0e1a;
+  --color-surface: #11172a;
+  --color-surface-2: #172036;
+  --color-border: #263050;
+  --color-fg: #e6e9f2;
+  --color-muted: #95a0bd;
+  --color-accent: #7c6cf0;
+  --color-accent-2: #38bdf8;
+  --color-good: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  min-height: 100%;
+}
+
+body {
+  background-image:
+    radial-gradient(900px 500px at 8% -10%, rgb(124 108 240 / 0.22), transparent 60%),
+    radial-gradient(800px 450px at 100% 0%, rgb(56 189 248 / 0.12), transparent 55%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(124 108 240 / 0.45);
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--color-accent-2);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Streaming cursor for answers being generated */
+.streaming-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-accent-2);
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}

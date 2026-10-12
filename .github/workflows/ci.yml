@@ -32,22 +32,23 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/export_openapi.py --check
 
-  api-client:
+  frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/api-client
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: packages/api-client/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - name: Generated types match openapi.json
+      - name: Generated API types match openapi.json
         run: |
-          npm run generate
-          git diff --exit-code src/schema.d.ts
-      - run: npm run typecheck
-      - run: npm test
+          npm run client:generate
+          git diff --exit-code packages/api-client/src/schema.d.ts
+      - run: npm run client:typecheck
+      - run: npm run client:test
+      - run: npm run web:typecheck
+      - run: npm run web:lint
+      - run: npm run web:test
+      - run: npm run web:build
