@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from typing import Dict, Any, List, Optional
-import json
 
 from .base_source import BaseSource
 

@@ -338,7 +338,7 @@ class RAGEngine:
             text = (res.get("answer") or res.get("text") or "").strip()
             if text:
                 return {"ok": True, "markdown": text}
-        except Exception as e:
+        except Exception:
             # Fall through to heuristic
             pass
 

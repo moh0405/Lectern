@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import json
 
 import streamlit as st
-import os
 from pathlib import Path
 
 

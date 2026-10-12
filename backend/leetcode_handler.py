@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import os
 import re
 import json
 import csv
-import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -392,7 +390,7 @@ class LeetCodeHandler:
         try:
             kaggle.api.authenticate()
             kaggle.api.dataset_download_files(dataset, path=str(dest), unzip=True)
-        except Exception as e:
+        except Exception:
             # Try local fallback
             return self._try_parse_local_kaggle_dump(dataset)
         # parse any CSV/JSON found in dest/dataset_name
