@@ -19,13 +19,24 @@ try:
 except Exception:
     hf_hub_download = None
 
-try:
-    import kaggle  # optional; requires credentials (~/.kaggle/kaggle.json)
-except Exception:
-    kaggle = None
 
 from .document_processor import embed_texts
 from .llm_config import GeminiClient
+
+
+def _import_kaggle():
+    """Lazily import the optional `kaggle` package.
+
+    Depending on the version, importing it or calling `api.authenticate()`
+    calls `sys.exit()` when credentials (~/.kaggle/kaggle.json) are missing,
+    so it must not run at module import time, and SystemExit has to be
+    caught explicitly.
+    """
+    try:
+        import kaggle  # type: ignore
+        return kaggle
+    except (Exception, SystemExit):
+        return None
 
 
 @dataclass
@@ -382,6 +393,7 @@ class LeetCodeHandler:
     # Kaggle loader
     # ----------------------
     def _try_load_kaggle_competition(self, dataset: str) -> int:
+        kaggle = _import_kaggle()
         if kaggle is None:
             # Attempt to read pre-downloaded content from cache_dir
             return self._try_parse_local_kaggle_dump(dataset)
@@ -390,8 +402,8 @@ class LeetCodeHandler:
         try:
             kaggle.api.authenticate()
             kaggle.api.dataset_download_files(dataset, path=str(dest), unzip=True)
-        except Exception:
-            # Try local fallback
+        except (Exception, SystemExit):
+            # kaggle calls sys.exit() when credentials are missing; use the local dump instead
             return self._try_parse_local_kaggle_dump(dataset)
         # parse any CSV/JSON found in dest/dataset_name
         return self._parse_dir_for_dataset(dest, dataset)
