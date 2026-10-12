@@ -30,7 +30,7 @@ class GeminiClient:
         if not key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment or .env file.")
         genai.configure(api_key=key)
-        requested = model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        requested = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self.model = self._resolve_model(requested)
         try:
             self.temperature = float(os.getenv("GEMINI_TEMPERATURE", str(temperature)))
