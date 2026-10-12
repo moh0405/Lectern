@@ -153,6 +153,8 @@ class LeetCodeHandler:
                 status_parts.append("embeddings ready")
             except Exception as e:
                 status_parts.append(f"embeddings unavailable: {e}")
+        elif self._load_cached_embeddings():
+            status_parts.append("cached embeddings loaded")
 
         return (len(self._problems), "; ".join(status_parts) or "ok")
 
@@ -293,6 +295,20 @@ class LeetCodeHandler:
     # ----------------------
     # Internal helpers
     # ----------------------
+    def _load_cached_embeddings(self) -> bool:
+        """Use embeddings.npy if it matches the problem list; never computes anything."""
+        emb_path = self.cache_dir / "embeddings.npy"
+        if not emb_path.exists():
+            return False
+        try:
+            arr = np.load(str(emb_path), allow_pickle=False)
+        except Exception:
+            return False
+        if arr.ndim != 2 or arr.shape[0] != len(self._problems):
+            return False
+        self._embeddings = arr
+        return True
+
     def _ensure_embeddings(self) -> None:
         """Create embeddings for all problems' text (title + description)."""
         emb_path = self.cache_dir / "embeddings.npy"

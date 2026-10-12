@@ -20,6 +20,14 @@ def _tokens(text: str) -> set:
     return {t for t in re.findall(r"\b\w+\b", text.lower()) if t not in _STOPWORDS}
 
 
+_FALLBACK_QUESTIONS = [
+    "Explain dynamic programming",
+    "Difference between BFS and DFS",
+    "How do hash tables handle collisions?",
+    "What is a balanced binary search tree?",
+    "Describe Dijkstra vs Bellman-Ford",
+]
+
 _shared: Dict[str, "RAGEngine"] = {}
 _shared_lock = threading.Lock()
 
@@ -131,13 +139,17 @@ class RAGEngine:
     # ------------------------------------------------------------------
     # Indexing (used by the API)
     # ------------------------------------------------------------------
-    def add_sources(self, inputs: List[str], refresh_urls: bool = False, save: bool = True):
+    def add_sources(self, inputs: List[str], refresh_urls: bool = False, save: bool = True, progress=None):
         """Index files/URLs into the live store and persist it. Returns an IndexReport."""
         from .indexer import index_inputs
 
-        report = index_inputs(self.store, inputs, embedder=self._embedder, refresh_urls=refresh_urls)
+        report = index_inputs(
+            self.store, inputs, embedder=self._embedder, refresh_urls=refresh_urls, progress=progress
+        )
         self._fallback_items = None
         self._embedder_failed = False
+        if len(self.store):
+            self._get_embedder()  # indexing just loaded it; bind it so semantic search is ready
         if save:
             self.store.save()
         return report
@@ -326,21 +338,9 @@ class RAGEngine:
                 # strip leading numbering
                 line = line.split(". ", 1)[-1] if line[0].isdigit() else line
                 qs.append(line)
-            return qs[:max_questions] or [
-                "Explain dynamic programming",
-                "Difference between BFS and DFS",
-                "How do hash tables handle collisions?",
-                "What is a balanced binary search tree?",
-                "Describe Dijkstra vs Bellman-Ford",
-            ]
+            return (qs or _FALLBACK_QUESTIONS)[:max_questions]
         except Exception:
-            return [
-                "Explain dynamic programming",
-                "Difference between BFS and DFS",
-                "How do hash tables handle collisions?",
-                "What is a balanced binary search tree?",
-                "Describe Dijkstra vs Bellman-Ford",
-            ]
+            return _FALLBACK_QUESTIONS[:max_questions]
 
     def summarize_chat(self, history: List[Dict[str, Any]], model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
         """
