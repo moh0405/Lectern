@@ -80,8 +80,13 @@ class LeetCodeHandler:
     def is_loaded(self) -> bool:
         return self._loaded and bool(self._problems)
 
-    def load_all(self, force: bool = False, generate_embeddings: bool = True) -> Tuple[int, str]:
-        """Load and normalize problems from all sources; returns (count, status)."""
+    def load_all(self, force: bool = False, generate_embeddings: bool = True, refresh: bool = False) -> Tuple[int, str]:
+        """Load problems; returns (count, status).
+
+        Reads the cached normalized file when present (fast, no network, no writes).
+        `refresh=True` also re-downloads and re-parses the raw datasets; `force=True` reloads
+        even if already loaded.
+        """
         if self._loaded and not force:
             return (len(self._problems), "already loaded")
 
@@ -97,30 +102,33 @@ class LeetCodeHandler:
             except Exception as e:
                 status_parts.append(f"failed to read normalized jsonl: {e}")
 
-        # 2) HuggingFace dataset (best-effort)
-        if not problems:  # prefer normalized if present
+        # Steps 2-4 touch the network and rewrite the normalized file, so they only run when there
+        # is nothing cached yet or the caller asks for a refresh (scripts/prepare_leetcode_data.py).
+        if refresh or not problems:
+            # 2) HuggingFace dataset (best-effort)
+            if not problems:  # prefer normalized if present
+                try:
+                    hf_count = self._try_load_huggingface()
+                    status_parts.append(f"huggingface: {hf_count}")
+                    problems.extend(self._read_normalized_jsonl(norm_path)) if norm_path.exists() else None
+                except Exception as e:
+                    status_parts.append(f"huggingface failed: {e}")
+
+            # 3) Kaggle datasets (best-effort)
             try:
-                hf_count = self._try_load_huggingface()
-                status_parts.append(f"huggingface: {hf_count}")
-                problems.extend(self._read_normalized_jsonl(norm_path)) if norm_path.exists() else None
+                k1 = self._try_load_kaggle_competition("gzipchrist/leetcode-problem-dataset")
+                k2 = self._try_load_kaggle_competition("mohitkumar282/leetcode-questions-dataset")
+                status_parts.append(f"kaggle gzipchrist: {k1}, mohitkumar282: {k2}")
             except Exception as e:
-                status_parts.append(f"huggingface failed: {e}")
+                status_parts.append(f"kaggle failed: {e}")
 
-        # 3) Kaggle datasets (best-effort)
-        try:
-            k1 = self._try_load_kaggle_competition("gzipchrist/leetcode-problem-dataset")
-            k2 = self._try_load_kaggle_competition("mohitkumar282/leetcode-questions-dataset")
-            status_parts.append(f"kaggle gzipchrist: {k1}, mohitkumar282: {k2}")
-        except Exception as e:
-            status_parts.append(f"kaggle failed: {e}")
-
-        # 4) Local CSV/JSON fallbacks in data/leetcode
-        try:
-            local_added = self._try_load_local_files()
-            if local_added:
-                status_parts.append(f"local files added: {local_added}")
-        except Exception as e:
-            status_parts.append(f"local read failed: {e}")
+            # 4) Local CSV/JSON fallbacks in data/leetcode
+            try:
+                local_added = self._try_load_local_files()
+                if local_added:
+                    status_parts.append(f"local files added: {local_added}")
+            except Exception as e:
+                status_parts.append(f"local read failed: {e}")
 
         # If still no normalized file, build from raw pieces and write it
         if not norm_path.exists():
@@ -350,6 +358,30 @@ class LeetCodeHandler:
             source=pick(a.source, b.source),
         )
 
+    def rebuild_from_local(self) -> int:
+        """Re-create normalized_problems.jsonl from the raw CSV/JSON files under cache_dir.
+
+        Offline only (no downloads). Use after the parsing rules change, since `load_all`
+        prefers an existing normalized file. Returns the number of problems written.
+        """
+        probs: List[LCProblem] = []
+        for p in sorted(self.cache_dir.rglob("*")):
+            if p.is_file() and p.name != "normalized_problems.jsonl" and p.suffix.lower() in {".csv", ".json", ".jsonl"}:
+                if "hf_" in p.parent.name or p.parent == self.cache_dir or "kaggle" in p.parts:
+                    try:
+                        probs.extend(self._parse_any_file(p, source="local"))
+                    except Exception:
+                        continue
+        uniq: Dict[str, LCProblem] = {}
+        for pr in probs:
+            key = (pr.title or pr.pid).strip().lower()
+            uniq[key] = self._merge_problem(uniq[key], pr) if key in uniq else pr
+        merged = list(uniq.values())
+        self._write_normalized_jsonl(self.cache_dir / "normalized_problems.jsonl", merged)
+        (self.cache_dir / "embeddings.npy").unlink(missing_ok=True)  # row order changed
+        self._problems, self._loaded, self._embeddings = [], False, None
+        return len(merged)
+
     # ----------------------
     # Reading / Writing normalized
     # ----------------------
@@ -555,7 +587,7 @@ class LeetCodeHandler:
         pid = str(get_any(["id", "question_id", "problem_id", "qid", "slug"], default=""))
         title = str(get_any(["title", "question_title", "name"], default="")).strip()
         difficulty = str(get_any(["difficulty", "level"], default="")).strip().title()
-        topics_raw = get_any(["topics", "tags", "topic_tags", "category", "categories"], default=[])
+        topics_raw = get_any(["topics", "tags", "topic_tags", "Topic_tags", "related_topics", "category", "categories"], default=[])
         if isinstance(topics_raw, str):
             topics = [t.strip() for t in re.split(r"[,;]", topics_raw) if t.strip()]
         elif isinstance(topics_raw, list):

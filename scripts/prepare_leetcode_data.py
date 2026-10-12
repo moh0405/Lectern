@@ -13,7 +13,8 @@ Outputs:
   - data/leetcode/embeddings.npy (if sentence-transformers is available)
 
 Usage:
-  python scripts/prepare_leetcode_data.py
+  python scripts/prepare_leetcode_data.py                  # download + normalize
+  python scripts/prepare_leetcode_data.py --rebuild-local  # offline: re-parse local CSVs
 """
 
 import sys
@@ -28,7 +29,10 @@ from backend.leetcode_handler import LeetCodeHandler
 
 def main() -> int:
     handler = LeetCodeHandler(cache_dir=str(PROJECT_ROOT / "data" / "leetcode"))
-    n, status = handler.load_all(force=True, generate_embeddings=False)
+    if "--rebuild-local" in sys.argv:
+        # Offline: re-parse the CSVs already under data/leetcode/ (no downloads).
+        print(f"Rebuilt normalized_problems.jsonl with {handler.rebuild_from_local()} problems")
+    n, status = handler.load_all(force=True, generate_embeddings=False, refresh=True)
     print(f"Loaded {n} problems ({status})")
     stats = handler.get_stats()
     print("Stats:")
