@@ -32,7 +32,7 @@ def test_math_solve_solve_equation():
 
 
 def test_gemini_client_requires_api_key(monkeypatch):
-    pytest.importorskip("google.generativeai")
+    pytest.importorskip("google.genai")
     from backend.llm_config import GeminiClient
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)

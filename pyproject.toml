@@ -15,7 +15,7 @@ dependencies = [
     "fonttools>=4.0",  # lets pypdf decode more embedded fonts (fewer garbled PDF pages)
     "python-dotenv>=1.0",
     "requests>=2.31",
-    "google-generativeai>=0.8",  # TODO(phase 2): migrate to the current Google Gen AI SDK
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]
