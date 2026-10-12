@@ -338,6 +338,19 @@
       },
       "Chunk": {
         "properties": {
+          "citation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deep link to the cited spot (for example a YouTube timestamp) when available",
+            "title": "Citation Url"
+          },
           "doc": {
             "title": "Doc",
             "type": "string"
@@ -355,7 +368,6 @@
             "title": "Page"
           },
           "score": {
-            "default": 0.0,
             "title": "Score",
             "type": "number"
           },
@@ -378,7 +390,8 @@
         },
         "required": [
           "text",
-          "doc"
+          "doc",
+          "score"
         ],
         "title": "Chunk",
         "type": "object"
@@ -386,7 +399,6 @@
       "Cleared": {
         "properties": {
           "ok": {
-            "default": true,
             "title": "Ok",
             "type": "boolean"
           },
@@ -396,6 +408,7 @@
           }
         },
         "required": [
+          "ok",
           "removed"
         ],
         "title": "Cleared",
@@ -512,12 +525,12 @@
             "type": "string"
           },
           "ok": {
-            "default": true,
             "title": "Ok",
             "type": "boolean"
           }
         },
         "required": [
+          "ok",
           "deleted",
           "chunks_removed"
         ],
@@ -721,7 +734,6 @@
           },
           "status": {
             "const": "ok",
-            "default": "ok",
             "title": "Status",
             "type": "string"
           },
@@ -731,6 +743,7 @@
           }
         },
         "required": [
+          "status",
           "version",
           "semantic_search",
           "chunks"
@@ -795,7 +808,6 @@
             "type": "string"
           },
           "progress": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -829,6 +841,7 @@
           "id",
           "kind",
           "status",
+          "progress",
           "created_at"
         ],
         "title": "Job",
@@ -877,6 +890,28 @@
           "steps"
         ],
         "title": "MathResult",
+        "type": "object"
+      },
+      "Models": {
+        "properties": {
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "models": {
+            "description": "Model names that can generate text for the configured key, newest Flash first",
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models",
+          "default"
+        ],
+        "title": "Models",
         "type": "object"
       },
       "Notes": {
@@ -1002,7 +1037,6 @@
             "type": "string"
           },
           "topics": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1025,6 +1059,7 @@
           "pid",
           "title",
           "difficulty",
+          "topics",
           "description"
         ],
         "title": "Problem",
@@ -1147,7 +1182,6 @@
             "type": "string"
           },
           "topics": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1169,9 +1203,115 @@
         "required": [
           "pid",
           "title",
-          "difficulty"
+          "difficulty",
+          "topics"
         ],
         "title": "ProblemSummary",
+        "type": "object"
+      },
+      "Projection": {
+        "properties": {
+          "embedder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedder"
+          },
+          "explained_variance": {
+            "description": "Share of the variance kept by each of the three axes",
+            "items": {
+              "type": "number"
+            },
+            "title": "Explained Variance",
+            "type": "array"
+          },
+          "method": {
+            "const": "pca",
+            "title": "Method",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectionPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "semantic": {
+            "description": "False for the hashing embedder: closeness reflects shared words, not meaning",
+            "title": "Semantic",
+            "type": "boolean"
+          },
+          "total_chunks": {
+            "title": "Total Chunks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "points",
+          "explained_variance",
+          "method",
+          "embedder",
+          "semantic",
+          "total_chunks"
+        ],
+        "title": "Projection",
+        "type": "object"
+      },
+      "ProjectionPoint": {
+        "properties": {
+          "doc": {
+            "title": "Doc",
+            "type": "string"
+          },
+          "index": {
+            "description": "Position of the passage in the index",
+            "title": "Index",
+            "type": "integer"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "text": {
+            "description": "First 200 characters of the passage",
+            "title": "Text",
+            "type": "string"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z",
+          "doc",
+          "text",
+          "index"
+        ],
+        "title": "ProjectionPoint",
         "type": "object"
       },
       "SearchResponse": {
@@ -1276,7 +1416,6 @@
       "SourcesAccepted": {
         "properties": {
           "files": {
-            "default": [],
             "items": {
               "$ref": "#/components/schemas/FileResult"
             },
@@ -1296,7 +1435,6 @@
             "title": "Job Id"
           },
           "urls": {
-            "default": [],
             "items": {
               "type": "string"
             },
@@ -1304,6 +1442,10 @@
             "type": "array"
           }
         },
+        "required": [
+          "files",
+          "urls"
+        ],
         "title": "SourcesAccepted",
         "type": "object"
       },
@@ -2380,6 +2522,122 @@
         ]
       }
     },
+    "/api/v1/embeddings/projection": {
+      "get": {
+        "description": "Projects the stored embeddings onto their top three principal components. `explained_variance` says how much of the structure each axis keeps, and `semantic` is false when the index was built with the non-semantic hashing embedder (distances then reflect shared words, not meaning).",
+        "operationId": "projection_api_v1_embeddings_projection_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 400,
+              "maximum": 1000,
+              "minimum": 10,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Projection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "3D PCA projection of indexed passages (for the embedding-space view)",
+        "tags": [
+          "visualize"
+        ]
+      }
+    },
     "/api/v1/export": {
       "post": {
         "operationId": "export_api_v1_export_post",
@@ -3207,6 +3465,107 @@
         "summary": "Symbolic math with LaTeX output (simplify, differentiate, integrate, solve, ...)",
         "tags": [
           "tutor"
+        ]
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "operationId": "models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Models"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Models the server can use (needs a Gemini key)",
+        "tags": [
+          "ask"
         ]
       }
     },

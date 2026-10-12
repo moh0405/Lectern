@@ -87,18 +87,28 @@ Bugs found and fixed while testing this phase: tutor tools used a different engi
 Layout: `apps/web` (Next.js) and `packages/api-client` (generated); `backend/` stays as is.
 
 Migrate in this order; each step should be shippable:
-1. [ ] **Shell**: layout, dark glass theme, sidebar settings, command palette (`cmdk`), typed API client with TanStack Query.
-2. [ ] **Ask**: SSE streaming hook, context cards with score and keyword highlights, mode picker, `react-markdown` + KaTeX, citation links (page numbers and YouTube timestamps).
-3. [ ] **Sources**: PDF drag and drop, URL list, audio upload, job progress, document list with delete.
-4. [ ] **LeetCode**: filtered search, problem view, AI study guide with syntax highlighting.
-5. [ ] **Tutor tools**: Concept Map (React Flow, JSON/DOT export), Socratic, Synthesis, Adaptive, Math (KaTeX).
-6. [ ] **Analytics**: persist events in the backend, charts, report export.
-7. [ ] **3D Viz**: real embeddings projected by the backend (UMAP or PCA).
-8. [ ] **Parity check**, delete `frontend/*.py`, update the README.
+1. [x] **Shell**: layout, dark glass theme, sidebar settings, command palette (`cmdk`), typed API client with TanStack Query.
+2. [x] **Ask**: SSE streaming hook, context cards with score and keyword highlights, mode picker, `react-markdown` + KaTeX, citation links (page numbers and YouTube timestamps).
+3. [x] **Sources**: PDF drag and drop, URL list, audio upload, job progress, document list with delete.
+4. [x] **LeetCode**: filtered search, problem view, AI study guide with syntax highlighting.
+5. [x] **Tutor tools**: Concept Map (React Flow, JSON/DOT export), Socratic, Synthesis, Adaptive, Math (KaTeX).
+6. [x] **Analytics**: persist events in the backend, charts, report export.
+7. [x] **3D Viz**: real embeddings projected by the backend (UMAP or PCA).
+8. [x] **Parity check**, delete `frontend/*.py`, update the README.
 
 Quality gates: `tsc --strict`, ESLint, Vitest (components and hooks), Playwright end-to-end for "upload → ask → cited answer".
 
 **Done when:** the Next.js app matches or beats the Streamlit app and Streamlit is removed.
+
+### What happened in Phase 3
+
+- Shipped a Next.js 16 app in `apps/web` (strict TypeScript, Tailwind v4, TanStack Query) over a typed client generated from the API's OpenAPI schema, with a Ctrl/Cmd+K command palette, error boundaries and a 404 page.
+- Tests: Vitest unit and component tests, and Playwright end-to-end tests that run the real API (scripted model) in a real browser, including axe WCAG A/AA checks on every page.
+- **Parity with the Streamlit app**, then removal (`frontend/` deleted in its own commit so it is easy to revert):
+  - Ported: Ask (now streaming, with citation chips and YouTube deep links), concept map, Socratic tutor, source comparison, adaptive explanations, Math, 3D view, LeetCode, analytics, source management, model picker, show-prompt, retrieval-only mode, study notes, flashcards CSV, command palette.
+  - Improved: the 3D view now projects the real embeddings (PCA) instead of SHA-256 hashes; analytics persist on the server; failures are explained instead of silently falling back.
+  - **Not ported: Demo Mode** (canned answers for presenting without a key or network). Without a key, retrieval, LeetCode, Math, the embedding map and analytics still work, and the e2e server shows how to run against a scripted model. Say if you want a canned demo mode back.
+- Bugs found and fixed while building it: LeetCode topics were never parsed (0 of 1,825 problems had any); "two sum" ranked "Combine Two Tables" first; every `load_all` re-hit Kaggle and rewrote the dataset; the Ask session was wiped from localStorage on mount; `apps/web/lib` was silently excluded by the Python `lib/` gitignore rule; the accent colour and a scrollable region failed WCAG.
 
 ## Phase 4: Answer quality (about 1 week; overlaps Phase 3)
 - [ ] Build an eval set of 30–50 questions with expected sources; track recall@k and citation correctness.

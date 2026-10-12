@@ -112,3 +112,15 @@ def test_prompt_modes(engine, mode, marker):
 def test_format_context_cites_doc_and_page(engine):
     out = engine.format_context(CHUNKS[:1])
     assert out.startswith("- [ds.pdf (page 3)]")
+
+
+def test_results_carry_citation_url_with_timestamp(tmp_path):
+    store = VectorStore(tmp_path / "s")
+    store.set_embedder(EMB.name, EMB.dim)
+    chunk = {"text": "binary search halves the range", "doc": "Lecture", "page": None, "source_type": "youtube",
+             "url": "https://youtu.be/abc", "extra": {"citation_url": "https://www.youtube.com/watch?v=abc&t=95s"}}
+    store.add([chunk], EMB.encode([chunk["text"]]), "https://youtu.be/abc")
+    eng = RAGEngine(store_dir=str(tmp_path / "s"), embedder=EMB, input_dir=str(tmp_path / "in"))
+    eng.store = store
+    hit = eng.retrieve_context("binary search", k=1)[0]
+    assert hit["citation_url"].endswith("&t=95s") and hit["url"] == "https://youtu.be/abc"

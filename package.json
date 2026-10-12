@@ -1,0 +1,17 @@
+{
+  "name": "ai-study-mentor",
+  "private": true,
+  "description": "Monorepo root: the Next.js app (apps/web) and the generated API client (packages/api-client). The Python backend lives in backend/.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "web:dev": "npm run dev -w apps/web",
+    "web:build": "npm run build -w apps/web",
+    "web:test": "npm test -w apps/web",
+    "web:typecheck": "npm run typecheck -w apps/web",
+    "web:lint": "npm run lint -w apps/web",
+    "client:generate": "npm run generate -w packages/api-client",
+    "client:test": "npm test -w packages/api-client",
+    "client:typecheck": "npm run typecheck -w packages/api-client"
+  },
+  "engines": { "node": ">=20" }
+}

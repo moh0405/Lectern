@@ -94,7 +94,7 @@ Option B (semantic retrieval, if environment stable):
 1. Solidify CLI + retrieval flows (done for keyword; semantic on standby).
 2. Add an LLM call wrapper (done: `GeminiClient`).
 3. Build FastAPI endpoints: upload PDF, rebuild index, query.
-4. Create Streamlit UI: upload/manage files, chat with retrieval.
+4. Build a UI: upload/manage files, chat with retrieval (first Streamlit, now a Next.js app in `apps/web`).
 5. Write evaluation harness: test questions, check citations.
 
 Each of these will be implemented in small patches with a clear rationale and test instructions.

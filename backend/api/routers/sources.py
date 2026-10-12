@@ -102,7 +102,7 @@ async def upload_files(
         saved.append(str(dest))
         results.append(FileResult(filename=name, size_bytes=len(data), ok=True))
     job_id = jobs.submit("index_files", _index_job(engine, saved)) if saved else None
-    return SourcesAccepted(job_id=job_id, files=results)
+    return SourcesAccepted(job_id=job_id, files=results, urls=[])
 
 
 @router.post("/sources/urls", response_model=SourcesAccepted, status_code=202,
@@ -123,7 +123,7 @@ def add_urls(
     known = _read_urls()
     _write_urls(known + [u for u in clean if u not in known])
     job_id = jobs.submit("index_urls", _index_job(engine, clean))
-    return SourcesAccepted(job_id=job_id, urls=clean)
+    return SourcesAccepted(job_id=job_id, files=[], urls=clean)
 
 
 @router.get("/jobs/{job_id}", response_model=Job, summary="Status and progress of a background job")
@@ -177,4 +177,4 @@ async def delete_source(
     if known_url:
         _write_urls([u for u in _read_urls() if u != key])
     removed = await run_in_threadpool(engine.remove_source, key)
-    return DeleteResult(deleted=key, chunks_removed=removed)
+    return DeleteResult(ok=True, deleted=key, chunks_removed=removed)

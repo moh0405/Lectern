@@ -18,7 +18,7 @@ from .. import __version__
 from .deps import make_engine
 from .errors import ERROR_RESPONSES, ErrorResponse, install_error_handlers
 from .jobs import JobManager
-from .routers import ask, leetcode, sources, study, tutor
+from .routers import ask, leetcode, sources, study, tutor, viz
 from .schemas import Health, SseDone, SseError, SseMeta, SseToken
 from .settings import settings
 
@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
         engine = getattr(app.state, "engine", None) or get_engine_lazy(app)
         return Health(status="ok", version=__version__, semantic_search=engine.semantic_ready, chunks=len(engine.store))
 
-    for r in (sources.router, ask.router, tutor.router, leetcode.router, study.router):
+    for r in (sources.router, ask.router, tutor.router, leetcode.router, study.router, viz.router):
         app.include_router(r)
 
     base_openapi = app.openapi
