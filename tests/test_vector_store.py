@@ -87,17 +87,44 @@ def test_chunk_hash_depends_on_source_and_text():
     assert chunk_hash(a) != chunk_hash({**a, "text": "y"})
 
 
-@pytest.mark.skipif(vs.faiss is None, reason="faiss not installed")
-def test_faiss_and_numpy_agree(store, tmp_path, monkeypatch):
+def test_default_backend_is_numpy_and_writes_no_faiss_file(store):
+    assert not store.uses_faiss
+    store.save()
+    assert not (store.dir / "index.faiss").exists()
+
+
+def test_faiss_backend_is_refused_when_torch_is_loaded(store, monkeypatch):
+    monkeypatch.setenv("VECTOR_BACKEND", "faiss")
+    monkeypatch.setitem(__import__("sys").modules, "torch", object())
+    assert not store.uses_faiss
+
+
+def _faiss_usable(monkeypatch):
+    import sys
+
+    if "torch" in sys.modules:
+        pytest.skip("torch is loaded in this process; faiss is disabled by design")
+    monkeypatch.setenv("VECTOR_BACKEND", "faiss")
+    if vs._faiss() is None:
+        pytest.skip("faiss not installed")
+
+
+def test_faiss_and_numpy_agree(store, monkeypatch):
     qv = EMB.encode(["linked list nodes"])[0]
-    with_faiss = store.search(qv, 3)
+    numpy_hits = store.search(qv, 3)
+    _faiss_usable(monkeypatch)
     assert store.uses_faiss
+    faiss_hits = store.search(qv, 3)
+    # ties may be ordered differently, so compare the best hit and the score profile
+    assert faiss_hits[0][0] == numpy_hits[0][0]
+    assert np.allclose(sorted(s for _, s in faiss_hits), sorted(s for _, s in numpy_hits), atol=1e-5)
+
+
+def test_faiss_index_is_persisted_and_reused(store, monkeypatch):
+    _faiss_usable(monkeypatch)
     store.save()
     assert (store.dir / "index.faiss").exists()
     reloaded = VectorStore.load(store.dir)
-    assert reloaded._index is not None  # persisted index is reused
-    monkeypatch.setattr(vs, "faiss", None)
-    without = VectorStore.load(store.dir).search(qv, 3)
-    # ties may be ordered differently, so compare the best hit and the score profile
-    assert with_faiss[0][0] == without[0][0]
-    assert np.allclose(sorted(s for _, s in with_faiss), sorted(s for _, s in without), atol=1e-5)
+    assert reloaded._index is None  # not read until first needed
+    reloaded.search(EMB.encode(["shortest path"])[0], 1)
+    assert reloaded._index is not None

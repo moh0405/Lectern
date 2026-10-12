@@ -5,7 +5,8 @@ Layout of a store directory (no pickle anywhere):
     manifest.json    version, embedder name/dim, per-source fingerprints
     chunks.jsonl     one JSON object per chunk (text, doc, page, ..., chunk_hash, source_key)
     embeddings.npy   float32 matrix, row i belongs to chunk i (L2-normalized)
-    index.faiss      FAISS IndexFlatIP cache of embeddings.npy (rebuilt if stale or missing)
+    index.faiss      optional FAISS IndexFlatIP cache of embeddings.npy; only written when
+                     VECTOR_BACKEND=faiss (rebuilt if stale or missing)
 
 `embeddings.npy` + `chunks.jsonl` are the source of truth; the FAISS file is
 only a cache. Chunks are de-duplicated by `chunk_hash`, and every chunk
@@ -19,20 +20,52 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import threading
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-try:
-    import faiss
-except Exception:  # optional dependency
-    faiss = None
-
 logger = logging.getLogger("ai-study-mentor.store")
 
 STORE_VERSION = 1
+
+_faiss_mod: Any = None
+_faiss_import_tried = False
+_warned_torch = False
+
+
+def _faiss() -> Any:
+    """The FAISS module if it is enabled *and* safe to use, else None.
+
+    Search backend is chosen with VECTOR_BACKEND=numpy|faiss (default numpy).
+    Exact inner-product search over normalized vectors is identical in both
+    and takes about a millisecond at this project's scale (~10^4 chunks), so
+    FAISS is opt-in.
+
+    FAISS is also refused whenever torch is loaded in the process: on macOS
+    both ship their own OpenMP runtime and the process aborts on the first
+    multithreaded call, whichever is imported first (verified with
+    faiss-cpu 1.x + torch 2.x), so the NumPy path is used instead.
+    """
+    global _faiss_mod, _faiss_import_tried, _warned_torch
+    if os.getenv("VECTOR_BACKEND", "numpy").strip().lower() != "faiss":
+        return None
+    if "torch" in sys.modules:
+        if not _warned_torch:
+            _warned_torch = True
+            logger.warning("VECTOR_BACKEND=faiss ignored: torch is loaded and the two clash on OpenMP; using NumPy search")
+        return None
+    if not _faiss_import_tried:
+        _faiss_import_tried = True
+        try:
+            import faiss
+
+            _faiss_mod = faiss
+        except Exception:
+            _faiss_mod = None
+    return _faiss_mod
 
 
 def chunk_hash(chunk: Dict[str, Any]) -> str:
@@ -62,6 +95,7 @@ class VectorStore:
         self.manifest: Dict[str, Any] = {"version": STORE_VERSION, "embedder": None, "dim": None, "sources": {}}
         self._hashes: set[str] = set()
         self._index = None
+        self._disk_index_ok = False  # index.faiss on disk matches the in-memory chunks
         self._lock = threading.RLock()
 
     # ------------------------------------------------------------------
@@ -112,14 +146,7 @@ class VectorStore:
         store.chunks = chunks
         store.embeddings = embeddings.astype(np.float32, copy=False)
         store._hashes = {c.get("chunk_hash", "") for c in chunks}
-        index_path = store.dir / "index.faiss"
-        if faiss is not None and index_path.exists():
-            try:
-                idx = faiss.read_index(str(index_path))
-                if idx.ntotal == len(chunks):
-                    store._index = idx
-            except Exception:
-                store._index = None
+        store._disk_index_ok = (store.dir / "index.faiss").exists()  # read lazily, see _get_index
         return store
 
     def save(self) -> None:
@@ -140,9 +167,11 @@ class VectorStore:
             _atomic_write(self.dir / "embeddings.npy", write_embeddings)
             index = self._get_index()
             if index is not None:
-                _atomic_write(self.dir / "index.faiss", lambda p: faiss.write_index(index, str(p)))
+                _atomic_write(self.dir / "index.faiss", lambda p: _faiss().write_index(index, str(p)))
+                self._disk_index_ok = True
             elif (self.dir / "index.faiss").exists():
                 (self.dir / "index.faiss").unlink()
+                self._disk_index_ok = False
             _atomic_write(
                 self.dir / "manifest.json",
                 lambda p: p.write_text(json.dumps(self.manifest, indent=2, sort_keys=True), encoding="utf-8"),
@@ -156,6 +185,7 @@ class VectorStore:
             self.manifest = {"version": STORE_VERSION, "embedder": None, "dim": None, "sources": {}}
             self._hashes = set()
             self._index = None
+            self._disk_index_ok = False
 
     # ------------------------------------------------------------------
     # Mutation
@@ -202,6 +232,7 @@ class VectorStore:
                     self.embeddings = np.vstack([self.embeddings, new_emb])
                 self.chunks.extend(records)
                 self._index = None
+                self._disk_index_ok = False
             entry = self.sources.setdefault(source_key, {"fingerprint": None, "chunks": 0})
             entry["fingerprint"] = fingerprint
             entry["chunks"] = sum(1 for c in self.chunks if c.get("source_key") == source_key)
@@ -216,6 +247,7 @@ class VectorStore:
                 self.embeddings = self.embeddings[mask]
                 self._hashes = {c["chunk_hash"] for c in self.chunks}
                 self._index = None
+                self._disk_index_ok = False
             return removed
 
     def remove_source(self, source_key: str) -> int:
@@ -237,8 +269,18 @@ class VectorStore:
     # Search
     # ------------------------------------------------------------------
     def _get_index(self):
+        faiss = _faiss()
         if faiss is None or not len(self.chunks):
             return None
+        if self._index is None and self._disk_index_ok:
+            try:
+                idx = faiss.read_index(str(self.dir / "index.faiss"))
+                if idx.ntotal == len(self.chunks) and idx.d == self.embeddings.shape[1]:
+                    self._index = idx
+            except Exception:
+                self._index = None
+            if self._index is None:
+                self._disk_index_ok = False
         if self._index is None:
             idx = faiss.IndexFlatIP(self.embeddings.shape[1])
             idx.add(np.ascontiguousarray(self.embeddings, dtype=np.float32))
@@ -247,7 +289,7 @@ class VectorStore:
 
     @property
     def uses_faiss(self) -> bool:
-        return faiss is not None
+        return _faiss() is not None
 
     def search(self, query_vec: np.ndarray, k: int = 3) -> List[Tuple[int, float]]:
         """Top-k (chunk_index, cosine_score) for one normalized query vector."""

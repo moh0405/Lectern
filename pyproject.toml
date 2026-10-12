@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.26",
     "pypdf>=4.0",
+    "fonttools>=4.0",  # lets pypdf decode more embedded fonts (fewer garbled PDF pages)
     "python-dotenv>=1.0",
     "requests>=2.31",
     "google-generativeai>=0.8",  # TODO(phase 2): migrate to the current Google Gen AI SDK
@@ -21,8 +22,10 @@ dependencies = [
 # Semantic retrieval. Without it the engine falls back to keyword overlap.
 embeddings = [
     "sentence-transformers>=3.0",
-    "faiss-cpu>=1.8",
 ]
+# Optional ANN/flat index backend, see VECTOR_BACKEND in README. Cannot be used in the
+# same process as torch on macOS (OpenMP clash), so it is not part of `embeddings` or `all`.
+faiss = ["faiss-cpu>=1.8"]
 api = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",

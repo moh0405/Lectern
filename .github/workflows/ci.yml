@@ -20,7 +20,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: "Install (no torch or faiss; tests use the keyword fallback)"
-        run: pip install -e ".[api,sources,leetcode,math,export,dev]"
+        run: pip install -e ".[api,sources,leetcode,math,export,faiss,dev]"
       - name: Lint
         run: ruff check .
       - name: "Type check (non-blocking while types are cleaned up)"

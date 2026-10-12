@@ -22,7 +22,7 @@ Why RAG? It avoids full model retraining for every new domain and keeps answers 
 ## Repository Map
 - `backend/document_processor.py`: PDF reading, chunking, embeddings, and FAISS/metadata saving.
 - `backend/rag_engine.py`: Loads vector store, retrieves top-k chunks, builds prompts. Now hardened with keyword fallback to avoid environment segfaults.
-- `keyword_cli.py`: Minimal CLI using keyword overlap retrieval (no ML libs) to demonstrate end-to-end context selection and prompt creation.
+- `chat_cli.py --keyword`: Minimal CLI using keyword retrieval (no ML libs) to demonstrate end-to-end context selection and prompt creation. (The original `keyword_cli.py` was folded into it.)
 - `chat_cli.py`: Semantic CLI that uses `RAGEngine` where embeddings are available. Falls back automatically.
 
 ## Step-by-Step Learning
@@ -40,14 +40,14 @@ Code: `read_pdf_text`, `chunk_text`, and `build_chunks_from_pdf` inside `backend
 Code: `embed_texts` inside `document_processor.py`. In `rag_engine.py`, embeddings are lazily generated and cached to `data/vector_store/embeddings.npy`.
 
 ### 3) Build the Vector Store
-- FAISS: fast similarity search; stores index plus doc metadata (`index.pkl`).
+- Vector store: embeddings plus chunk metadata on disk (`embeddings.npy`, `chunks.jsonl`, `manifest.json`); search is exact cosine similarity, via NumPy or optionally FAISS. (The first prototype used FAISS plus a pickle file.)
 - Metadata includes page content and source/page references for citation.
 - If FAISS causes environment issues, the hardened `RAGEngine` can operate with precomputed embeddings or fall back to keyword retrieval.
 Code: `build_faiss_index` and saving routines in `document_processor.py`. Loading and retrieval in `rag_engine.py`.
 
 ### 4) Retrieve Top-k Context
 - Semantic search: compute query embedding, cosine similarity with chunk embeddings, pick top-k.
-- Keyword fallback: Jaccard overlap of tokens; useful when ML libs are unstable.
+- Keyword fallback: share of query terms found in a chunk; useful when ML libs are unavailable.
 Code: `retrieve_context` in `rag_engine.py` supports both paths.
 
 ### 5) Prompt Construction
@@ -68,7 +68,7 @@ Code: `GeminiClient` in `backend/llm_config.py` and `RAGEngine.answer_with_gemin
 
 ## Running the Current Demo
 Option A (keyword-only retrieval, zero ML deps):
-- `python3 keyword_cli.py`
+- `python3 chat_cli.py --keyword`
 - Ask: "What is a linked list?"
 
 Option B (semantic retrieval, if environment stable):
@@ -77,7 +77,7 @@ Option B (semantic retrieval, if environment stable):
 
 ## Environment Troubleshooting on macOS
 - If you see segfaults during embedding or FAISS:
-  - Use keyword-only CLI to continue learning (`keyword_cli.py`).
+  - Use keyword-only CLI to continue learning (`chat_cli.py --keyword`).
   - Prefer CPU-only installs for Torch on macOS.
   - Try setting `OMP_NUM_THREADS=1` and avoiding MPS acceleration.
   - Keep `sentence-transformers` and `faiss-cpu` versions aligned; upgrade Torch if needed.
@@ -86,7 +86,7 @@ Option B (semantic retrieval, if environment stable):
 - Keep each step small and validated:
   1. Add ingestion and chunking → run a chunk count.
   2. Save metadata and index files → confirm presence.
-  3. Implement retrieval fallback → demo with `keyword_cli.py`.
+  3. Implement retrieval fallback → demo with `chat_cli.py --keyword`.
   4. Add semantic retrieval only after environment is stable.
   5. Integrate LLM last, after prompt looks good.
 
