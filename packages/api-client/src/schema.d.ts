@@ -115,6 +115,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/embeddings/projection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 3D PCA projection of indexed passages (for the embedding-space view)
+         * @description Projects the stored embeddings onto their top three principal components. `explained_variance` says how much of the structure each axis keeps, and `semantic` is false when the index was built with the non-semantic hashing embedder (distances then reflect shared words, not meaning).
+         */
+        get: operations["projection_api_v1_embeddings_projection_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/export": {
         parameters: {
             query?: never;
@@ -828,6 +848,53 @@ export interface components {
             topics: string[];
             /** Url */
             url?: string | null;
+        };
+        /** Projection */
+        Projection: {
+            /** Embedder */
+            embedder: string | null;
+            /**
+             * Explained Variance
+             * @description Share of the variance kept by each of the three axes
+             */
+            explained_variance: number[];
+            /**
+             * Method
+             * @constant
+             */
+            method: "pca";
+            /** Points */
+            points: components["schemas"]["ProjectionPoint"][];
+            /**
+             * Semantic
+             * @description False for the hashing embedder: closeness reflects shared words, not meaning
+             */
+            semantic: boolean;
+            /** Total Chunks */
+            total_chunks: number;
+        };
+        /** ProjectionPoint */
+        ProjectionPoint: {
+            /** Doc */
+            doc: string;
+            /**
+             * Index
+             * @description Position of the passage in the index
+             */
+            index: number;
+            /** Page */
+            page?: number | null;
+            /**
+             * Text
+             * @description First 200 characters of the passage
+             */
+            text: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Z */
+            z: number;
         };
         /** SearchResponse */
         SearchResponse: {
@@ -1582,6 +1649,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    projection_api_v1_embeddings_projection_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Projection"];
                 };
             };
             /** @description Bad Request */

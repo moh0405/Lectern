@@ -277,6 +277,26 @@ class Cleared(BaseModel):
     removed: int
 
 
+# ---------------------------------------------------------------- visualization
+class ProjectionPoint(BaseModel):
+    x: float
+    y: float
+    z: float
+    doc: str
+    page: Optional[int] = None
+    text: str = Field(description="First 200 characters of the passage")
+    index: int = Field(description="Position of the passage in the index")
+
+
+class Projection(BaseModel):
+    points: List[ProjectionPoint]
+    explained_variance: List[float] = Field(description="Share of the variance kept by each of the three axes")
+    method: Literal["pca"]
+    embedder: Optional[str]
+    semantic: bool = Field(description="False for the hashing embedder: closeness reflects shared words, not meaning")
+    total_chunks: int
+
+
 # ---------------------------------------------------------------- SSE payloads (POST /ask/stream)
 class SseMeta(BaseModel):
     chunks: List[Chunk]

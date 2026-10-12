@@ -202,3 +202,23 @@ def test_failed_questions_are_recorded_as_not_ok(indexed, fake_gemini):
     fake_gemini.fail_with = ValueError("boom")
     indexed.post("/api/v1/ask", json={"question": "what is a binary heap"})
     assert indexed.get("/api/v1/analytics").json()["recent"][0]["ok"] is False
+
+
+# ----------------------------------------------------------------- visualization
+def test_projection_of_an_empty_index(api):
+    body = api.get("/api/v1/embeddings/projection").json()
+    assert body["points"] == [] and body["total_chunks"] == 0 and body["semantic"] is False
+
+
+def test_projection_returns_points_with_variance_and_honest_semantic_flag(indexed):
+    body = indexed.get("/api/v1/embeddings/projection", params={"limit": 50}).json()
+    assert body["method"] == "pca" and body["total_chunks"] >= 1
+    p = body["points"][0]
+    assert {"x", "y", "z", "doc", "page", "text", "index"} <= set(p) and p["doc"] == "heaps.pdf"
+    assert len(body["explained_variance"]) == 3
+    assert body["embedder"].startswith("hashing") and body["semantic"] is False  # tests use the hashing embedder
+
+
+def test_projection_limit_is_validated(api):
+    assert api.get("/api/v1/embeddings/projection", params={"limit": 5}).status_code == 422
+    assert api.get("/api/v1/embeddings/projection", params={"limit": 5000}).status_code == 422

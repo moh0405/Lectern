@@ -3,12 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const API = "http://127.0.0.1:8100";
-const PDF = path.join(import.meta.dirname, "fixtures", "heaps.pdf");
+const fixture = (name: string) => path.join(import.meta.dirname, "fixtures", name);
 
-/** Index the fixture PDF through the real API and wait for the job to finish. */
-export async function indexFixture(request: APIRequestContext) {
+/** Index a fixture PDF (default: heaps.pdf) through the real API and wait for the job to finish. */
+export async function indexFixture(request: APIRequestContext, name = "heaps.pdf") {
   const res = await request.post(`${API}/api/v1/sources/files`, {
-    multipart: { files: { name: "heaps.pdf", mimeType: "application/pdf", buffer: fs.readFileSync(PDF) } },
+    multipart: { files: { name, mimeType: "application/pdf", buffer: fs.readFileSync(fixture(name)) } },
   });
   const { job_id } = await res.json();
   for (let i = 0; i < 100; i++) {
@@ -20,6 +20,6 @@ export async function indexFixture(request: APIRequestContext) {
   throw new Error("indexing did not finish");
 }
 
-export async function removeFixture(request: APIRequestContext) {
-  await request.delete(`${API}/api/v1/sources`, { params: { key: "heaps.pdf" } });
+export async function removeFixture(request: APIRequestContext, name = "heaps.pdf") {
+  await request.delete(`${API}/api/v1/sources`, { params: { key: name } });
 }
