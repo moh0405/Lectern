@@ -1,0 +1,50 @@
+{"category": "direct", "question": "What is Big-O notation?", "answerable": true, "expect": [{"doc": "complexity.md", "any": ["upper bound on how the running time"]}], "id": "s01"}
+{"category": "direct", "question": "How does separate chaining resolve hash collisions?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["each bucket holds a linked list"]}], "id": "s02"}
+{"category": "direct", "question": "What is the time complexity of Dijkstra's algorithm with a binary heap?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["o((v plus e) log v)"]}], "id": "s03"}
+{"category": "direct", "question": "What does the master theorem solve?", "answerable": true, "expect": [{"doc": "complexity.md", "any": ["master theorem solves recurrences"]}], "id": "s04"}
+{"category": "direct", "question": "Why is merge sort a stable sort?", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["stable, meaning equal elements keep"]}], "id": "s05"}
+{"category": "direct", "question": "What are the ACID properties of a transaction?", "answerable": true, "expect": [{"doc": "databases.md", "any": ["atomicity"]}], "id": "s06"}
+{"category": "direct", "question": "How does the TCP three-way handshake establish a connection?", "answerable": true, "expect": [{"doc": "networking.md", "any": ["three-way handshake"]}], "id": "s07"}
+{"category": "direct", "question": "What is a trie used for?", "answerable": true, "expect": [{"doc": "trees.md", "any": ["ideal for autocomplete"]}], "id": "s08"}
+{"category": "direct", "question": "How is the 0/1 knapsack problem solved with a table?", "answerable": true, "expect": [{"doc": "dp-greedy.md", "any": ["skipping item i or taking it"]}], "id": "s09"}
+{"category": "direct", "question": "What does the yield keyword do in a Python generator?", "answerable": true, "expect": [{"doc": "python-notes.md", "any": ["yield keyword to produce values lazily"]}], "id": "s10"}
+{"category": "direct", "question": "How does Kruskal's algorithm build a minimum spanning tree?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["kruskal's algorithm sorts the edges"]}], "id": "s11"}
+{"category": "direct", "question": "What is an inode?", "answerable": true, "expect": [{"doc": "file-systems.md", "any": ["inode, a structure that stores"]}], "id": "s12"}
+{"category": "direct", "question": "What is the load factor of a hash table?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["load factor is the number of stored entries"]}], "id": "s13"}
+{"category": "direct", "question": "What is the GIL in CPython?", "answerable": true, "expect": [{"doc": "python-notes.md", "any": ["global interpreter lock"]}], "id": "s14"}
+{"category": "direct", "question": "How does Timsort work?", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["timsort"]}], "id": "s15"}
+{"category": "direct", "question": "What does path compression do in union-find?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["path compression"]}], "id": "s16"}
+{"category": "paraphrase", "question": "Which data structure lets me look up values in constant time on average?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["o(1) time on average"]}], "id": "s17"}
+{"category": "paraphrase", "question": "What technique avoids recomputing the same subproblems by saving their answers?", "answerable": true, "expect": [{"doc": "dp-greedy.md", "any": ["computed only once"]}], "id": "s18"}
+{"category": "paraphrase", "question": "How can I order tasks so that prerequisites always come before the tasks that need them?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["topological ordering"]}], "id": "s19"}
+{"category": "paraphrase", "question": "How can a program crash because functions keep calling themselves too many times?", "answerable": true, "expect": [{"doc": "memory.md", "any": ["stack overflow"]}], "id": "s20"}
+{"category": "paraphrase", "question": "Which tree keeps the smallest element instantly accessible?", "answerable": true, "expect": [{"doc": "trees.md", "any": ["min-heap every parent is smaller"]}], "id": "s21"}
+{"category": "paraphrase", "question": "Which sorting method always takes n log n and keeps equal items in their original order?", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["stable, meaning equal elements keep"]}], "id": "s22"}
+{"category": "paraphrase", "question": "How do website names get converted into numeric machine addresses?", "answerable": true, "expect": [{"doc": "networking.md", "any": ["translates human-readable names"]}], "id": "s23"}
+{"category": "paraphrase", "question": "How does a networked storage system survive a server dying?", "answerable": true, "expect": [{"doc": "file-systems.md", "any": ["replicates blocks across several servers"]}], "id": "s24"}
+{"category": "paraphrase", "question": "How do I stop my search tree from becoming a long chain?", "answerable": true, "expect": [{"doc": "trees.md", "any": ["self-balancing trees guarantee a height"]}], "id": "s25"}
+{"category": "paraphrase", "question": "Which structure is best when I constantly add and remove items at both ends?", "answerable": true, "expect": [{"doc": "arrays-lists.md", "any": ["double-ended queue or deque"]}, {"doc": "python-notes.md", "any": ["collections.deque"]}], "id": "s26"}
+{"category": "ambiguity", "question": "How does DFS differ from BFS?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["the key difference between the two"]}], "id": "s27"}
+{"category": "ambiguity", "question": "What is heap memory?", "answerable": true, "expect": [{"doc": "memory.md", "any": ["heap memory is the region"]}], "id": "s28"}
+{"category": "ambiguity", "question": "What is the heap property?", "answerable": true, "expect": [{"doc": "trees.md", "any": ["heap property"]}], "id": "s29"}
+{"category": "ambiguity", "question": "How does a distributed file system replicate data?", "answerable": true, "expect": [{"doc": "file-systems.md", "any": ["replicates blocks across several servers"]}], "id": "s30"}
+{"category": "ambiguity", "question": "What is a stack frame?", "answerable": true, "expect": [{"doc": "memory.md", "any": ["one stack frame for every active function call"]}], "id": "s31"}
+{"category": "ambiguity", "question": "How do I implement a stack with push and pop operations?", "answerable": true, "expect": [{"doc": "arrays-lists.md", "any": ["last-in first-out structure with push and pop"]}], "id": "s32"}
+{"category": "ambiguity", "question": "What is a B-tree?", "answerable": true, "expect": [{"doc": "databases.md", "any": ["b-trees, which are balanced multiway"]}], "id": "s33"}
+{"category": "ambiguity", "question": "What does the CAP theorem say?", "answerable": true, "expect": [{"doc": "databases.md", "any": ["cap theorem says"]}, {"doc": "file-systems.md", "any": ["cap theorem"]}], "id": "s34"}
+{"category": "comparison", "question": "Compare quicksort and merge sort.", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["quicksort picks a pivot"]}, {"doc": "sorting.md", "any": ["merge sort splits the array"]}], "id": "s35"}
+{"category": "comparison", "question": "Is an array or a linked list better for random access?", "answerable": true, "expect": [{"doc": "arrays-lists.md", "any": ["no random access"]}, {"doc": "arrays-lists.md", "any": ["access by index o(1)"]}], "id": "s36"}
+{"category": "comparison", "question": "When is BFS enough instead of Dijkstra's algorithm?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["shortest path in an unweighted graph"]}], "id": "s37"}
+{"category": "comparison", "question": "Should I use Dijkstra or Bellman-Ford with negative edge weights?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["allows negative edge weights"]}, {"doc": "graphs.md", "any": ["fails on graphs with negative edge weights"]}], "id": "s38"}
+{"category": "comparison", "question": "Is TCP or UDP better for video streaming?", "answerable": true, "expect": [{"doc": "networking.md", "any": ["good fit for streaming"]}], "id": "s39"}
+{"category": "comparison", "question": "Should I choose chaining or open addressing?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["open addressing stores every entry"]}, {"doc": "hashing.md", "any": ["separate chaining"]}], "id": "s40"}
+{"category": "complexity", "question": "What is the best possible speed of a comparison-based sort?", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["omega(n log n) comparisons"]}], "id": "s41"}
+{"category": "complexity", "question": "Why is appending to a Python list O(1) amortized?", "answerable": true, "expect": [{"doc": "arrays-lists.md", "any": ["twice the size"]}, {"doc": "complexity.md", "any": ["doubles its capacity"]}], "id": "s42"}
+{"category": "complexity", "question": "What is the time complexity of building a heap from n elements?", "answerable": true, "expect": [{"doc": "trees.md", "any": ["only o(n) with the bottom-up method"]}], "id": "s43"}
+{"category": "complexity", "question": "What is the worst case of quicksort and when does it happen?", "answerable": true, "expect": [{"doc": "sorting.md", "any": ["worst case is o(n squared)"]}], "id": "s44"}
+{"category": "unanswerable", "question": "What is the capital of France?", "answerable": false, "expect": [], "id": "s45"}
+{"category": "unanswerable", "question": "How do I train a neural network with backpropagation?", "answerable": false, "expect": [], "id": "s46"}
+{"category": "unanswerable", "question": "Explain quantum entanglement.", "answerable": false, "expect": [], "id": "s47"}
+{"category": "unanswerable", "question": "What is a good recipe for sourdough bread?", "answerable": false, "expect": [], "id": "s48"}
+{"category": "unanswerable", "question": "Who won the 2018 football world cup?", "answerable": false, "expect": [], "id": "s49"}
+{"category": "unanswerable", "question": "How do I configure a Kubernetes ingress controller?", "answerable": false, "expect": [], "id": "s50"}
