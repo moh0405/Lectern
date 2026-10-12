@@ -50,11 +50,11 @@ Even then, try these first: better system prompts, few-shot examples, structured
 ---
 
 ## Phase 0: Repo hygiene (1–2 days)
-- [ ] Complete and pin dependencies; move to `pyproject.toml` with dev extras. Remove or isolate unused `langchain` and Ollama code.
-- [ ] Remove tracked `.DS_Store`; stop tracking large data (PDFs, `data/vector_store`, `data/repos`). Move PDFs to Git LFS or a download script.
-- [ ] Add `ruff`, `mypy` (lenient to start), `pytest`, and pre-commit.
-- [ ] Add GitHub Actions: lint + tests (+ frontend typecheck once it exists).
-- [ ] Add `OPENAI_API_KEY` (optional) to `.env.example`.
+- [x] Complete dependencies; move to `pyproject.toml` with extras and dev tools. Remove unused `langchain` and Ollama code. (Versions are lower-bounded, not pinned; a lockfile can come with deployment in Phase 6.)
+- [x] Remove tracked `.DS_Store`; stop tracking PDFs and generated data (`data/vector_store`, `data/repos`). PDFs are user-supplied (copyrighted textbooks) and documented in `data/README.md`; history is not rewritten.
+- [x] Add `ruff`, `mypy` (lenient to start), `pytest`, and pre-commit.
+- [x] Add GitHub Actions: lint + tests on Python 3.10 and 3.12 (frontend typecheck to be added in Phase 3).
+- [x] Add `OPENAI_API_KEY` (optional) to `.env.example`.
 
 **Done when:** a fresh clone installs and passes CI with one command.
 

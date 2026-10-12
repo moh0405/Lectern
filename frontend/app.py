@@ -394,7 +394,8 @@ def build_ui():
         st.download_button("Export markdown", data="\n".join(md), file_name="chat_export.md")
         # Flashcards CSV (Q, A)
         try:
-            import io, csv
+            import io
+            import csv
             buf = io.StringIO()
             writer = csv.writer(buf)
             writer.writerow(["Question", "Answer"])
@@ -626,7 +627,6 @@ def build_ui():
         else:
             try:
                 import plotly.express as px
-                import plotly.graph_objects as go
                 import pandas as _pd
                 df = _pd.DataFrame(evs)
 

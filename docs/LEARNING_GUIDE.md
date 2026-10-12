@@ -16,7 +16,7 @@ Why RAG? It avoids full model retraining for every new domain and keeps answers 
 4. Vector store: index embeddings and support similarity search (FAISS or NumPy).
 5. Retrieval: select top-k relevant chunks for a query.
 6. Prompting: build a careful, instruction-based prompt using retrieved context.
-7. Generation: call an LLM (e.g., Ollama) to answer.
+7. Generation: call an LLM (Gemini in this project) to answer.
 8. Evaluation: verify correctness, citation, and faithfulness.
 
 ## Repository Map
@@ -55,11 +55,11 @@ Code: `retrieve_context` in `rag_engine.py` supports both paths.
 - Emphasize: use only provided context, be concise, cite sources.
 Code: `generate_prompt` and `format_context` in `rag_engine.py`.
 
-### 6) LLM Integration (Ollama)
-- Once retrieval and prompts work, integrate an LLM via LangChain + Ollama.
+### 6) LLM Integration (Gemini)
+- Once retrieval and prompts work, integrate an LLM. This project started with a local Ollama model and now uses Gemini through `GeminiClient`.
 - Flow: `retrieve_context` → `generate_prompt` → LLM call → streamed answer.
 - Keep generations deterministic where possible for reproducibility.
-Code stub to add next: an `llm` module or inside `rag_engine.py` to call Ollama.
+Code: `GeminiClient` in `backend/llm_config.py` and `RAGEngine.answer_with_gemini` in `rag_engine.py`.
 
 ## Training vs. RAG vs. Fine-tuning
 - Training a foundation LLM from scratch is costly and complex.
@@ -92,7 +92,7 @@ Option B (semantic retrieval, if environment stable):
 
 ## Next Steps in This Project
 1. Solidify CLI + retrieval flows (done for keyword; semantic on standby).
-2. Add Ollama integration through LangChain (LLM call wrapper).
+2. Add an LLM call wrapper (done: `GeminiClient`).
 3. Build FastAPI endpoints: upload PDF, rebuild index, query.
 4. Create Streamlit UI: upload/manage files, chat with retrieval.
 5. Write evaluation harness: test questions, check citations.

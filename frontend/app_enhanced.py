@@ -201,7 +201,6 @@ except Exception:
     render_demo_app = None
 from backend.leetcode_handler import LeetCodeHandler
 import random
-import functools
 
 
 def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
@@ -212,7 +211,6 @@ def doc_stats(engine: RAGEngine | None = None) -> Dict[str, Any]:
     except Exception:
         # Fallback: scan uploaded sources directly (no FAISS required)
         try:
-            from backend.document_processor import list_chunks_from_dir
             items = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
         except Exception:
             items = []
@@ -1024,7 +1022,6 @@ def build_ui() -> None:
             items = RAGEngine(auto_embeddings=False)._docstore_iter()
             if not items:
                 try:
-                    from backend.document_processor import list_chunks_from_dir
                     items = list_chunks_from_dir(str(Path("data/uploaded_files").resolve()))
                 except Exception:
                     items = []

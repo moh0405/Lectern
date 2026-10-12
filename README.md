@@ -130,7 +130,7 @@ flowchart LR
 - **Graceful degradation everywhere**: optional imports are wrapped in `try/except`, so a missing library disables a feature rather than crashing the app. This was added after segfaults from PyTorch/Accelerate on macOS.
 - **Lazy loading**: `sentence-transformers` is imported only when embeddings are actually needed.
 - **Pluggable sources**: every source implements the `BaseSource` interface (`validate`, `extract`, `get_metadata`) and returns the same chunk schema.
-- **Cloud inference only**: Gemini is the supported LLM. An older Ollama client remains in the repo (see [limitations](#known-limitations)).
+- **Cloud inference only**: Gemini is the supported LLM (default `gemini-3.8-flash`).
 
 ---
 
@@ -143,7 +143,6 @@ AI-study-mentor-/
 │   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes, synthesis
 │   ├── document_processor.py   # PDF reading, chunking, source routing, embeddings, FAISS build/load
 │   ├── llm_config.py           # GeminiClient: model resolution, retry/backoff, fallback
-│   ├── llm_ollama.py           # OllamaClient (legacy local-LLM path)
 │   ├── advanced_ai.py          # Concept map, Socratic tutor, multi-doc synthesis, adaptive explain, math solver
 │   ├── leetcode_handler.py     # LeetCodeHandler: load/normalize/search/explain LeetCode problems
 │   ├── export_utils.py         # Markdown → PDF (ReportLab) and Markdown → HTML
@@ -173,13 +172,16 @@ AI-study-mentor-/
 │   ├── LEARNING_GUIDE.md       # Step-by-step RAG tutorial using this codebase
 │   ├── demo_guide.md           # 3-minute demo script
 │   └── ARCHITECTURE.md         # (placeholder, currently empty)
-├── tests/test_rag_pipeline.py  # (placeholder, currently empty)
+├── tests/                      # pytest suite (chunking, retrieval, prompt modes, API, exports, LeetCode)
+├── pyproject.toml              # dependencies (core + extras), ruff, mypy, pytest config
+├── Makefile                    # make install / lint / test / check
+├── .github/workflows/ci.yml    # CI: ruff + pytest on Python 3.10 and 3.12
+├── .pre-commit-config.yaml
 ├── chat_cli.py                 # Interactive retrieval CLI (semantic with keyword fallback)
 ├── keyword_cli.py              # Retrieval CLI using keyword overlap only
-├── ollama_cli.py               # Ollama-based CLI
 ├── test_real_pdf.py            # Quick PDF text-extraction smoke test
 ├── Emergency Hackathon Context.md  # Hackathon-day planning notes and pitch
-├── requirements.txt
+├── requirements.txt            # shim: installs .[all]
 ├── .env.example
 └── LICENSE (MIT)
 ```
@@ -221,13 +223,30 @@ cd AI-study-mentor-
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -e ".[all,dev]"        # everything (includes torch via sentence-transformers; large download)
+# or: pip install -r requirements.txt   # same as .[all] without the dev tools
 ```
 
-`requirements.txt` does not currently list every optional dependency. If a feature reports a missing package, install what it names. These are the ones used by code in this repo that are **not** pinned:
+Dependencies are declared in `pyproject.toml` as a small core plus optional extras, so you can install only what you need:
+
+| Extra | Adds |
+|---|---|
+| *(core)* | numpy, pypdf, python-dotenv, requests, Gemini SDK |
+| `embeddings` | sentence-transformers + faiss-cpu (semantic retrieval; without it the engine uses keyword overlap) |
+| `api` | FastAPI, Uvicorn, python-multipart, Pydantic |
+| `sources` | YouTube, web, GitHub and audio ingestion |
+| `leetcode` | pandas, huggingface_hub, kaggle |
+| `math` | SymPy |
+| `export` | ReportLab, markdown |
+| `ui` | Streamlit, Plotly, scikit-learn (the current UI; being replaced by Next.js) |
+| `dev` | pytest, ruff, mypy, pre-commit, httpx |
+
+Example for backend development without the heavy ML stack: `pip install -e ".[api,sources,leetcode,math,export,dev]"`.
+
+### Check your setup
 
 ```bash
-pip install pandas numpy huggingface_hub kaggle reportlab markdown matplotlib
+make check        # ruff + pytest, same as CI
 ```
 
 ### Configure
@@ -246,10 +265,9 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `GEMINI_API_KEY` | Yes, for generation | none | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-flash-latest` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
+| `GEMINI_MODEL` | No | `gemini-3.8-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
-| `OPENAI_API_KEY` | Only for audio | none | Whisper transcription of `.mp3/.mp4/.wav/.m4a` (read by the audio source, not listed in `.env.example`) |
-| `OLLAMA_MODEL` | No | `llama3` | Model for the legacy Ollama client |
+| `OPENAI_API_KEY` | Only for audio | none | Whisper transcription of `.mp3/.mp4/.wav/.m4a` (read by the audio source) |
 
 Never commit `.env`. It is already in `.gitignore`.
 
@@ -266,7 +284,7 @@ Everything lives under `data/uploaded_files/`.
 | **URLs** | Add one URL per line to `data/uploaded_files/sources.txt` (or edit it in the sidebar "Add URLs" expander). Supported: YouTube videos, GitHub repos, and generic web articles. |
 
 The repo ships with:
-- 3 PDFs: *Data Structures Using Python*, *Dsa*, *Introduction to Computer Science*
+- No PDFs. Add your own to `data/uploaded_files/` (they are gitignored; see `data/README.md`). The project was developed with *Data Structures Using Python*, *Dsa* and *Introduction to Computer Science*.
 - `sources.txt` pointing to a YouTube lecture, the Python tutorial, and several algorithm repos (`pypa/sampleproject`, `dsc-iem/TheAlgorithms`, `akshitagit/Python`, `mitcc/AlgoSolutions`, `alfaarghya/alfa-leetcode-api`) plus a YouTube playlist link.
 
 ### Build the index (recommended)
@@ -387,7 +405,6 @@ Validation: `question` must be at least 3 characters, `k` is 1–20, and `temper
 |---|---|
 | `python chat_cli.py` | Interactive loop: prints retrieved context and the final prompt for each question. Uses semantic retrieval with a keyword fallback. |
 | `python keyword_cli.py` | Pure keyword-overlap retrieval (no ML libraries). Reads a LangChain-style `index.pkl`. |
-| `python ollama_cli.py` | Ollama-based CLI (legacy path). |
 | `python test_real_pdf.py` | Extracts and previews text from `data/uploaded_files/Dsa.pdf` to check PDF parsing. |
 | `python scripts/preprocess_all_documents.py` | Build the vector store. |
 | `python scripts/prepare_leetcode_data.py` | Download and normalize LeetCode datasets. |
@@ -430,7 +447,7 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 - `generate_query_suggestions(...)`: proposes study questions from the corpus (static fallback list on failure).
 - `summarize_chat(history)`: turns the last 20 Q&A turns into Markdown study notes (heuristic fallback).
 - `multi_source_synthesis(question)`: top chunks per document, then Gemini compares and cites.
-- Accepts both LangChain-style (`(docstore, index_to_id)`) and this project's `{"metadata": [...]}` pickle formats.
+- Accepts both a LangChain-style `(docstore, index_to_id)` pickle (from the first prototype) and this project's `{"metadata": [...]}` pickle format.
 
 ### `GeminiClient` (`backend/llm_config.py`)
 1. Reads `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TEMPERATURE`.
@@ -480,7 +497,7 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 
 | Path | Contents |
 |---|---|
-| `data/uploaded_files/` | 3 CS textbook PDFs and `sources.txt` (about 56 MB total) |
+| `data/uploaded_files/` | `sources.txt` (tracked). PDFs and audio you add are gitignored. |
 | `data/leetcode/kaggle/` | Three raw Kaggle CSVs |
 | `data/leetcode/normalized_problems.jsonl` | 1,825 normalized problems |
 | `data/vector_store/` | *Generated.* FAISS index, metadata pickle, embeddings |
@@ -519,8 +536,10 @@ For presentations (and as a backup if the network or API fails):
 
 Documented honestly so you know what to expect. These come from reading the code, not from a test run.
 
-- **Tests are empty**: `tests/test_rag_pipeline.py` has no content, and there is no CI.
-- **Dependencies are incomplete**: several libraries the code imports (pandas, huggingface_hub, kaggle, reportlab, markdown, matplotlib, numpy) are not in `requirements.txt`. The file says Ollama support was removed, but `llm_ollama.py`, `ollama_cli.py` and `RAGEngine.answer_with_ollama` still exist and need `langchain-ollama`. `langchain` is pinned but not used by the core pipeline.
+- **Test coverage is thin**: there is a smoke-test suite and CI (Phase 0), but no retrieval-quality evaluation yet (Phase 4). One strict `xfail` test documents the keyword-score bug.
+- **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
+- **Deprecated Gemini SDK**: `google-generativeai` no longer receives updates (Phase 2 migrates to `google-genai`).
+- **Raw HTML passes through exports**: `markdown_to_html` does not strip raw HTML from the input.
 - **FAISS is built but not queried**: `RAGEngine` loads `index.faiss` but retrieval is done with NumPy over `embeddings.npy`.
 - **Keyword fallback scores**: in `retrieve_context`, every result in the keyword path reports the top result's score rather than its own.
 - **3D Viz is not semantic**: points are projected from SHA-256 hashes of the text (chosen to avoid macOS segfaults), so distances do not reflect meaning.
@@ -532,7 +551,7 @@ Documented honestly so you know what to expect. These come from reading the code
   - Uploaded filenames are used as-is, so path-traversal sequences in a filename are not rejected.
   - The vector store metadata is loaded with `pickle`, so only load stores you built yourself.
   - The math tool passes user input to SymPy's `sympify`, which evaluates expressions, so do not expose it to untrusted users.
-- **Committed artifacts**: `.DS_Store` files and about 56 MB of PDFs are tracked in git.
+- **Git history**: the textbook PDFs and `.DS_Store` files are no longer tracked, but they remain in earlier commits, so the repo is still large to clone.
 - **Source quirks**: YouTube playlist URLs (as in the sample `sources.txt`) have no `v=` video id and are skipped. Python files from GitHub repos are indexed as comments/docstrings only, not code.
 - **Stale hackathon numbers**: figures like "977 docs / 12K chunks" and "2000+ problems" in the demo script and context file describe the hackathon corpus. The shipped LeetCode file has 1,825 problems.
 
@@ -541,8 +560,8 @@ Documented honestly so you know what to expect. These come from reading the code
 ## Roadmap
 
 - Finish the FAISS document-processing pipeline (PR #1) and use the FAISS index for retrieval
-- Add real tests (chunking, retrieval, prompt modes, API) and CI
-- Complete `requirements.txt` and add a Dockerfile
+- Retrieval-quality evaluation and broader tests
+- Add a Dockerfile
 - Real token streaming from Gemini, and expose study modes in the API
 - Persistent index updates on upload/delete
 - Use real embeddings for the 3D view

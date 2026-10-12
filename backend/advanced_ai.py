@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 import json
 
@@ -267,7 +265,6 @@ def math_solve(user_input: str) -> Dict[str, Any]:
     if sp is None:
         return {"ok": False, "error": "sympy not installed", "steps": ["Install sympy for full math features."]}
 
-    import re
     s = user_input.strip()
     try:
         if s.lower().startswith("simplify"):
