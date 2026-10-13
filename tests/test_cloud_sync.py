@@ -164,3 +164,73 @@ def test_app_pulls_before_loading_the_engine_and_syncs_on_shutdown(tmp_path, clo
     with TestClient(app_mod.create_app()):
         assert (tmp_path / "restored" / "store" / "manifest.json").exists()
     assert (tmp_path / "restored" / "study.db").exists()
+
+
+def test_secret_is_fetched_only_when_asked_for_and_not_already_set(monkeypatch):
+    from backend.cloud_sync import load_secret_env
+
+    class SM:
+        calls = 0
+
+        def get_secret_value(self, SecretId):
+            SM.calls += 1
+            return {"SecretString": " the-key\n"}
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_SECRET_ID", raising=False)
+    load_secret_env(SM())
+    assert "GEMINI_API_KEY" not in os.environ and SM.calls == 0
+
+    monkeypatch.setenv("GEMINI_SECRET_ID", "x/y")
+    load_secret_env(SM())
+    assert os.environ["GEMINI_API_KEY"] == "the-key" and SM.calls == 1
+
+    load_secret_env(SM())  # already set: no second call
+    assert SM.calls == 1
+    monkeypatch.delenv("GEMINI_API_KEY")
+
+
+def test_on_lambda_changes_are_saved_after_each_request_not_on_a_timer(tmp_path, cloud, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import backend.cloud_sync as cs
+    from backend.api.settings import settings
+
+    app_mod = importlib.import_module("backend.api.app")
+    monkeypatch.setattr(cs, "_client", lambda: cloud)
+    monkeypatch.setattr(cs, "ON_LAMBDA", True)
+    monkeypatch.setattr(settings, "s3_bucket", "b")
+    monkeypatch.setattr(settings, "s3_prefix", "pfx")
+    monkeypatch.setattr(settings, "store_dir", tmp_path / "r" / "store")
+    monkeypatch.setattr(settings, "study_db", tmp_path / "r" / "study.db")
+    monkeypatch.setattr(app_mod, "make_engine", lambda: type("E", (), {"warm": lambda self: None})())
+    pushed = []
+    monkeypatch.setattr(S3Sync, "push", lambda self: pushed.append(1) or [])
+    monkeypatch.setattr(S3Sync, "start", lambda self, interval: pytest.fail("no timer on Lambda"))
+    app = app_mod.create_app()
+    app.add_api_route("/touch", lambda: {"ok": 1}, methods=["GET", "POST"])
+    with TestClient(app) as client:
+        client.get("/touch")
+        assert pushed == []
+        client.post("/touch")
+        assert pushed == [1]
+
+
+def test_cli_pushes_and_pulls(tmp_path, cloud, monkeypatch, capsys):
+    import backend.cloud_sync as cs
+    from backend.api.settings import settings
+
+    monkeypatch.setattr(cs, "_client", lambda: cloud)
+    monkeypatch.setattr(settings, "s3_bucket", "b")
+    monkeypatch.setattr(settings, "s3_prefix", "pfx")
+    src = make_sync(tmp_path, cloud, "src")
+    seed(src)
+    monkeypatch.setattr(settings, "store_dir", src.store_dir)
+    monkeypatch.setattr(settings, "study_db", src.study_db)
+    assert cs.main(["push"]) == 0
+    assert "manifest.json" in capsys.readouterr().out
+    dst = make_sync(tmp_path, cloud, "dst")
+    monkeypatch.setattr(settings, "store_dir", dst.store_dir)
+    monkeypatch.setattr(settings, "study_db", dst.study_db)
+    assert cs.main(["pull"]) == 0
+    assert (dst.store_dir / "manifest.json").exists()

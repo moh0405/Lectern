@@ -34,6 +34,9 @@ ENV PATH=/opt/venv/bin:$PATH \
     PORT=8000
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /opt/hf /opt/hf
+# AWS Lambda Web Adapter: lets Lambda talk to this ordinary web server (streaming included).
+# Outside Lambda the file is just ignored.
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 RUN useradd --create-home --uid 10001 app && mkdir -p /data && chown app /data
 USER app
 WORKDIR /app

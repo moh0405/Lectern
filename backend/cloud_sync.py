@@ -4,6 +4,11 @@ Container disks are wiped on every redeploy. With ``S3_BUCKET`` set, the API pul
 at startup (only the ones missing locally) and a background thread pushes changed files every
 ``S3_SYNC_SECONDS``, plus once more on shutdown. Without ``S3_BUCKET`` nothing here runs.
 
+On AWS Lambda the process is frozen between requests, so a background thread cannot be trusted. There
+(``AWS_LAMBDA_FUNCTION_NAME`` is set) the API instead saves right after every request that changes data.
+Work that continues after a response, such as indexing a new source in the background, can be cut off;
+build the index locally and upload it with ``python -m backend.cloud_sync push``.
+
 Files are tracked by (size, mtime). The SQLite database is copied with SQLite's own backup API
 first, so a half-written page is never uploaded. In the index, ``manifest.json`` is uploaded last
 and downloaded last: it is the file that says which version of the other two is current.
@@ -21,6 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("ai-study-mentor.cloud")
 
+ON_LAMBDA = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 INDEX_FILES = ["embeddings.npy", "chunks.jsonl", "index.faiss", "manifest.json"]  # manifest last, on purpose
 
 
@@ -130,3 +136,39 @@ class S3Sync:
             self.push()
         except Exception as e:
             logger.warning("Final S3 sync failed: %s", e)
+
+
+def load_secret_env(client: Optional[Any] = None) -> None:
+    """If ``GEMINI_SECRET_ID`` names a Secrets Manager secret and ``GEMINI_API_KEY`` is unset, fetch it.
+
+    Lambda cannot inject secrets as environment variables the way App Runner can, so the code asks for it.
+    """
+    secret_id = os.getenv("GEMINI_SECRET_ID")
+    if not secret_id or os.getenv("GEMINI_API_KEY"):
+        return
+    if client is None:
+        import boto3
+
+        client = boto3.client("secretsmanager")
+    os.environ["GEMINI_API_KEY"] = client.get_secret_value(SecretId=secret_id)["SecretString"].strip()
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """``python -m backend.cloud_sync push|pull``: copy the index and study database to or from S3."""
+    import argparse
+
+    from .api.settings import settings
+
+    ap = argparse.ArgumentParser(prog="python -m backend.cloud_sync", description=main.__doc__)
+    ap.add_argument("action", choices=["push", "pull"])
+    args = ap.parse_args(argv)
+    if not settings.s3_bucket:
+        ap.error("S3_BUCKET is not set")
+    sync = S3Sync(settings.s3_bucket, settings.s3_prefix, settings.store_dir, settings.study_db)
+    done = sync.push() if args.action == "push" else sync.pull()
+    print(f"{args.action}: {', '.join(done) or 'nothing to do'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
