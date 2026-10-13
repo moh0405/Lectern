@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import { API, indexFixture, removeFixture } from "./helpers";
 
 test.describe.configure({ mode: "serial" });

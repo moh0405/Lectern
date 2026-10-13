@@ -17,8 +17,9 @@ Start with the [project README](../README.md) for the overview, then read in thi
    9. [Frontend stack](concepts/09-frontend-stack.md): TypeScript, React, Next.js, TanStack Query, visualisation
    10. [Testing and CI](concepts/10-testing-and-ci.md)
    11. [Glossary](concepts/11-glossary.md)
+   12. [Spaced repetition, study tracking and LLM providers](concepts/12-study-features.md)
 3. **[Phase by phase](phases/README.md)**: how the project was built, in order, with the bugs and decisions of each phase.
-4. **[API reference](API.md)**: all 26 operations with examples.
+4. **[API reference](API.md)**: all 40 operations with examples.
 
 ## Reference
 

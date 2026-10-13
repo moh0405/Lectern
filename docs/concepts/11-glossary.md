@@ -7,6 +7,7 @@
 | **BM25** | Keyword ranking: rewards rare terms, saturates repeats, normalizes passage length. See [search](04-search-and-ranking.md). |
 | **Chunk / passage** | A piece of a document (about 300-900 characters) that is embedded, stored and retrieved on its own. |
 | **Citation check** | Verifying that `[doc (page N)]` in an answer refers to a passage that was in the prompt. |
+| **Anki** | Flashcard software; imports CSV and `.apkg` files. |
 | **Context window** | The maximum prompt size a model can read. |
 | **Cosine similarity** | Cosine of the angle between two vectors; the standard similarity measure for embeddings. |
 | **Cross-encoder** | A model that scores a (query, passage) pair together; accurate but slow; used for reranking. |
@@ -33,6 +34,7 @@
 | **Reranking** | Re-ordering a short candidate list with a slower, more accurate model. |
 | **RRF** | Reciprocal rank fusion: merge ranked lists by summing 1/(k + rank). |
 | **SSE** | Server-Sent Events: a one-way event stream over HTTP, used to stream answers. |
+| **SM-2** | The spaced-repetition scheduling algorithm behind Anki's classic mode. See [study features](12-study-features.md). |
 | **Stemming** | Reducing words to a base form (`collisions` → `collision`) so they match. |
 | **Stopword** | A very common word ("the", "is") ignored by keyword search. |
 | **Temperature** | Sampling randomness of a model; lower is more deterministic. |

@@ -143,12 +143,14 @@ Quality gates: `tsc --strict`, ESLint, Vitest (components and hooks), Playwright
 - **Remaining failures (2 of 33)** are paraphrases the embedder confuses ("added *last*" retrieves *queue* passages).
 - **Not done, deliberately:** a "no good match" threshold (unanswerable questions score far lower, AUROC 1.0, but 6 examples cannot set a threshold), and answer-faithfulness measurement (needs a model and a key).
 
-## Phase 5: Product extras (deferred, post-v1)
-Out of scope for the portfolio v1. Possible later work:
-- Accounts and persistent history.
-- Flashcards with spaced repetition and Anki export (`genanki` is already a dependency).
-- LeetCode progress tracking and study plans from weak topics.
-- Multiple model providers behind one interface.
+## Phase 5: Study tools
+Originally deferred; done after v1's core because the user asked for it. **Accounts are deliberately out of scope**: this is a single-user tool, and a login system would add a lot of security surface for no portfolio value. State lives in one SQLite file.
+- [x] Flashcards with spaced repetition (SM-2), model-written or saved from an answer, Anki export. *CSV always; `.apkg` through the optional `anki` extra (`genanki` was not actually a dependency yet).*
+- [x] LeetCode progress (todo / attempted / solved, notes) and a study plan from weak topics.
+- [x] Multiple model providers behind one interface (`LLM_PROVIDER=gemini|openai`; the OpenAI client also works with any OpenAI-compatible server through `OPENAI_BASE_URL`). Tested with fake SDK clients only; **not run against a live OpenAI endpoint**.
+- [x] Server-side persistent history (no accounts): saved when an answer finishes, restored when the browser has none.
+
+**Done when:** each feature has API tests, frontend tests and a browser test. *Met (see `docs/phases/phase-5-study-tools.md`).*
 
 ## Phase 6: Deploy and operate (3–4 days)
 - [ ] Backend Dockerfile deployed to a container host (Cloud Run, Fly or Render); frontend on Vercel.

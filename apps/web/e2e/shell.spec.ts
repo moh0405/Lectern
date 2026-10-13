@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 test("command palette jumps between pages from the keyboard", async ({ page }) => {
   await page.goto("/ask");

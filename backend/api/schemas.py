@@ -318,6 +318,127 @@ class Projection(BaseModel):
     total_chunks: int
 
 
+# ---------------------------------------------------------------- flashcards (spaced repetition)
+class CardCreate(BaseModel):
+    front: str = Field(..., min_length=1, max_length=1200)
+    back: str = Field(..., min_length=1, max_length=1200)
+    source: Optional[str] = Field(None, max_length=300, description="Where the card came from, for example a document name")
+
+
+class Card(BaseModel):
+    id: int
+    front: str
+    back: str
+    source: Optional[str] = None
+    created_at: float
+    due_at: float = Field(description="Epoch seconds; the card is due when this is in the past")
+    interval_days: int
+    ef: float = Field(description="SM-2 ease factor (never below 1.3)")
+    repetitions: int
+    lapses: int
+    reviews: int
+    last_reviewed: Optional[float] = None
+
+
+class CardStats(BaseModel):
+    total: int
+    due: int
+    new_cards: int
+    mature: int = Field(description="Cards with an interval of 21 days or more")
+    reviews: int
+
+
+class CardList(BaseModel):
+    cards: List[Card]
+    stats: CardStats
+
+
+class ReviewRequest(BaseModel):
+    grade: int = Field(..., ge=0, le=5, description="SM-2 grade: 0 blackout .. 5 perfect. The UI buttons use again=1, hard=3, good=4, easy=5")
+
+
+class GenerateCardsRequest(BaseModel):
+    topic: Optional[str] = Field(None, max_length=200, description="Focus on this topic; omit to sample your whole material")
+    n: int = Field(5, ge=1, le=15)
+    temperature: float = Field(0.2, ge=0.0, le=2.0)
+
+
+# ---------------------------------------------------------------- LeetCode progress and plan
+ProgressStatus = Literal["todo", "attempted", "solved"]
+
+
+class ProgressUpdate(BaseModel):
+    status: ProgressStatus
+    notes: Optional[str] = Field(None, max_length=4000, description="Omit to keep the existing notes")
+
+
+class ProgressItem(BaseModel):
+    pid: str
+    title: str
+    status: ProgressStatus
+    notes: str
+    attempts: int
+    difficulty: str
+    topics: List[str]
+    updated_at: float
+    solved_at: Optional[float] = None
+
+
+class ProgressSummary(BaseModel):
+    solved: int
+    attempted: int
+    todo: int
+    solved_by_difficulty: Dict[str, int]
+
+
+class ProgressList(BaseModel):
+    items: List[ProgressItem]
+    summary: ProgressSummary
+
+
+class TopicStat(BaseModel):
+    topic: str
+    attempted: int
+    solved: int
+    solve_rate: float
+
+
+class PlanItem(BaseModel):
+    pid: str
+    title: str
+    difficulty: str
+    topics: List[str]
+    reason: str
+
+
+class StudyPlan(BaseModel):
+    weak_topics: List[str] = Field(description="Topics you attempted but solved under half of")
+    topics: List[TopicStat]
+    items: List[PlanItem]
+
+
+# ---------------------------------------------------------------- saved Ask history
+class HistoryTurn(BaseModel):
+    question: str = Field(..., max_length=2000)
+    answer: str = Field("", max_length=20000)
+    mode: Optional[str] = None
+    model: Optional[str] = None
+    cached: bool = False
+    chunks: List[Chunk] = []
+    citations: List[CitationCheck] = []
+    unverified_citations: int = 0
+    uncited: bool = False
+
+
+class SavedTurn(HistoryTurn):
+    id: int
+    ts: float
+
+
+class SavedHistory(BaseModel):
+    turns: List[SavedTurn]
+
+
 # ---------------------------------------------------------------- SSE payloads (POST /ask/stream)
 class SseMeta(BaseModel):
     chunks: List[Chunk]

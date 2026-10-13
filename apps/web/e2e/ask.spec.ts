@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import path from "node:path";
 
 const PDF = path.join(import.meta.dirname, "fixtures", "heaps.pdf");

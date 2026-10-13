@@ -14,6 +14,8 @@ import { useUrlParams } from "@/lib/use-url-params";
 import { cn } from "@/lib/utils";
 import { DifficultyBadge } from "./difficulty-badge";
 import { ProblemDetail } from "./problem-detail";
+import { StatusIcon, useProgress, type Status } from "./progress";
+import { StudyPlan } from "./study-plan";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 
@@ -73,6 +75,8 @@ export function LeetCodeView() {
   const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   const topTopics = (stats.data?.top_topics ?? []).slice(0, 14).map((t) => String(t[0]));
   const results = search.data?.problems ?? [];
+  const progress = useProgress();
+  const statusOf = new Map((progress.data?.items ?? []).map((i) => [i.pid, i.status as Status]));
 
   return (
     <>
@@ -91,6 +95,8 @@ export function LeetCodeView() {
           ))}
         </div>
       ) : null}
+
+      <StudyPlan onOpen={(pid) => url.set({ p: pid })} />
 
       <Card className="mb-4 space-y-3">
         <div className="relative">
@@ -142,8 +148,9 @@ export function LeetCodeView() {
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-medium">
-                    {p.pid}. {p.title}
+                  <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+                    <StatusIcon status={statusOf.get(p.pid)} className="shrink-0" />
+                    <span className="truncate">{p.pid}. {p.title}</span>
                   </span>
                   <DifficultyBadge difficulty={p.difficulty} />
                 </div>

@@ -21,7 +21,7 @@ except Exception:
 
 
 from .document_processor import embed_texts
-from .llm_config import GeminiClient
+from .llm_providers import create_llm
 
 
 def _import_kaggle():
@@ -247,7 +247,7 @@ class LeetCodeHandler:
             f"Description:\n{p.description}\n\n"
         )
         try:
-            client = GeminiClient(model=model, temperature=temperature)
+            client = create_llm(model=model, temperature=temperature)
             res = client.generate(prompt, temperature=temperature)
             if res.get("ok"):
                 return {"ok": True, "markdown": res.get("answer"), "model": res.get("model")}

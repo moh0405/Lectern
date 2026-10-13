@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from ...citations import check_answer
-from ...llm_config import DEFAULT_MODEL, GeminiClient
+from ...llm_config import DEFAULT_MODEL
+from ...llm_providers import create_llm
 from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
 from ..answer_cache import AnswerCache, make_key
@@ -144,7 +145,7 @@ def ask_stream(
         yield sse("meta", meta)
         parts: List[str] = []
         try:
-            client = GeminiClient(model=req.model, temperature=req.temperature)
+            client = create_llm(model=req.model, temperature=req.temperature)
             for piece in client.stream(prompt, temperature=req.temperature):
                 parts.append(piece)
                 yield sse("token", {"text": piece})
@@ -152,7 +153,7 @@ def ask_stream(
                 raise RuntimeError("Model returned an empty response (it may have been blocked by a safety filter)")
         except Exception as e:
             msg = str(e)
-            code = "llm_unavailable" if ("GEMINI_API_KEY" in msg or "not installed" in msg) else "llm_error"
+            code = "llm_unavailable" if ("_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg) else "llm_error"
             _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return
@@ -190,7 +191,7 @@ def suggestions(n: int = Query(5, ge=1, le=10), engine: RAGEngine = Depends(get_
 @router.get("/models", response_model=Models, summary="Models the server can use (needs a Gemini key)")
 def models():
     try:
-        client = GeminiClient()
+        client = create_llm()
     except RuntimeError as e:
         raise ApiError(503, str(e), code="llm_unavailable")
     return Models(models=client.list_supported_models(), default=client.model or DEFAULT_MODEL)

@@ -21,6 +21,7 @@ class Settings:
     upload_dir: Path = field(default_factory=lambda: Path(os.getenv("UPLOAD_DIR", "data/uploaded_files")).resolve())
     store_dir: Path = field(default_factory=lambda: Path(os.getenv("STORE_DIR", "data/vector_store")).resolve())
     analytics_db: Path = field(default_factory=lambda: Path(os.getenv("ANALYTICS_DB", "data/analytics.db")).resolve())
+    study_db: Path = field(default_factory=lambda: Path(os.getenv("STUDY_DB", "data/study.db")).resolve())
     cors_origins: List[str] = field(
         default_factory=lambda: _csv(os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"))
     )

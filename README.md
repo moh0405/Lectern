@@ -16,7 +16,9 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 - **Answers only from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **verified** against the retrieved passages and flagged if the document or page was never retrieved.
 - **Retrieves with hybrid search**: embeddings (meaning) + BM25 (exact terms), merged by reciprocal rank fusion. Measured, not assumed.
 - **Tutors**: concept maps, a Socratic tutor that gives hints not answers, cross-source synthesis, level-adaptive explanations, symbolic math.
-- **LeetCode mentor**: 1,825 searchable problems with AI-written study guides.
+- **LeetCode mentor**: 1,825 searchable problems with AI-written study guides, progress tracking (todo / attempted / solved, with notes) and a study plan built from your weak topics.
+- **Flashcards with spaced repetition**: SM-2 scheduling, cards written from your material by the model or saved from any answer, exported to Anki (CSV or `.apkg`).
+- **Remembers your work**: Ask history is saved on the server and comes back even if you clear the browser.
 - **Shows its work**: retrieved passages with scores, a 3D map of your document embeddings, and an analytics dashboard.
 
 | | |
@@ -81,12 +83,12 @@ How the pieces fit:
 |---|---|---|
 | Web app | Next.js 16, React 19, TypeScript (strict), Tailwind v4, TanStack Query | UI, streaming, state |
 | Typed client | OpenAPI → `openapi-typescript` + `openapi-fetch`, custom SSE reader | Frontend types generated from the backend |
-| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 26 operations under `/api/v1` |
+| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 40 operations under `/api/v1` |
 | Retrieval | NumPy exact search (FAISS opt-in), BM25, RRF, optional cross-encoder | Hybrid search |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-d), hashing fallback | Meaning as vectors |
-| Generation | Google Gemini via `google-genai` | Answers, tutor tools, JSON mode |
+| Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
-| Quality | pytest (271), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (318), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -112,6 +114,9 @@ All under `/api/v1` except `/health`. Interactive docs at `/docs`. Full detail a
 | Ask and search | `POST /ask` · `POST /ask/stream` (SSE) · `GET /search` · `GET /suggestions` · `GET /models` |
 | Tutor tools | `POST /concept-map` · `/socratic` · `/synthesis` · `/adaptive` · `/math` |
 | LeetCode | `GET /leetcode/stats` · `/leetcode/search` · `/leetcode/problems/{pid}` · `POST /leetcode/problems/{pid}/explain` |
+| Flashcards | `GET` / `POST /cards` · `POST /cards/generate` · `GET /cards/export` · `POST /cards/{id}/review` · `DELETE /cards/{id}` |
+| LeetCode progress | `GET /leetcode/progress` · `PUT` / `DELETE /leetcode/progress/{pid}` · `GET /leetcode/plan` |
+| History | `GET` / `POST /history` · `DELETE /history` · `DELETE /history/{id}` |
 | Notes and export | `POST /notes` · `POST /export` |
 | Analytics and viz | `GET` / `DELETE /analytics` · `GET /embeddings/projection` |
 
@@ -121,7 +126,7 @@ Streaming events from `POST /ask/stream`: `meta` (retrieved passages) → `token
 
 ## Quick start
 
-Requires Python 3.10+, Node 20+, and a [Gemini API key](https://aistudio.google.com/) for generated answers (retrieval, LeetCode, math and the embedding map work without one).
+Requires Python 3.10+, Node 20+, and a [Gemini API key](https://aistudio.google.com/) (or an OpenAI-compatible endpoint, see `LLM_PROVIDER`) for generated answers (retrieval, LeetCode, math and the embedding map work without one).
 
 ```bash
 git clone https://github.com/moh0405/AI-study-mentor-.git && cd AI-study-mentor-
@@ -151,7 +156,7 @@ This project was built to be understood. The docs teach each technology from fir
 
 - **[Docs index](docs/README.md)**: reading order
 - **[Phase by phase](docs/phases/README.md)**: how the project was built and what each stage taught
-- **Concepts**: [RAG](docs/concepts/01-rag.md) · [Embeddings](docs/concepts/02-embeddings.md) · [Vector databases](docs/concepts/03-vector-databases.md) · [Search and ranking](docs/concepts/04-search-and-ranking.md) · [Chunking](docs/concepts/05-chunking.md) · [LLMs and prompting](docs/concepts/06-llms-and-prompting.md) · [Backend stack](docs/concepts/07-backend-stack.md) · [Evaluation](docs/concepts/08-evaluation.md) · [Frontend stack](docs/concepts/09-frontend-stack.md) · [Testing and CI](docs/concepts/10-testing-and-ci.md) · [Glossary](docs/concepts/11-glossary.md)
+- **Concepts**: [RAG](docs/concepts/01-rag.md) · [Embeddings](docs/concepts/02-embeddings.md) · [Vector databases](docs/concepts/03-vector-databases.md) · [Search and ranking](docs/concepts/04-search-and-ranking.md) · [Chunking](docs/concepts/05-chunking.md) · [LLMs and prompting](docs/concepts/06-llms-and-prompting.md) · [Backend stack](docs/concepts/07-backend-stack.md) · [Evaluation](docs/concepts/08-evaluation.md) · [Frontend stack](docs/concepts/09-frontend-stack.md) · [Testing and CI](docs/concepts/10-testing-and-ci.md) · [Glossary](docs/concepts/11-glossary.md) · [Spaced repetition and LLM providers](docs/concepts/12-study-features.md)
 
 ## Repository layout
 
@@ -167,9 +172,9 @@ docs/            architecture, concepts, phases, API, plan
 
 ## Status and honest limits
 
-Phases 0 to 4 are done (hygiene, retrieval core, API, frontend, answer quality). Planned: flashcards and progress tracking (Phase 5), deployment (Phase 6), release polish (Phase 7); see [`docs/PLAN.md`](docs/PLAN.md).
+Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Planned: deployment (Phase 6) and release polish (Phase 7); see [`docs/PLAN.md`](docs/PLAN.md).
 
-- Single process: in-memory jobs and rate limits, no user accounts (portfolio scope).
+- Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).
 - Exact search is right up to roughly 100k passages; beyond that you would want an approximate index.
 - Evaluation measures retrieval, not whether a generated claim is faithful to its source; citation checks catch invented sources only.
 - The demo screenshots use a scripted model, as noted above.

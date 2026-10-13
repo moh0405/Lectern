@@ -276,7 +276,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `GEMINI_API_KEY` | Yes, for generation | none | Google Gemini API key |
+| `LLM_PROVIDER` | No | `gemini` | Which language-model backend answers: `gemini` or `openai` (any OpenAI-compatible server) |
+| `GEMINI_API_KEY` | Yes, with `gemini` | none | Google Gemini API key |
 | `GEMINI_MODEL` | No | `gemini-3.8-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
@@ -287,8 +288,10 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
 | `MAX_UPLOAD_MB` | No | `50` | Per-file upload limit |
 | `RATE_LIMIT_PER_MIN` | No | `60` | Per-IP request limit for `/api/v1` |
-| `UPLOAD_DIR`, `STORE_DIR`, `ANALYTICS_DB` | No | `data/uploaded_files`, `data/vector_store`, `data/analytics.db` | Where the API keeps files, the index and analytics |
-| `OPENAI_API_KEY` | Only for audio | none | Whisper transcription of `.mp3/.mp4/.wav/.m4a` (read by the audio source) |
+| `UPLOAD_DIR`, `STORE_DIR`, `ANALYTICS_DB`, `STUDY_DB` | No | `data/uploaded_files`, `data/vector_store`, `data/analytics.db`, `data/study.db` | Where the API keeps files, the index, analytics, and your flashcards / LeetCode progress / saved history |
+| `OPENAI_API_KEY` | With `LLM_PROVIDER=openai`; also for audio | none | OpenAI key, also used for Whisper transcription of `.mp3/.mp4/.wav/.m4a` |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | Model for the `openai` provider (change it to whatever your server offers) |
+| `OPENAI_BASE_URL` | No | OpenAI | Point at Ollama, vLLM, LM Studio, OpenRouter...; no real key is needed for local servers |
 
 Never commit `.env`. It is already in `.gitignore`.
 
@@ -633,7 +636,7 @@ The canned-answer "Demo Mode" from the original Streamlit app was not carried ov
 
 Documented honestly so you know what to expect. These come from reading the code, not from a test run.
 
-- **Tests and evaluation exist but have limits**: 271 backend tests, frontend unit tests, browser tests and a retrieval evaluation (small sample, one labeller). Answer faithfulness is not measured.
+- **Tests and evaluation exist but have limits**: 318 backend tests, frontend unit tests, browser tests and a retrieval evaluation (small sample, one labeller). Answer faithfulness is not measured.
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
 - **Retrieval is good, not solved**: on the real-textbook evaluation 2 of 33 questions still miss (paraphrases where "last" and "first" look alike to the embedder). The evaluation is small, so every claim carries an interval, and it measures retrieval only, not whether the model's answer is faithful. Answer faithfulness is unmeasured; citation checking catches invented sources, not misattributed claims.
 - **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.

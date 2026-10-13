@@ -18,7 +18,7 @@ from .. import __version__
 from .deps import make_engine
 from .errors import ERROR_RESPONSES, ErrorResponse, install_error_handlers
 from .jobs import JobManager
-from .routers import ask, leetcode, sources, study, tutor, viz
+from .routers import ask, leetcode, sources, study, tracking, tutor, viz
 from .schemas import Health, SseDone, SseError, SseMeta, SseToken
 from .settings import settings
 
@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "X-API-Key"],
     )
     install_error_handlers(app)
@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
         engine = getattr(app.state, "engine", None) or get_engine_lazy(app)
         return Health(status="ok", version=__version__, semantic_search=engine.semantic_ready, chunks=len(engine.store))
 
-    for r in (sources.router, ask.router, tutor.router, leetcode.router, study.router, viz.router):
+    for r in (sources.router, ask.router, tutor.router, leetcode.router, study.router, viz.router, tracking.router):
         app.include_router(r)
 
     base_openapi = app.openapi

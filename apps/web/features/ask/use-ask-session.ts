@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
-import { initialSession, loadTurns, saveTurns, sessionReducer, type Mode } from "./session";
+import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Mode, type Turn } from "./session";
 
 export interface AskParams {
   question: string;
@@ -17,6 +17,24 @@ export interface AskParams {
   retrievalOnly?: boolean;
 }
 
+/** Run a server call whose failure must never disturb the UI (a sync or throw is swallowed too). */
+async function bestEffort(call: () => unknown): Promise<void> {
+  try {
+    await call();
+  } catch {
+    /* offline or unavailable */
+  }
+}
+
+async function saveRemote(turn: Turn, ids: Map<string, number>): Promise<void> {
+  try {
+    const res = await api.http.POST("/api/v1/history", { body: toHistoryTurn(turn) });
+    if (res?.data) ids.set(turn.id, res.data.id);
+  } catch {
+    /* offline: the turn stays in this browser only */
+  }
+}
+
 let counter = 0;
 const newId = () => `${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
@@ -25,9 +43,40 @@ export function useAskSession() {
   const controllers = useRef(new Map<string, AbortController>());
   // Saving is gated on `hydrated` (state, not a ref): the first commit must not write the empty
   // initial list over what is in storage before the restored turns have been applied.
+  // History is also kept on the server, so it survives clearing the browser. Server calls are best-effort:
+  // if the API is unreachable the session still works from this browser's own storage.
+  const synced = useRef(new Set<string>());
+  const serverIds = useRef(new Map<string, number>());
+
   useEffect(() => {
-    dispatch({ type: "hydrate", turns: loadTurns() });
+    const loaded = loadTurns();
+    loaded.forEach((t) => synced.current.add(t.id));
+    dispatch({ type: "hydrate", turns: loaded });
+    if (loaded.length > 0) return;
+    void (async () => {
+      try {
+        const res = await api.http.GET("/api/v1/history", { params: { query: { limit: 20 } } });
+        const restored = res?.data?.turns?.map(fromSavedTurn) ?? [];
+        restored.forEach((t) => {
+          synced.current.add(t.id);
+          serverIds.current.set(t.id, Number(t.id.slice(4)));
+        });
+        if (restored.length > 0) dispatch({ type: "restore", turns: restored });
+      } catch {
+        /* offline: nothing to restore */
+      }
+    })();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    for (const t of turns) {
+      if (t.status !== "done" || synced.current.has(t.id)) continue;
+      synced.current.add(t.id);
+      if (!t.answer) continue; // retrieval-only lookups are not history
+      void saveRemote(t, serverIds.current);
+    }
+  }, [turns, hydrated]);
 
   useEffect(() => {
     if (hydrated) saveTurns(turns);
@@ -88,10 +137,19 @@ export function useAskSession() {
   }, []);
 
   const stop = useCallback((id: string) => controllers.current.get(id)?.abort(), []);
-  const remove = useCallback((id: string) => dispatch({ type: "remove", id }), []);
+  const remove = useCallback((id: string) => {
+    dispatch({ type: "remove", id });
+    const serverId = serverIds.current.get(id);
+    if (serverId !== undefined) {
+      serverIds.current.delete(id);
+      void bestEffort(() => api.http.DELETE("/api/v1/history/{turn_id}", { params: { path: { turn_id: serverId } } }));
+    }
+  }, []);
   const clear = useCallback(() => {
     controllers.current.forEach((c) => c.abort());
     dispatch({ type: "clear" });
+    serverIds.current.clear();
+    void bestEffort(() => api.http.DELETE("/api/v1/history"));
   }, []);
 
   return { turns, ask, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };

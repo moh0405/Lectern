@@ -237,7 +237,7 @@ def test_parse_questions_keeps_only_question_shaped_lines():
 
 
 def test_suggestions_ignore_a_reply_with_no_usable_questions(engine, monkeypatch):
-    import backend.llm_config as cfg
+    import backend.llm_providers as cfg
 
     class Rambler:
         def __init__(self, **kw):
@@ -246,6 +246,6 @@ def test_suggestions_ignore_a_reply_with_no_usable_questions(engine, monkeypatch
         def generate(self, prompt, temperature=None, json_mode=False):
             return {"ok": True, "model": "x", "answer": "| a | b |\n|---|---|\nSome prose without any question."}
 
-    monkeypatch.setattr(cfg, "GeminiClient", Rambler)
+    monkeypatch.setattr(cfg, "create_llm", Rambler)
     qs = engine.generate_query_suggestions(max_questions=3)
     assert len(qs) == 3 and all(q.endswith(("?",)) or q for q in qs) and "|" not in "".join(qs)

@@ -197,6 +197,7 @@ def main() -> None:
         UPLOAD_DIR=str(work / "uploads"),
         STORE_DIR=str(work / "store"),
         ANALYTICS_DB=str(work / "analytics.db"),
+        STUDY_DB=str(work / "study.db"),
         CORS_ORIGINS=os.getenv("DEMO_WEB_ORIGIN", "http://localhost:3200"),
         RATE_LIMIT_PER_MIN="100000",
         GEMINI_API_KEY="",
@@ -207,9 +208,9 @@ def main() -> None:
     if src.exists():
         shutil.copy(src, work / "data" / "leetcode" / "normalized_problems.jsonl")
 
-    for module_name in ("backend.llm_config", "backend.advanced_ai", "backend.leetcode_handler", "backend.api.routers.ask"):
+    for module_name in ("backend.llm_providers", "backend.advanced_ai", "backend.leetcode_handler", "backend.api.routers.ask", "backend.api.routers.tracking"):
         __import__(module_name)
-        sys.modules[module_name].GeminiClient = DemoModel
+        sys.modules[module_name].create_llm = DemoModel
 
     from eval.harness import CONFIGS, CORPORA, build_store
 

@@ -10,7 +10,7 @@ The project began as a hackathon prototype (a Streamlit app calling Gemini over 
 | 2 | a versioned, typed, secure API with streaming | #12 | [phase-2-api.md](phase-2-api.md) |
 | 3 | the TypeScript/Next.js frontend | #13 | [phase-3-frontend.md](phase-3-frontend.md) |
 | 4 | answer quality: evaluation, hybrid search, chunking, citation checks | #14 | [phase-4-retrieval-quality.md](phase-4-retrieval-quality.md) |
-| 5 | product extras: flashcards, progress tracking, providers | open | issue #7 |
+| 5 | study tools: flashcards (SM-2), LeetCode progress and plan, server-side history, LLM providers | #16 | [phase-5-study-tools.md](phase-5-study-tools.md) |
 | 6 | deploy and operate | open | issue #8 |
 | 7 | docs and v1.0 release | open | issue #9 |
 

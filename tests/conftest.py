@@ -24,10 +24,11 @@ def _never_load_torch(monkeypatch):
 def fake_gemini(monkeypatch):
     FakeGemini.handler, FakeGemini.fail_with, FakeGemini.calls = None, None, []
     for target in (
-        "backend.llm_config.GeminiClient",
-        "backend.api.routers.ask.GeminiClient",
-        "backend.advanced_ai.GeminiClient",
-        "backend.leetcode_handler.GeminiClient",
+        "backend.llm_providers.create_llm",
+        "backend.api.routers.ask.create_llm",
+        "backend.api.routers.tracking.create_llm",
+        "backend.advanced_ai.create_llm",
+        "backend.leetcode_handler.create_llm",
     ):
         monkeypatch.setattr(target, FakeGemini)
     return FakeGemini
@@ -67,6 +68,7 @@ def api(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "upload_dir", tmp_path / "uploads")
     monkeypatch.setattr(settings, "store_dir", tmp_path / "store")
     monkeypatch.setattr(settings, "analytics_db", tmp_path / "analytics.db")
+    monkeypatch.setattr(settings, "study_db", tmp_path / "study.db")
     monkeypatch.setattr(settings, "api_key", None)
     monkeypatch.setattr(settings, "rate_limit_per_min", 1000)
     (tmp_path / "uploads").mkdir()
@@ -74,7 +76,7 @@ def api(tmp_path, monkeypatch):
     if src.exists():
         (tmp_path / "data" / "leetcode").mkdir(parents=True)
         shutil.copy(src, tmp_path / "data" / "leetcode" / "normalized_problems.jsonl")
-    for attr in ("engine", "jobs", "analytics", "leetcode", "answer_cache"):
+    for attr in ("engine", "jobs", "analytics", "leetcode", "answer_cache", "study"):
         setattr(app.state, attr, None)
     deps._rate_state.clear()
     RAGEngine.clear_shared()
