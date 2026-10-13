@@ -76,7 +76,7 @@ def test_plan_puts_weak_topics_first_easiest_first_and_skips_solved():
     progress = {"1": {"status": "solved"}, "3": {"status": "attempted"}}
     plan = build_plan(progress, BANK, size=4)
     assert plan["weak_topics"] == ["Dynamic Programming"]
-    assert [i["pid"] for i in plan["items"][:2]] == ["4", "5"]  # 3 is attempted-not-solved: still offered, easiest first
+    assert [i["pid"] for i in plan["items"][:3]] == ["3", "4", "5"]  # 3 is attempted but not solved: still offered; easiest first
     assert all(i["pid"] != "1" for i in plan["items"])
     assert plan["items"][0]["reason"] == "Weak topic: Dynamic Programming"
 
