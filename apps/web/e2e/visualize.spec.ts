@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import { indexFixture, removeFixture } from "./helpers";
 
 test("explains an empty index", async ({ page }) => {

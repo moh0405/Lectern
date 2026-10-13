@@ -1,12 +1,18 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-import { indexFixture, removeFixture } from "./helpers";
+import type { Page } from "@playwright/test";
+import { API, indexFixture, removeFixture } from "./helpers";
+import { expect, test } from "./test";
+
+let cardId: number | undefined;
 
 test.beforeAll(async ({ request }) => {
+  const card = await request.post(`${API}/api/v1/cards`, { data: { front: "What is a heap?", back: "A tree with the heap property." } });
+  cardId = (await card.json()).id;
   await indexFixture(request, "heaps.pdf");
   await indexFixture(request, "graphs.pdf");
 });
 test.afterAll(async ({ request }) => {
+  if (cardId) await request.delete(`${API}/api/v1/cards/${cardId}`);
   await removeFixture(request, "heaps.pdf");
   await removeFixture(request, "graphs.pdf");
 });
@@ -19,6 +25,7 @@ async function violations(page: Page) {
 const PAGES: [string, string, (page: Page) => Promise<void>][] = [
   ["Ask", "/ask", async () => {}],
   ["Sources", "/sources", async (p) => void (await p.getByText("Indexed sources").waitFor())],
+  ["Flashcards", "/study", async (p) => void (await p.getByRole("button", { name: "Show answer" }).waitFor())],
   ["LeetCode", "/leetcode?q=two+sum&p=1", async (p) => void (await p.getByLabel("Problem detail").getByRole("heading").first().waitFor())],
   ["Tutor tools", "/tutor", async () => {}],
   ["Math", "/math", async () => {}],
