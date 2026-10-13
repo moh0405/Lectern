@@ -25,6 +25,10 @@ class Settings:
     cors_origins: List[str] = field(
         default_factory=lambda: _csv(os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"))
     )
+    # With a bucket set, the index and study database are kept in S3 (see backend/cloud_sync.py).
+    s3_bucket: Optional[str] = field(default_factory=lambda: os.getenv("S3_BUCKET") or None)
+    s3_prefix: str = field(default_factory=lambda: os.getenv("S3_PREFIX", "ai-study-mentor"))
+    s3_sync_seconds: float = field(default_factory=lambda: float(os.getenv("S3_SYNC_SECONDS", "30")))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "50"))
     max_files_per_request: int = 10
     rate_limit_per_min: int = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))

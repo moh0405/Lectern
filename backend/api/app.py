@@ -30,6 +30,12 @@ if not logging.getLogger().handlers:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    sync = None
+    if settings.s3_bucket:
+        from ..cloud_sync import S3Sync
+
+        sync = S3Sync(settings.s3_bucket, settings.s3_prefix, settings.store_dir, settings.study_db)
+        await run_in_threadpool(sync.pull)  # before the engine loads the index
     app.state.engine = make_engine()
     app.state.jobs = JobManager()
     try:
@@ -37,8 +43,12 @@ async def lifespan(app: FastAPI):
         await run_in_threadpool(app.state.engine.warm)
     except Exception as e:  # semantic search is optional; keyword fallback still works
         logger.warning("Embedder warm-up failed: %s", e)
+    if sync:
+        sync.start(settings.s3_sync_seconds)
     yield
     app.state.jobs.shutdown()
+    if sync:
+        await run_in_threadpool(sync.stop)
 
 
 def create_app() -> FastAPI:
