@@ -14,6 +14,7 @@ from .analytics_store import AnalyticsStore
 from .answer_cache import AnswerCache
 from .errors import ApiError
 from .jobs import JobManager
+from .study_store import StudyStore
 from .settings import settings
 
 _rate_state: Dict[str, List[float]] = {}
@@ -42,6 +43,13 @@ def get_analytics(request: Request) -> AnalyticsStore:
     store = getattr(request.app.state, "analytics", None)
     if store is None:
         store = request.app.state.analytics = AnalyticsStore(settings.analytics_db)
+    return store
+
+
+def get_study(request: Request) -> StudyStore:
+    store = getattr(request.app.state, "study", None)
+    if store is None:
+        store = request.app.state.study = StudyStore(settings.study_db)
     return store
 
 
@@ -86,7 +94,7 @@ def raise_if_failed(result: Dict[str, Any]) -> Dict[str, Any]:
     if result.get("ok", True):
         return result
     msg = str(result.get("error") or "The language model request failed")
-    if "GEMINI_API_KEY" in msg or "not installed" in msg:
+    if "_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg:
         raise ApiError(503, msg, code="llm_unavailable")
     raise ApiError(502, msg, code="llm_error")
 

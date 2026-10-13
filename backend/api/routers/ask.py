@@ -153,7 +153,7 @@ def ask_stream(
                 raise RuntimeError("Model returned an empty response (it may have been blocked by a safety filter)")
         except Exception as e:
             msg = str(e)
-            code = "llm_unavailable" if ("GEMINI_API_KEY" in msg or "not installed" in msg) else "llm_error"
+            code = "llm_unavailable" if ("_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg) else "llm_error"
             _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return

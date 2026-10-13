@@ -20,6 +20,7 @@ os.environ.update(
     UPLOAD_DIR=str(work / "uploads"),
     STORE_DIR=str(work / "store"),
     ANALYTICS_DB=str(work / "analytics.db"),
+    STUDY_DB=str(work / "study.db"),
     EMBEDDER="hashing",
     CORS_ORIGINS=os.getenv("E2E_WEB_ORIGIN", "http://localhost:3100"),
     RATE_LIMIT_PER_MIN="100000",
@@ -38,9 +39,10 @@ FakeGemini.echo_context = True
 import backend.advanced_ai  # noqa: E402
 import backend.api.routers.ask  # noqa: E402
 import backend.leetcode_handler  # noqa: E402
+import backend.api.routers.tracking  # noqa: E402
 import backend.llm_providers  # noqa: E402
 
-for module in (backend.llm_providers, backend.api.routers.ask, backend.advanced_ai, backend.leetcode_handler):
+for module in (backend.llm_providers, backend.api.routers.ask, backend.api.routers.tracking, backend.advanced_ai, backend.leetcode_handler):
     module.create_llm = FakeGemini
 
 import uvicorn  # noqa: E402

@@ -149,6 +149,7 @@ class StudyStore:
         if row is not None:
             row["chunks"], row["citations"] = json.loads(row["chunks"]), json.loads(row["citations"])
             row["cached"], row["uncited"] = bool(row["cached"]), bool(row["uncited"])
+            row["unverified_citations"] = row.pop("unverified")
         return row
 
     def get_history_item(self, hid: int) -> Optional[Dict[str, Any]]:
