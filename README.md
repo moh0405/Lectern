@@ -18,17 +18,18 @@ AI Study Mentor was my first project for learning AI engineering, and it grew in
 8. [Adding study material](#adding-study-material)
 9. [Running the app](#running-the-app)
 10. [Using the UI](#using-the-ui)
-11. [REST API](#rest-api)
-12. [Command-line tools](#command-line-tools)
-13. [Core concepts and internals](#core-concepts-and-internals)
-14. [LeetCode module](#leetcode-module)
-15. [Datasets and data directory](#datasets-and-data-directory)
-16. [Trying it without an API key](#trying-it-without-an-api-key)
-17. [Documentation in this repo](#documentation-in-this-repo)
-18. [Project history and status](#project-history-and-status)
-19. [Known limitations](#known-limitations)
-20. [Roadmap](#roadmap)
-21. [License](#license)
+11. [Retrieval quality](#retrieval-quality)
+12. [REST API](#rest-api)
+13. [Command-line tools](#command-line-tools)
+14. [Core concepts and internals](#core-concepts-and-internals)
+15. [LeetCode module](#leetcode-module)
+16. [Datasets and data directory](#datasets-and-data-directory)
+17. [Trying it without an API key](#trying-it-without-an-api-key)
+18. [Documentation in this repo](#documentation-in-this-repo)
+19. [Project history and status](#project-history-and-status)
+20. [Known limitations](#known-limitations)
+21. [Roadmap](#roadmap)
+22. [License](#license)
 
 ---
 
@@ -36,8 +37,9 @@ AI Study Mentor was my first project for learning AI engineering, and it grew in
 
 ### Core RAG
 - **Multi-source ingestion**: PDFs, YouTube transcripts, web articles, GitHub repos (READMEs, docs and Python docstrings/comments), and audio/video files transcribed with Whisper. Indexing is incremental: only new or changed files are processed.
-- **Semantic retrieval** with `sentence-transformers/all-MiniLM-L6-v2` embeddings (384-d, normalized, cosine similarity), with an automatic **keyword-coverage fallback** when ML libraries are unavailable.
-- **Grounded answers**: prompts tell Gemini to use only the retrieved context and to cite it. Answers **stream** token by token and can be stopped.
+- **Hybrid retrieval**: BM25 keyword ranking and `all-MiniLM-L6-v2` vector search, fused with reciprocal rank fusion. On the real-textbook evaluation this finds the right passage in the top 3 for 94% of questions, against 82% for vector search alone. Without a neural model the app uses BM25 alone, which is nearly as good on that evaluation. See [Retrieval quality](#retrieval-quality).
+- **Grounded, checked answers**: prompts tell Gemini to use only the retrieved context and to cite it. Answers **stream** token by token and can be stopped. Every citation is **checked against the passages the model was actually given**; an invented source or a page it never saw is flagged in the UI.
+- **Answer cache**: repeating a question reuses the answer (never after the sources change); "Fresh answer" asks the model again.
 - **Visible evidence**: every answer shows its sources as citation chips, with expandable passages, relevance scores and highlighted query terms. YouTube citations link to the exact timestamp.
 - **Four study modes** that change the prompt style: *ELI5*, *Technical*, *Interview prep*, *Quick summary*. Optionally show the exact prompt sent to the model, pick the model, or skip the model and just list matching passages.
 
@@ -78,29 +80,31 @@ A missing `GEMINI_API_KEY` is explained in the UI (retrieval keeps working), and
  Sources (PDF / YouTube / Web / GitHub / Audio)
         │  extract text per source type
         ▼
- Chunking (800 chars, 160 overlap)  ──►  chunk dicts {text, doc, page, chunk_id, source_type, url, extra}
+ Chunking (sentences, headings, boilerplate stripped)  ──►  chunk dicts {text, doc, page, chunk_id, source_type, url, extra}
         │
         ▼
  Embeddings (all-MiniLM-L6-v2, normalized; chunks de-duplicated by hash)
         │
         ▼
- Vector store (manifest.json + chunks.jsonl + embeddings.npy; no pickle)
-        │                                   ┌── keyword coverage fallback if embeddings unavailable
- Query ─► embed ─► exact cosine top-k ◄─────┘   (NumPy by default, FAISS optional)
+ Vector store (manifest.json + chunks.jsonl + embeddings.npy; no pickle)  +  BM25 index (built in memory)
+        │
+ Query ─► vector search ─┐
+                         ├─► reciprocal rank fusion ─► top-k   (BM25 alone when the index is not semantic)
+ Query ─► BM25 ──────────┘
         │
         ▼
  Prompt builder (mode: default / eli5 / technical / interview / summary)
         │
         ▼
- Gemini (google-genai)  ──►  answer + citations  ──►  Next.js UI / FastAPI / CLI
+ Gemini (google-genai)  ──►  answer  ──►  citation check against the retrieved passages  ──►  Next.js UI / FastAPI / CLI
 ```
 
 1. **Ingest**: each input is routed to a source handler by type (see [Core concepts](#core-concepts-and-internals)).
-2. **Chunk**: text is split into ~800-character windows with 160 characters of overlap so sentences survive chunk boundaries.
+2. **Chunk**: text is split on sentence and paragraph boundaries into passages of up to ~900 characters, with one sentence of overlap. Running page headers and licence boilerplate are removed, paragraphs may continue across a page break (a chunk records its page range), Markdown headings become context ("Hash Tables > Collisions"), and code blocks stay whole.
 3. **Embed**: chunks are encoded in batches (32, falling back to 8) and L2-normalized, so the dot product equals cosine similarity.
-4. **Retrieve**: the query is embedded the same way, and the top-k chunks (default 3) are returned with scores.
+4. **Retrieve**: the query is searched two ways, by meaning (vectors) and by words (BM25), and the two rankings are merged. The top-k passages (default 3) come back with scores.
 5. **Prompt**: chunks are formatted as `- [doc (page N)] text` and inserted into a mode-specific template.
-6. **Generate**: Gemini produces the answer. If generation fails, the UI still shows the retrieved context and prompt.
+6. **Generate and check**: Gemini produces the answer, and each citation in it is verified against the passages the model was given. If generation fails, the UI still shows the retrieved context.
 
 ---
 
@@ -143,6 +147,10 @@ AI-study-mentor-/
 │   ├── safe_math.py            # Whitelisted SymPy parser + worker process with timeout
 │   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes, synthesis
 │   ├── embeddings.py           # Sentence-transformers and dependency-free hashing embedders
+│   ├── lexical.py              # BM25 keyword ranking and reciprocal rank fusion
+│   ├── chunking.py             # Structure-aware chunking (sentences, headings, code, boilerplate)
+│   ├── rerank.py               # Optional cross-encoder reranker
+│   ├── citations.py            # Checks an answer's citations against the retrieved passages
 │   ├── vector_store.py         # Pickle-free on-disk store: add, dedupe, remove, search (NumPy or FAISS)
 │   ├── indexer.py              # Incremental indexing: fingerprints, skip unchanged, prune, CLI
 │   ├── document_processor.py   # PDF reading, chunking, source routing, input discovery
@@ -174,6 +182,7 @@ AI-study-mentor-/
 │   ├── LEARNING_GUIDE.md       # Step-by-step RAG tutorial using this codebase
 │   ├── demo_guide.md           # 3-minute demo script
 │   └── ARCHITECTURE.md         # (placeholder, currently empty)
+├── eval/                       # Retrieval evaluation: corpora, questions, metrics, committed reports
 ├── tests/                      # pytest suite (chunking, retrieval, prompt modes, API, exports, LeetCode)
 ├── pyproject.toml              # dependencies (core + extras), ruff, mypy, pytest config
 ├── Makefile                    # make install / lint / test / check
@@ -269,6 +278,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `GEMINI_MODEL` | No | `gemini-3.8-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
+| `RETRIEVAL_MODE` | No | `auto` | `auto` (hybrid with a semantic index, else BM25), `hybrid`, `dense` or `bm25` |
+| `RERANKER` | No | off | `cross-encoder` to rerank the top candidates (slower, see Retrieval quality) |
 | `VECTOR_BACKEND` | No | `numpy` | `numpy` or `faiss` (see "Search backend") |
 | `CORS_ORIGINS` | No | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed by CORS |
 | `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
@@ -320,7 +331,7 @@ Useful flags: `--rebuild` (start over, needed if you change the embedder), `--no
 
 Measured on the three textbooks this project was developed with: 4,715 chunks, about 43 s for the first build (MiniLM on CPU), about 0.5 s for a no-change re-run, and 4–26 ms per query once the model is loaded.
 
-Without a prebuilt store, the engine falls back to scanning **local files only** (PDFs and audio) once and uses keyword retrieval. The API also indexes uploads automatically and removes a document's chunks when you delete it.
+Without a prebuilt store, the engine falls back to scanning **local files only** (PDFs and audio) once and uses BM25 keyword ranking. The API also indexes uploads automatically and removes a document's chunks when you delete it.
 
 **Search backend.** Retrieval is exact cosine similarity over normalized vectors. `VECTOR_BACKEND=numpy` (default) uses a NumPy matrix product; `VECTOR_BACKEND=faiss` uses a FAISS `IndexFlatIP` (install the `faiss` extra). Both return the same results, and NumPy takes about a millisecond at this scale. FAISS is refused automatically when torch is loaded in the same process, because on macOS the two bundle separate OpenMP runtimes and the process aborts on the first multithreaded call.
 
@@ -389,6 +400,30 @@ E2E_PYTHON=$(which python) npx playwright test     # browser tests against the r
 
 ---
 
+## Retrieval quality
+
+Retrieval is measured, not assumed. `eval/` holds two question sets (a committed synthetic corpus and your own textbooks), the metrics, and reports; `python -m eval.run` reproduces them. Headline result on the real textbooks (33 answerable questions; see `eval/README.md` for method, caveats and the ablations):
+
+| | hit@3 | MRR | ms/query |
+|---|---:|---:|---:|
+| old keyword scorer | 64% | 0.58 | 75 |
+| BM25 | 82% | 0.71 | 0.3 |
+| vector search only (MiniLM) | 82% | 0.78 | 3 |
+| **default: hybrid + structure-aware chunks** | **94%** | 0.78 | 3.5 |
+| default + cross-encoder reranker (opt-in) | 94% | 0.86 | 337 |
+
+What was decided from this, and what was not:
+
+- **Hybrid search with structure-aware chunks is the default** (+12 points at hit@3, 95% interval +3 to +24). Each half helps little alone.
+- **Hybrid is only used with a semantic index.** With the non-semantic fallback embedder, fusing is worse than BM25 alone, so `RETRIEVAL_MODE=auto` picks BM25 there.
+- **The cross-encoder reranker is off by default** (`RERANKER=cross-encoder`): it improves the top-1 passage but not the top 3 that the prompt uses, at about 100 times the latency.
+- **Still failing:** 2 of 33 questions, both paraphrases where first-in/last-out style wording confuses the embedder. Citation checking catches invented sources, not a wrong claim attributed to a real one.
+- **Not measured:** answer faithfulness (needs a model and a key). A "no good match" cut-off looks possible (unanswerable questions score far lower) but 6 examples are too few to choose a threshold.
+
+Environment: `RETRIEVAL_MODE=auto|hybrid|dense|bm25`, `RERANKER=cross-encoder`. After upgrading, the next index run re-chunks existing sources automatically (each source records which chunker made it).
+
+---
+
 ## REST API
 
 Start it with `uvicorn backend.api:app --reload --port 8000`. Interactive docs: <http://localhost:8000/docs> (Swagger) and `/redoc`; the schema is at `/openapi.json`.
@@ -406,8 +441,8 @@ All `/api/v1` routes are rate limited per IP (`RATE_LIMIT_PER_MIN`, default 60).
 | `GET` | `/api/v1/documents` | Indexed sources with chunk counts. |
 | `DELETE` | `/api/v1/sources?key=...` | Remove a source (file name or URL) from disk, `sources.txt` and the index. |
 | `GET` | `/api/v1/stats` | Documents, chunks, page range, embedder, whether search is semantic. |
-| `POST` | `/api/v1/ask` | Answer a question. Body: `{question, k=3, mode?, model?, temperature=0.2, include_prompt=false}`. Returns `{answer, chunks, model, prompt?}`. |
-| `POST` | `/api/v1/ask/stream` | Same input, streamed as Server-Sent Events: `meta` (retrieved chunks), `token` (text fragments), then `done` or `error`. |
+| `POST` | `/api/v1/ask` | Answer a question. Body: `{question, k=3, mode?, model?, temperature=0.2, include_prompt=false, no_cache=false}`. Returns `{answer, chunks, model, prompt?, citations, unverified_citations, uncited, cached}`: each citation in the answer is checked against the retrieved passages (`ok`, `page_not_retrieved`, `unknown_source`). |
+| `POST` | `/api/v1/ask/stream` | Same input, streamed as Server-Sent Events: `meta` (retrieved chunks), `token` (text fragments), then `done` (with the citation check and whether it was cached) or `error`. |
 | `GET` | `/api/v1/search?query=&k=` | Retrieval only (no model call). |
 | `GET` | `/api/v1/suggestions?n=` | Study questions suggested from your material. |
 | `POST` | `/api/v1/concept-map` | `{topic}` → nodes, edges and Graphviz DOT. |
@@ -495,7 +530,7 @@ All handlers extend `BaseSource` and return chunks in this schema:
 Source type is detected in `document_processor._detect_source` (and `source_manager.detect_source_type`): local `.pdf` → PDF, local audio extensions → audio, `youtube.com`/`youtu.be` → YouTube, `github.com` → GitHub, other `http(s)` → web.
 
 ### `RAGEngine` (`backend/rag_engine.py`)
-- `retrieve_context(query, k)`: exact cosine search over the store's embeddings; if they are unavailable, ranks chunks by the share of query terms they contain (stopwords ignored). Every result carries its own score.
+- `retrieve_context(query, k)`: in `auto` mode, hybrid search (vector search and BM25, merged with reciprocal rank fusion) when the index has semantic embeddings, BM25 alone otherwise. Each result's `score` is its cosine similarity (or normalized BM25), and carries its page range. Details: `backend/lexical.py`, `backend/chunking.py`, `backend/rerank.py`, `backend/citations.py`.
 - `RAGEngine.shared()`: one engine per store directory, used by the API. `add_sources()` / `remove_source()` update the live index and persist it.
 - `generate_prompt(question, chunks, mode)`: builds the mode-specific prompt.
 - `answer_with_gemini(...)`: retrieve → prompt → Gemini. `generate_answer(...)` synthesizes from caller-supplied context.
@@ -578,6 +613,7 @@ The canned-answer "Demo Mode" from the original Streamlit app was not carried ov
 - [`docs/LEARNING_GUIDE.md`](docs/LEARNING_GUIDE.md): a step-by-step RAG tutorial that maps each concept (ingestion, chunking, embeddings, vector stores, retrieval, prompting, LLM integration, evaluation) to code in this repository.
 - [`docs/demo_guide.md`](docs/demo_guide.md): a short script for presenting the project.
 - [`docs/PLAN.md`](docs/PLAN.md): the completion plan and what was decided along the way.
+- [`eval/README.md`](eval/README.md): how retrieval is evaluated, what it found, and the caveats.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): placeholder (empty). The architecture is documented above.
 
 ---
@@ -597,7 +633,7 @@ Documented honestly so you know what to expect. These come from reading the code
 
 - **Test coverage is thin**: there is a smoke-test suite and CI (Phase 0), but no retrieval-quality evaluation yet (Phase 4). One strict `xfail` test documents the keyword-score bug.
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
-- **Retrieval quality is unmeasured**: semantic search works, but ambiguous acronyms can mislead it (for example, "BFS vs DFS" retrieved "distributed file system" passages). Hybrid retrieval and an evaluation set are Phase 4.
+- **Retrieval is good, not solved**: on the real-textbook evaluation 2 of 33 questions still miss (paraphrases where "last" and "first" look alike to the embedder). The evaluation is small, so every claim carries an interval, and it measures retrieval only, not whether the model's answer is faithful. Answer faithfulness is unmeasured; citation checking catches invented sources, not misattributed claims.
 - **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.
 - **The embedding map is only as semantic as the index**: with the fallback `hashing` embedder, closeness reflects shared words. The page warns when that is the case.
 - **Security is portfolio-grade, not hardened**: the rate limiter is in-memory per process (and keyed by the connecting IP, so it needs adjusting behind a proxy), there are no user accounts (just an optional shared `API_KEY`), and uploads are not virus-scanned. Remaining Phase 6 work: spend caps and deployment hardening.
@@ -611,7 +647,8 @@ Documented honestly so you know what to expect. These come from reading the code
 
 ## Roadmap
 
-- Retrieval-quality evaluation and broader tests
+- A larger evaluation set (and answer-faithfulness checks with a model), then a calibrated "no good match" threshold
+- Try a stronger embedding model or query rewriting for the paraphrase failures
 - Add a Dockerfile
 - Real token streaming from Gemini, and expose study modes in the API
 - Persistent index updates on upload/delete
