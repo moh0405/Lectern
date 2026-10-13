@@ -1,4 +1,6 @@
-import type { Chunk } from "@ai-study-mentor/api-client";
+import type { Chunk, components } from "@ai-study-mentor/api-client";
+
+export type CitationCheck = components["schemas"]["CitationCheck"];
 
 export type Mode = "eli5" | "technical" | "interview" | "summary";
 export type TurnStatus = "streaming" | "done" | "error" | "stopped";
@@ -12,6 +14,10 @@ export interface Turn {
   model?: string;
   /** The exact prompt sent to the model, when the user asked to see it. */
   prompt?: string;
+  /** Citations in the answer, checked by the server against the passages the model was given. */
+  citations?: CitationCheck[];
+  uncited?: boolean;
+  cached?: boolean;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
@@ -20,7 +26,7 @@ export type Action =
   | { type: "start"; id: string; question: string; mode?: Mode }
   | { type: "meta"; id: string; chunks: Chunk[]; prompt?: string }
   | { type: "token"; id: string; text: string }
-  | { type: "done"; id: string; model?: string }
+  | { type: "done"; id: string; model?: string; citations?: CitationCheck[]; uncited?: boolean; cached?: boolean }
   | { type: "error"; id: string; code: string; message: string }
   | { type: "stop"; id: string }
   | { type: "remove"; id: string }
@@ -42,7 +48,14 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
     case "token":
       return update(turns, action.id, (t) => ({ ...t, answer: t.answer + action.text }));
     case "done":
-      return update(turns, action.id, (t) => ({ ...t, status: "done", model: action.model ?? t.model }));
+      return update(turns, action.id, (t) => ({
+        ...t,
+        status: "done",
+        model: action.model ?? t.model,
+        citations: action.citations ?? t.citations,
+        uncited: action.uncited ?? t.uncited,
+        cached: action.cached ?? t.cached,
+      }));
     case "error":
       return update(turns, action.id, (t) => ({ ...t, status: "error", error: { code: action.code, message: action.message } }));
     case "stop":

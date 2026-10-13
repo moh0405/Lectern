@@ -11,6 +11,8 @@ export interface AskParams {
   temperature: number;
   model?: string;
   showPrompt?: boolean;
+  /** Ask the model again instead of reusing a cached answer. */
+  noCache?: boolean;
   /** Skip the model: just list the passages that match. */
   retrievalOnly?: boolean;
 }
@@ -55,11 +57,20 @@ export function useAskSession() {
         temperature: p.temperature,
         model: p.model || undefined,
         include_prompt: p.showPrompt || undefined,
+        no_cache: p.noCache || undefined,
       };
       for await (const ev of api.askStream(body, controller.signal)) {
         if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks, prompt: ev.data.prompt ?? undefined });
         else if (ev.event === "token") dispatch({ type: "token", id, text: ev.data.text });
-        else if (ev.event === "done") dispatch({ type: "done", id, model: ev.data.model ?? undefined });
+        else if (ev.event === "done")
+          dispatch({
+            type: "done",
+            id,
+            model: ev.data.model ?? undefined,
+            citations: ev.data.citations,
+            uncited: ev.data.uncited,
+            cached: ev.data.cached,
+          });
         else dispatch({ type: "error", id, code: ev.data.code, message: ev.data.message });
       }
     } catch (err) {

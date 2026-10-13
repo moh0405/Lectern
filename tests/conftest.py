@@ -74,7 +74,7 @@ def api(tmp_path, monkeypatch):
     if src.exists():
         (tmp_path / "data" / "leetcode").mkdir(parents=True)
         shutil.copy(src, tmp_path / "data" / "leetcode" / "normalized_problems.jsonl")
-    for attr in ("engine", "jobs", "analytics", "leetcode"):
+    for attr in ("engine", "jobs", "analytics", "leetcode", "answer_cache"):
         setattr(app.state, attr, None)
     deps._rate_state.clear()
     RAGEngine.clear_shared()

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import type { Chunk } from "@ai-study-mentor/api-client";
+import { pageLabel } from "@/lib/format";
 import { queryTerms, splitByTerms } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,7 @@ export function ChunkCard({ chunk, query, index }: { chunk: Chunk; query: string
         <span className="min-w-0 truncate">
           {index !== undefined ? <span className="mr-1.5 font-mono text-fg">[{index + 1}]</span> : null}
           {chunk.doc}
-          {chunk.page ? ` · page ${chunk.page}` : ""}
+          {chunk.page ? ` · ${pageLabel(chunk.page, chunk.end_page)}` : ""}
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {href ? (

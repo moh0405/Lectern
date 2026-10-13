@@ -34,11 +34,18 @@ Reasons:
 4. **Cost and risk.** Tuning needs a curated dataset, training spend, evaluation, and re-tuning when the base model changes. Small datasets risk overfitting.
 5. **Retrieval quality is the real bottleneck.** In this codebase the biggest quality risks are chunking, retrieval scoring and citations, not model capability. That is Phase 4.
 
-**When to revisit fine-tuning** (only if the eval set in Phase 4 shows it):
+**Phase 4 update: the numbers, and the answer stays the same.**
+
+- With hybrid retrieval, the right passage is in the top 3 for 94% of real-textbook questions (33 questions), and in the top 5 for 94%. Of the 6% that miss, the evidence never reaches the model. **No change to the generator, including fine-tuning it, can answer from a passage it was never shown.** Those misses are retrieval problems.
+- The levers that moved retrieval were all cheap and reversible (BM25 + fusion, better chunks), and each is measured. The next candidates are also retrieval-side: a stronger embedding model, query rewriting, reranking.
+- The one place fine-tuning could still apply is the **embedding model** (training it on domain question and passage pairs), not the answer model. That needs a few hundred labelled pairs; the current evaluation (33 + 44 questions) is far too small to train on *and* to test on. Revisit only after growing the evaluation set and trying a stronger off-the-shelf embedder.
+- **Answer faithfulness is still unmeasured** (it needs a model call, and a key was not available while building this). If answers turn out to ignore or distort their sources, fix it first with stricter prompts, structured output, and the citation check, which already catches invented sources.
+
+**When to revisit fine-tuning** (only if the evaluation shows it):
 - Answers stay stylistically inconsistent despite prompts and few-shot examples, or
 - You want a much cheaper or smaller model to match Flash quality on one narrow task (for example, generating Socratic hint ladders), using Flash outputs as training data.
 
-Even then, try these first: better system prompts, few-shot examples, structured output schemas, reranking, and a Flash-Lite model for simple tasks.
+Even then, try these first: better system prompts, few-shot examples, structured output schemas, a stronger embedder or reranker, and a Flash-Lite model for simple tasks.
 
 **Model notes (verified against Google's docs, Oct 2026):**
 - `gemini-3.8-flash` is the newest Flash model and is GA.
@@ -111,14 +118,30 @@ Quality gates: `tsc --strict`, ESLint, Vitest (components and hooks), Playwright
 - Bugs found and fixed while building it: LeetCode topics were never parsed (0 of 1,825 problems had any); "two sum" ranked "Combine Two Tables" first; every `load_all` re-hit Kaggle and rewrote the dataset; the Ask session was wiped from localStorage on mount; `apps/web/lib` was silently excluded by the Python `lib/` gitignore rule; the accent colour and a scrollable region failed WCAG.
 
 ## Phase 4: Answer quality (about 1 week; overlaps Phase 3)
-- [ ] Build an eval set of 30–50 questions with expected sources; track recall@k and citation correctness.
-- [ ] Hybrid retrieval (BM25 + dense) and optionally a reranker.
-- [ ] Better chunking: respect headings and sentences; treat code differently from prose.
-- [ ] Flag answers that cite sources not in the retrieved chunks.
-- [ ] Cache by (question, mode, store version).
-- [ ] Re-evaluate the fine-tuning question using these numbers (see [Model strategy](#model-strategy)).
+- [x] Build an eval set of 30–50 questions with expected sources; track recall@k and citation correctness. *Two sets (50 synthetic, 39 on the real textbooks), hit@k / MRR / evidence coverage / answerable-vs-unanswerable AUROC, paired-bootstrap intervals, committed reports (`eval/`). Citation correctness is checked per answer at runtime (see below), not as an offline metric: measuring it offline needs a model.*
+- [x] Hybrid retrieval (BM25 + dense) and optionally a reranker. *Hybrid is the default with a semantic index; BM25 alone otherwise; the cross-encoder reranker is built and measured but opt-in.*
+- [x] Better chunking: respect headings and sentences; treat code differently from prose. *`backend/chunking.py`, adopted because it helps hybrid retrieval (it does not help vector-only search).*
+- [x] Flag answers that cite sources not in the retrieved chunks. *`backend/citations.py`; the API and UI report `ok` / `page_not_retrieved` / `unknown_source`.*
+- [x] Cache by (question, mode, store version). *Also keyed by k, model and temperature; failures never cached; "Fresh answer" bypasses it.*
+- [x] Re-evaluate the fine-tuning question using these numbers (see [Model strategy](#model-strategy)).
 
-**Done when:** each retrieval or prompt change shows up as a number in an eval report.
+**Done when:** each retrieval or prompt change shows up as a number in an eval report. *Met: `python -m eval.run` regenerates the reports, and CI guards the cheap configurations.*
+
+### What Phase 4 found (real textbooks, 33 answerable questions)
+
+| | hit@3 | MRR | ms/query |
+|---|---:|---:|---:|
+| old keyword scorer | 64% | 0.58 | 75 |
+| BM25 | 82% | 0.71 | 0.3 |
+| vector search only (Phase 1 baseline) | 82% | 0.78 | 3 |
+| **hybrid + v2 chunks (new default)** | **94%** | 0.78 | 3.5 |
+| + cross-encoder reranker | 94% | 0.86 | 337 |
+
+- The default is **+12 points at hit@3 (95% interval +3 to +24)**. It is the only change whose interval excludes zero. MRR and hit@1 are unchanged within noise.
+- **Surprises worth keeping:** v2 chunking alone *hurts* MRR (-0.12); hybrid with the non-semantic hashing embedder is *worse* than BM25 alone; the original keyword fallback was 18 points worse and 250 times slower than BM25; and several of my first hypotheses (chunk size, page attribution) were tested and ruled out.
+- **The evaluation itself needed fixing twice:** the first phrase-in-chunk labels depended on chunk boundaries (valid neighbouring chunks counted as misses), and a label audit added 11 valid alternative passages. Both are disclosed in `eval/README.md`, which also lists the caveats (small n, one labeller, tuned on what it measures).
+- **Remaining failures (2 of 33)** are paraphrases the embedder confuses ("added *last*" retrieves *queue* passages).
+- **Not done, deliberately:** a "no good match" threshold (unanswerable questions score far lower, AUROC 1.0, but 6 examples cannot set a threshold), and answer-faithfulness measurement (needs a model and a key).
 
 ## Phase 5: Product extras (deferred, post-v1)
 Out of scope for the portfolio v1. Possible later work:

@@ -23,6 +23,7 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+from .chunking import CHUNKER_VERSION
 from .document_processor import build_chunks_from_input, discover_inputs
 from .embeddings import Embedder, get_embedder, get_embedder_by_name
 from .vector_store import VectorStore, chunk_hash
@@ -102,7 +103,9 @@ def index_inputs(
         except OSError as e:
             report.failed[key] = f"cannot read file: {e}"
             continue
-        if existing is not None and (is_url(inp) and not refresh_urls or fp is not None and existing.get("fingerprint") == fp):
+        # A source indexed with an older chunker is re-processed even if the file is unchanged.
+        current = existing is not None and existing.get("chunker") == CHUNKER_VERSION
+        if current and (is_url(inp) and not refresh_urls or fp is not None and existing.get("fingerprint") == fp):
             report.skipped.append(key)
             continue
 
@@ -135,6 +138,7 @@ def index_inputs(
             report.chunks_added += store.add(new_chunks, vectors, key, fp)
         else:
             store.add([], np.zeros((0, 0), dtype=np.float32), key, fp)
+        store.sources[key]["chunker"] = CHUNKER_VERSION
         report.indexed.append(key)
     return report
 

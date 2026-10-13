@@ -35,17 +35,8 @@ class BaseSource(ABC):
     def get_metadata(self) -> Dict[str, Any]:
         pass
 
-    # Shared helper: conservative text chunking
-    def chunk_text(self, text: str, chunk_size: int = 800, overlap: int = 160) -> List[str]:
-        chunks: List[str] = []
-        start = 0
-        tlen = len(text)
-        while start < tlen:
-            end = min(start + chunk_size, tlen)
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-            if end == tlen:
-                break
-            start = max(0, end - overlap)
-        return chunks
+    # Shared helper: structure-aware chunking (sentences, headings, whole code blocks), see backend/chunking.py
+    def chunk_text(self, text: str, max_chars: int = 900) -> List[str]:
+        from ..chunking import chunk_document
+
+        return chunk_document(text, max_chars=max_chars)

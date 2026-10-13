@@ -16,6 +16,7 @@ class Chunk(BaseModel):
     text: str
     doc: str
     page: Optional[int] = None
+    end_page: Optional[int] = Field(None, description="Set when the passage runs onto the next page of a PDF (so it spans page..end_page)")
     score: float
     url: Optional[str] = None
     citation_url: Optional[str] = Field(None, description="Deep link to the cited spot (for example a YouTube timestamp) when available")
@@ -84,6 +85,16 @@ class DeleteResult(BaseModel):
 
 
 # ---------------------------------------------------------------- ask
+class CitationCheck(BaseModel):
+    label: str = Field(description="The citation as the model wrote it, e.g. 'Dsa.pdf (page 12)'")
+    doc: str
+    page: Optional[int] = None
+    status: Literal["ok", "page_not_retrieved", "unknown_source"] = Field(
+        description="ok: among the retrieved passages. page_not_retrieved: that document was retrieved, but not this page. "
+        "unknown_source: that document was not retrieved at all (possibly invented)."
+    )
+
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
     k: int = Field(3, ge=1, le=20, description="Number of chunks to retrieve")
@@ -91,6 +102,7 @@ class AskRequest(BaseModel):
     model: Optional[str] = Field(None, max_length=100)
     temperature: float = Field(0.2, ge=0.0, le=1.0)
     include_prompt: bool = False
+    no_cache: bool = Field(False, description="Skip the answer cache and ask the model again")
 
 
 class AskResponse(BaseModel):
@@ -98,6 +110,10 @@ class AskResponse(BaseModel):
     chunks: List[Chunk]
     model: Optional[str] = None
     prompt: Optional[str] = None
+    citations: List[CitationCheck] = Field(description="Citations found in the answer, each checked against the retrieved passages")
+    unverified_citations: int = Field(description="How many citations are not among the retrieved passages")
+    uncited: bool = Field(description="True when passages were retrieved and the answer is long but cites none of them")
+    cached: bool = Field(description="True when this answer came from the cache instead of a new model call")
 
 
 class Models(BaseModel):
@@ -314,6 +330,10 @@ class SseToken(BaseModel):
 
 class SseDone(BaseModel):
     model: Optional[str] = None
+    citations: List[CitationCheck]
+    unverified_citations: int
+    uncited: bool
+    cached: bool
 
 
 class SseError(BaseModel):

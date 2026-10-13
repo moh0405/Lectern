@@ -30,3 +30,10 @@ describe("ChunkCard", () => {
     expect([scoreTone(0.8), scoreTone(0.4), scoreTone(0.1)]).toEqual(["good", "mid", "low"]);
   });
 });
+
+describe("ChunkCard page labels", () => {
+  it("shows a page range when the passage spans two pages", () => {
+    render(<ChunkCard chunk={{ ...base, page: 132, end_page: 133 }} query="heap" />);
+    expect(screen.getByText(/pages 132–133/)).toBeInTheDocument();
+  });
+});

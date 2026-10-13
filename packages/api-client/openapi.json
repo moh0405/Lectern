@@ -255,6 +255,12 @@
             ],
             "title": "Model"
           },
+          "no_cache": {
+            "default": false,
+            "description": "Skip the answer cache and ask the model again",
+            "title": "No Cache",
+            "type": "boolean"
+          },
           "question": {
             "maxLength": 2000,
             "minLength": 3,
@@ -281,11 +287,24 @@
             "title": "Answer",
             "type": "string"
           },
+          "cached": {
+            "description": "True when this answer came from the cache instead of a new model call",
+            "title": "Cached",
+            "type": "boolean"
+          },
           "chunks": {
             "items": {
               "$ref": "#/components/schemas/Chunk"
             },
             "title": "Chunks",
+            "type": "array"
+          },
+          "citations": {
+            "description": "Citations found in the answer, each checked against the retrieved passages",
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
             "type": "array"
           },
           "model": {
@@ -309,11 +328,25 @@
               }
             ],
             "title": "Prompt"
+          },
+          "uncited": {
+            "description": "True when passages were retrieved and the answer is long but cites none of them",
+            "title": "Uncited",
+            "type": "boolean"
+          },
+          "unverified_citations": {
+            "description": "How many citations are not among the retrieved passages",
+            "title": "Unverified Citations",
+            "type": "integer"
           }
         },
         "required": [
           "answer",
-          "chunks"
+          "chunks",
+          "citations",
+          "unverified_citations",
+          "uncited",
+          "cached"
         ],
         "title": "AskResponse",
         "type": "object"
@@ -355,6 +388,19 @@
             "title": "Doc",
             "type": "string"
           },
+          "end_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Set when the passage runs onto the next page of a PDF (so it spans page..end_page)",
+            "title": "End Page"
+          },
           "page": {
             "anyOf": [
               {
@@ -394,6 +440,48 @@
           "score"
         ],
         "title": "Chunk",
+        "type": "object"
+      },
+      "CitationCheck": {
+        "properties": {
+          "doc": {
+            "title": "Doc",
+            "type": "string"
+          },
+          "label": {
+            "description": "The citation as the model wrote it, e.g. 'Dsa.pdf (page 12)'",
+            "title": "Label",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "status": {
+            "description": "ok: among the retrieved passages. page_not_retrieved: that document was retrieved, but not this page. unknown_source: that document was not retrieved at all (possibly invented).",
+            "enum": [
+              "ok",
+              "page_not_retrieved",
+              "unknown_source"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "doc",
+          "status"
+        ],
+        "title": "CitationCheck",
         "type": "object"
       },
       "Cleared": {
@@ -1451,6 +1539,17 @@
       },
       "SseDone": {
         "properties": {
+          "cached": {
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "model": {
             "anyOf": [
               {
@@ -1462,8 +1561,22 @@
             ],
             "default": null,
             "title": "Model"
+          },
+          "uncited": {
+            "title": "Uncited",
+            "type": "boolean"
+          },
+          "unverified_citations": {
+            "title": "Unverified Citations",
+            "type": "integer"
           }
         },
+        "required": [
+          "citations",
+          "unverified_citations",
+          "uncited",
+          "cached"
+        ],
         "title": "SseDone",
         "type": "object"
       },
@@ -2197,7 +2310,7 @@
     },
     "/api/v1/ask/stream": {
       "post": {
-        "description": "Same input as `/ask`. The response is `text/event-stream` with these events, in order:\n\n- `meta`: `{chunks, prompt?}` (retrieved context, sent first)\n- `token`: `{text}` (zero or more answer fragments)\n- `done`: `{model}` (end of a successful answer)\n- `error`: `{code, message}` (terminal; `code` is `llm_unavailable`, `llm_error` or `retrieval_error`)",
+        "description": "Same input as `/ask`. The response is `text/event-stream` with these events, in order:\n\n- `meta`: `{chunks, prompt?}` (retrieved context, sent first)\n- `token`: `{text}` (zero or more answer fragments)\n- `done`: `{model, citations, unverified_citations, uncited, cached}` (end of a successful answer; the citations are checked against the retrieved passages)\n- `error`: `{code, message}` (terminal; `code` is `llm_unavailable`, `llm_error` or `retrieval_error`)",
         "operationId": "ask_stream_api_v1_ask_stream_post",
         "requestBody": {
           "content": {
