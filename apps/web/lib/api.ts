@@ -1,5 +1,9 @@
 import { createApiClient, ApiError } from "@ai-study-mentor/api-client";
 
+/**
+ * Where the browser sends API calls. Locally this is the FastAPI server itself; on the hosted app it is
+ * "/api/backend", a server-side proxy that holds the API key (see lib/backend-proxy.ts).
+ */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /** One typed client for the whole app. */
