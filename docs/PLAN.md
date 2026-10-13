@@ -153,11 +153,12 @@ Originally deferred; done after v1's core because the user asked for it. **Accou
 **Done when:** each feature has API tests, frontend tests and a browser test. *Met (see `docs/phases/phase-5-study-tools.md`).*
 
 ## Phase 6: Deploy and operate (3–4 days)
-- [ ] Backend Dockerfile deployed to a container host (Cloud Run, Fly or Render); frontend on Vercel.
-- [ ] Secrets in the host's secret store; a Gemini spend cap; rate limiting.
-- [ ] Structured logging and a health/readiness endpoint.
-- [ ] Preview deployments per PR.
-- [ ] A live demo link in the README.
+- [x] Backend Dockerfile (CPU torch, model baked in, non-root). **Deviation:** deployed to AWS Lambda (container image + Function URL), not Cloud Run/Fly/Render, because a cloud-provider portfolio piece was wanted. App Runner was tried first and is not enabled on the account; EC2 was ruled out as an always-on cost. See `docs/AWS.md`.
+- [x] State in S3 (index and study database), restored at start and saved after changes; secrets in Secrets Manager; infrastructure as Terraform (`infra/`); monthly budget alert ($15).
+- [ ] Frontend on Vercel, pointed at the API (add its origin to `CORS_ORIGINS`).
+- [ ] A hard Gemini spend cap and an API key on the public endpoint. Known gap: the function cannot be capped at one copy on this account, so overlapping writes can race.
+- [ ] CI deploy on merge (GitHub Actions with OIDC, no stored AWS keys); preview deployments per PR.
+- [ ] A live demo link in the README (deliberately not published until the endpoint is protected).
 
 ## Phase 7: Docs and release
 - [ ] Fill in `docs/ARCHITECTURE.md`; add an API guide and a contributor guide.

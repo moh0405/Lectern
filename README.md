@@ -88,7 +88,8 @@ How the pieces fit:
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-d), hashing fallback | Meaning as vectors |
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
-| Quality | pytest (318), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
+| Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
+| Quality | pytest (331), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -124,6 +125,38 @@ Streaming events from `POST /ask/stream`: `meta` (retrieved passages) → `token
 
 ---
 
+## Deployed on AWS
+
+The API runs in the cloud as a **container on AWS Lambda**, with its state in **S3**, infrastructure written as **Terraform**, and a spend alert on the account. The web app is still run locally; hosting it is the next step.
+
+```mermaid
+flowchart LR
+  Dev[docker build + push] --> ECR[(ECR<br/>image registry)]
+  ECR --> L
+  U[Browser / curl] -->|HTTPS| FU[Lambda Function URL<br/>streams answers]
+  FU --> L[Lambda<br/>FastAPI + MiniLM, 2 GB]
+  L <-->|restore at start,<br/>save after changes| S3[(S3<br/>index + study.db)]
+  L -->|reads key at start| SM[Secrets Manager]
+  L --> G[Gemini]
+  B[AWS Budgets] -.->|email alert| Me[Owner]
+```
+
+| AWS service | Why it is here |
+|---|---|
+| **Lambda** (container image) | Runs the API only while a request is handled, so there is no idle server bill. A Function URL gives it public HTTPS and streams answers token by token. |
+| **S3** | Container disks are wiped on restart; the search index and the flashcard/progress database are restored from S3 at start and saved back after changes. Private, encrypted, versioned. |
+| **ECR** | Holds the Docker image (CPU-only PyTorch, the MiniLM model baked in so there is no download at runtime). |
+| **Secrets Manager** | Holds the Gemini API key; it never appears in the image, the repo or Terraform state. |
+| **IAM** | One least-privilege role: write logs, use its own bucket prefix, read its own secret. |
+| **Budgets** | A monthly spend alert ($15) by email. |
+| **Terraform** | The whole setup is one reviewable file (`infra/main.tf`); `terraform destroy` removes it. |
+
+Measured on the live deployment: a cold start takes about 23 s (loading the model and restoring the index), a warm request about 0.13 s, peak memory about 970 MB of 2 GB. The estimated cost is about $1 a month (AWS list prices, not yet checked against a bill).
+
+Honest limits: Lambda can run several copies at once and this account's quota does not allow capping it at one, so overlapping writes to the study database could overwrite each other (fine for one person, not for many). The endpoint is public with only rate limiting in front, so its address is deliberately not published here. There is no automatic deploy from GitHub yet. Full explanation, including a first attempt on App Runner that this account could not use: [`docs/AWS.md`](docs/AWS.md).
+
+---
+
 ## Quick start
 
 Requires Python 3.10+, Node 20+, and a [Gemini API key](https://aistudio.google.com/) (or an OpenAI-compatible endpoint, see `LLM_PROVIDER`) for generated answers (retrieval, LeetCode, math and the embedding map work without one).
@@ -155,6 +188,7 @@ Everything else (configuration, CLI tools, data directory, troubleshooting): [`d
 This project was built to be understood. The docs teach each technology from first principles, using real numbers from this repo.
 
 - **[Docs index](docs/README.md)**: reading order
+- **[AWS deployment](docs/AWS.md)**: what runs in the cloud, why, what it costs, how to operate it
 - **[Phase by phase](docs/phases/README.md)**: how the project was built and what each stage taught
 - **Concepts**: [RAG](docs/concepts/01-rag.md) · [Embeddings](docs/concepts/02-embeddings.md) · [Vector databases](docs/concepts/03-vector-databases.md) · [Search and ranking](docs/concepts/04-search-and-ranking.md) · [Chunking](docs/concepts/05-chunking.md) · [LLMs and prompting](docs/concepts/06-llms-and-prompting.md) · [Backend stack](docs/concepts/07-backend-stack.md) · [Evaluation](docs/concepts/08-evaluation.md) · [Frontend stack](docs/concepts/09-frontend-stack.md) · [Testing and CI](docs/concepts/10-testing-and-ci.md) · [Glossary](docs/concepts/11-glossary.md) · [Spaced repetition and LLM providers](docs/concepts/12-study-features.md)
 
@@ -167,13 +201,16 @@ packages/api-client/   OpenAPI schema + generated TypeScript client + SSE reader
 eval/            retrieval evaluation: corpora, questions, metrics, committed reports
 tests/           pytest suite, scripted model, e2e API server
 scripts/         OpenAPI export, preprocessing, demo server
+infra/           Terraform for the AWS deployment
+Dockerfile       the API image (also what Lambda runs)
 docs/            architecture, concepts, phases, API, plan
 ```
 
 ## Status and honest limits
 
-Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Planned: deployment (Phase 6) and release polish (Phase 7); see [`docs/PLAN.md`](docs/PLAN.md).
+Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Phase 6 (deployment) is partly done: the API is live on AWS, while the hosted web app, automatic deploys and extra hardening are next. Phase 7 is release polish; see [`docs/PLAN.md`](docs/PLAN.md).
 
+- The AWS deployment is a single-user demo design: study data is a SQLite file synced through S3, not a database that several users can write to at once.
 - Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).
 - Exact search is right up to roughly 100k passages; beyond that you would want an approximate index.
 - Evaluation measures retrieval, not whether a generated claim is faithful to its source; citation checks catch invented sources only.

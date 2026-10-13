@@ -11,7 +11,7 @@ The project began as a hackathon prototype (a Streamlit app calling Gemini over 
 | 3 | the TypeScript/Next.js frontend | #13 | [phase-3-frontend.md](phase-3-frontend.md) |
 | 4 | answer quality: evaluation, hybrid search, chunking, citation checks | #14 | [phase-4-retrieval-quality.md](phase-4-retrieval-quality.md) |
 | 5 | study tools: flashcards (SM-2), LeetCode progress and plan, server-side history, LLM providers | #16 | [phase-5-study-tools.md](phase-5-study-tools.md) |
-| 6 | deploy and operate | open | issue #8 |
+| 6 | deploy and operate: the API on AWS Lambda, S3, ECR, Terraform (hosted web app, CI deploy and hardening still open) | #17 (partial) | [../AWS.md](../AWS.md), issue #8 |
 | 7 | docs and v1.0 release | open | issue #9 |
 
 Every write-up has the same shape: **goal, what was built, how it works, technologies, decisions and trade-offs, bugs found, result.** Technologies are explained in depth in [../concepts/](../concepts/).
