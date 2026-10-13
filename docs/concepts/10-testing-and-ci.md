@@ -4,7 +4,7 @@
 
 | Layer | Tool | Where | What it covers |
 |---|---|---|---|
-| Unit | **pytest** | `tests/test_*.py` (331 tests) | chunking, BM25, fusion, stemmer, citations, vector store, indexer, cache, safe math, eval metrics |
+| Unit | **pytest** | `tests/test_*.py` (340 tests) | chunking, BM25, fusion, stemmer, citations, vector store, indexer, cache, safe math, eval metrics |
 | API | pytest + FastAPI `TestClient` | `tests/test_api*.py` | every route, the error format, auth, rate limits, upload validation |
 | Frontend unit/component | **Vitest** + Testing Library (jsdom) | `apps/web/**/*.test.ts(x)` | reducer, helpers, components |
 | End to end | **Playwright** (real Chromium) | `apps/web/e2e/*.spec.ts` | real web app + real API, user flows |

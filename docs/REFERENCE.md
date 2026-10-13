@@ -636,7 +636,7 @@ The canned-answer "Demo Mode" from the original Streamlit app was not carried ov
 
 Documented honestly so you know what to expect. These come from reading the code, not from a test run.
 
-- **Tests and evaluation exist but have limits**: 331 backend tests, frontend unit tests, browser tests and a retrieval evaluation (small sample, one labeller). Answer faithfulness is not measured.
+- **Tests and evaluation exist but have limits**: 340 backend tests, frontend unit tests, browser tests and a retrieval evaluation (small sample, one labeller). Answer faithfulness is not measured.
 - **Type checking is non-blocking in CI**: the optional-import pattern produces about 30 mypy errors.
 - **Retrieval is good, not solved**: on the real-textbook evaluation 2 of 33 questions still miss (paraphrases where "last" and "first" look alike to the embedder). The evaluation is small, so every claim carries an interval, and it measures retrieval only, not whether the model's answer is faithful. Answer faithfulness is unmeasured; citation checking catches invented sources, not misattributed claims.
 - **PDF extraction quality varies**: some pages come out garbled (math or code fonts); `fonttools` helps but does not fix everything.
