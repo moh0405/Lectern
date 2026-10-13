@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1060" viewBox="0 0 1600 1060" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9fb0e6"/></marker><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a1f3d"/><stop offset="1" stop-color="#0a0e1a"/></linearGradient></defs>
+<rect width="1600" height="1060" fill="url(#g)"/>
+<text x="44" y="52" font-size="30" font-weight="800" fill="#e6e9f2">AI Study Mentor</text>
+<text x="44" y="80" font-size="16" fill="#95a0bd">Architecture: a RAG tutor with hybrid retrieval, checked citations and a typed full-stack client</text>
+<rect x="20" y="104" width="1560" height="236" rx="16" fill="none" stroke="#2a3558" stroke-width="1" stroke-dasharray="3 6"/>
+<text x="44" y="134" font-size="15" font-weight="700" letter-spacing="1.2" fill="#38bdf8">1 · INDEXING  (when you add material)</text>
+<rect x="44" y="140" width="170" height="42" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="129.0" y="167.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">PDF</text>
+<rect x="44" y="190" width="170" height="42" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="129.0" y="217.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">YouTube</text>
+<rect x="44" y="240" width="170" height="42" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="129.0" y="267.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Web / GitHub</text>
+<rect x="44" y="290" width="170" height="42" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="129.0" y="317.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Audio</text>
+<rect x="260" y="170" width="190" height="100" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="355.0" y="210.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Extract text</text>
+<text x="355.0" y="232.0" text-anchor="middle" font-size="13" fill="#95a0bd">one handler per</text>
+<text x="355.0" y="249.0" text-anchor="middle" font-size="13" fill="#95a0bd">source type</text>
+<rect x="490" y="170" width="240" height="100" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="610.0" y="210.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Chunk  (v2)</text>
+<text x="610.0" y="232.0" text-anchor="middle" font-size="13" fill="#95a0bd">sentences, headings, code</text>
+<text x="610.0" y="249.0" text-anchor="middle" font-size="13" fill="#95a0bd">blocks; boilerplate stripped</text>
+<rect x="770" y="170" width="210" height="100" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="875.0" y="210.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Embed</text>
+<text x="875.0" y="232.0" text-anchor="middle" font-size="13" fill="#95a0bd">MiniLM · 384-d vectors</text>
+<text x="875.0" y="249.0" text-anchor="middle" font-size="13" fill="#95a0bd">cached by chunk hash</text>
+<rect x="1020" y="148" width="280" height="64" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="1160.0" y="170.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">VectorStore</text>
+<text x="1160.0" y="192.0" text-anchor="middle" font-size="13" fill="#95a0bd">chunks.jsonl · embeddings.npy · manifest</text>
+<rect x="1020" y="232" width="280" height="56" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="1160.0" y="250.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">BM25 index</text>
+<text x="1160.0" y="272.0" text-anchor="middle" font-size="13" fill="#95a0bd">in memory, rebuilt on change</text>
+<rect x="1340" y="148" width="220" height="140" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="1450.0" y="208.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Background jobs</text>
+<text x="1450.0" y="230.0" text-anchor="middle" font-size="13" fill="#95a0bd">content fingerprints</text>
+<text x="1450.0" y="247.0" text-anchor="middle" font-size="13" fill="#95a0bd">incremental re-index</text>
+<text x="1450.0" y="264.0" text-anchor="middle" font-size="13" fill="#95a0bd">progress polling</text>
+<line x1="214" y1="220" x2="260" y2="220" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="450" y1="220" x2="490" y2="220" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="730" y1="220" x2="770" y2="220" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="980" y1="200" x2="1020" y2="180" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="980" y1="240" x2="1020" y2="258" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="214" y1="161" x2="260" y2="193.0" stroke="#5b6aa8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="214" y1="211" x2="260" y2="201.0" stroke="#5b6aa8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="214" y1="261" x2="260" y2="209.0" stroke="#5b6aa8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="214" y1="311" x2="260" y2="217.0" stroke="#5b6aa8" stroke-width="2" marker-end="url(#a)"/>
+<rect x="20" y="360" width="1560" height="300" rx="16" fill="none" stroke="#2a3558" stroke-width="1" stroke-dasharray="3 6"/>
+<text x="44" y="390" font-size="15" font-weight="700" letter-spacing="1.2" fill="#34d399">2 · ANSWERING  (every question)</text>
+<rect x="44" y="440" width="170" height="64" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="129.0" y="462.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Question</text>
+<text x="129.0" y="484.0" text-anchor="middle" font-size="13" fill="#95a0bd">+ study mode, k</text>
+<rect x="260" y="396" width="230" height="64" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="375.0" y="418.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Vector search</text>
+<text x="375.0" y="440.0" text-anchor="middle" font-size="13" fill="#95a0bd">cosine similarity</text>
+<rect x="260" y="490" width="230" height="64" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="375.0" y="512.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">BM25 search</text>
+<text x="375.0" y="534.0" text-anchor="middle" font-size="13" fill="#95a0bd">exact terms, rare words</text>
+<rect x="540" y="440" width="240" height="76" rx="12" fill="#11172a" stroke="#34d399" stroke-width="1.5"/>
+<text x="660.0" y="468.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Fuse</text>
+<text x="660.0" y="490.0" text-anchor="middle" font-size="13" fill="#95a0bd">reciprocal rank fusion</text>
+<text x="660.0" y="507.0" text-anchor="middle" font-size="13" fill="#95a0bd">hybrid only if embeddings are semantic</text>
+<rect x="830" y="440" width="210" height="76" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="935.0" y="468.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Prompt</text>
+<text x="935.0" y="490.0" text-anchor="middle" font-size="13" fill="#95a0bd">study mode + passages</text>
+<text x="935.0" y="507.0" text-anchor="middle" font-size="13" fill="#95a0bd">labelled [doc (page N)]</text>
+<rect x="1090" y="440" width="210" height="76" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="1195.0" y="468.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Gemini</text>
+<text x="1195.0" y="490.0" text-anchor="middle" font-size="13" fill="#95a0bd">streamed over SSE</text>
+<rect x="1340" y="396" width="220" height="64" rx="12" fill="#11172a" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="1450.0" y="418.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Check citations</text>
+<text x="1450.0" y="440.0" text-anchor="middle" font-size="13" fill="#95a0bd">each [doc (page)] vs passages</text>
+<rect x="1340" y="490" width="220" height="64" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="1450.0" y="512.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Cache + analytics</text>
+<text x="1450.0" y="534.0" text-anchor="middle" font-size="13" fill="#95a0bd">keyed by index version</text>
+<line x1="214" y1="472" x2="260" y2="428" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="214" y1="472" x2="260" y2="522" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="490" y1="428" x2="540" y2="470" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="490" y1="522" x2="540" y2="490" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="780" y1="478" x2="830" y2="478" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="1040" y1="478" x2="1090" y2="478" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="1300" y1="470" x2="1340" y2="430" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="1300" y1="490" x2="1340" y2="520" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1160 212 L1160 231" fill="none" stroke="#5b6aa8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<path d="M1020 180 C 900 330, 700 330, 380 396" fill="none" stroke="#5b6aa8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<path d="M1020 262 C 900 340, 700 400, 380 490" fill="none" stroke="#5b6aa8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="640" y="618" text-anchor="middle" font-size="13" fill="#95a0bd">optional cross-encoder reranker (opt-in): better top-1, ~100x slower</text>
+<text x="640" y="600" text-anchor="middle" font-size="13" fill="#95a0bd">top 3 passages go to the prompt</text>
+<rect x="20" y="680" width="1560" height="360" rx="16" fill="none" stroke="#2a3558" stroke-width="1" stroke-dasharray="3 6"/>
+<text x="44" y="710" font-size="15" font-weight="700" letter-spacing="1.2" fill="#6d5de8">3 · THE PRODUCT</text>
+<rect x="44" y="720" width="330" height="150" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="209.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">FastAPI  /api/v1</text>
+<text x="209.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">26 routes: sources · jobs · ask (+stream)</text>
+<text x="209.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">search · tutor tools · LeetCode · notes</text>
+<text x="209.0" y="841.0" text-anchor="middle" font-size="13" fill="#95a0bd">export · analytics · embedding map</text>
+<rect x="420" y="740" width="210" height="110" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
+<text x="525.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">OpenAPI schema</text>
+<text x="525.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">single source of truth,</text>
+<text x="525.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">checked in CI</text>
+<rect x="680" y="740" width="230" height="110" rx="12" fill="#11172a" stroke="#38bdf8" stroke-width="1.5"/>
+<text x="795.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Typed TS client</text>
+<text x="795.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">generated types, SSE reader,</text>
+<text x="795.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">ApiError with server codes</text>
+<rect x="960" y="720" width="600" height="150" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
+<text x="1260.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Next.js app  (React 19, TypeScript strict, Tailwind)</text>
+<text x="1260.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">Ask · Sources · LeetCode · Tutor tools · Math</text>
+<text x="1260.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">Embedding map (3D) · Analytics · Ctrl/⌘+K palette</text>
+<text x="1260.0" y="841.0" text-anchor="middle" font-size="13" fill="#95a0bd">TanStack Query · React Flow · Plotly · KaTeX</text>
+<line x1="374" y1="795" x2="420" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="630" y1="795" x2="680" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<line x1="910" y1="795" x2="960" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
+<rect x="44" y="900" width="1516" height="110" rx="12" fill="#11172a" stroke="#34d399" stroke-width="1.5"/>
+<text x="802.0" y="945.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Quality gates (all in CI)</text>
+<text x="802.0" y="967.0" text-anchor="middle" font-size="13" fill="#95a0bd">350+ automated tests: pytest · Vitest · Playwright browser tests incl. axe accessibility · retrieval evaluation with confidence intervals</text>
+<text x="802.0" y="984.0" text-anchor="middle" font-size="13" fill="#95a0bd">ruff · tsc --strict · eslint · generated-types check · Python 3.10 and 3.12 · scripted-model e2e (no API key needed)</text>
+</svg>
