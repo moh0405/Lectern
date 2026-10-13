@@ -31,7 +31,7 @@ variable "budget_email" {
 
 variable "monthly_budget_usd" {
   type    = number
-  default = 10
+  default = 15
 }
 
 variable "create_service" {
