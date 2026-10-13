@@ -201,3 +201,9 @@ node_modules/
 out/
 *.tsbuildinfo
 data/analytics.db
+
+# Terraform
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+infra/*.tfvars
