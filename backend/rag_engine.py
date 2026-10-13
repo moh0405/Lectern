@@ -302,12 +302,19 @@ class RAGEngine:
         scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
         return [self._result(item, cov) for cov, _j, item in scored[:k]]
 
+    @staticmethod
+    def source_label(chunk: Dict[str, Any]) -> str:
+        """How a passage is named in the prompt, and so how the model is likely to cite it:
+        "Dsa.pdf (page 12)", "Dsa.pdf (pages 12-13)", or just the name for sources without pages."""
+        page, end = chunk.get("page"), chunk.get("end_page")
+        if not page:
+            return str(chunk["doc"])
+        if end and end != page:
+            return f"{chunk['doc']} (pages {page}-{end})"
+        return f"{chunk['doc']} (page {page})"
+
     def format_context(self, chunks: List[Dict[str, Any]]) -> str:
-        lines = []
-        for c in chunks:
-            src = f"{c['doc']} (page {c['page']})"
-            lines.append(f"- [{src}] {c['text']}")
-        return "\n".join(lines)
+        return "\n".join(f"- [{self.source_label(c)}] {c['text']}" for c in chunks)
 
     def generate_prompt(self, question: str, chunks: List[Dict[str, Any]], mode: str | None = None) -> str:
         template = self._prompt_for_mode(mode)

@@ -78,3 +78,9 @@ def test_summary_counts_unverified_and_flags_uncited_answers():
 
 def test_works_with_no_chunks():
     assert extract_citations("[Dsa.pdf (page 12)]", [])[0].status == "unknown_source"
+
+
+@pytest.mark.parametrize("text", ["[Intro to Heaps (page None)]", "[Intro to Heaps (page n/a)]", "[Intro to Heaps (p. null)]"])
+def test_a_source_without_pages_may_be_cited_as_page_none(text):
+    # an older prompt labelled such sources "(page None)", and models copy labels; that must not look invented
+    assert [c.status for c in extract_citations(text, CHUNKS)] == ["ok"]

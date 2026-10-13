@@ -196,3 +196,21 @@ def test_bm25_index_is_rebuilt_when_the_store_changes(tmp_path, monkeypatch):
     assert eng.retrieve_context("zygomorphic")[0]["doc"] == "bio.pdf"
     eng.remove_source("bio", save=False)
     assert eng.retrieve_context("zygomorphic") == []
+
+
+def test_source_labels_match_what_a_model_should_cite(engine):
+    assert engine.source_label({"doc": "a.pdf", "page": 12}) == "a.pdf (page 12)"
+    assert engine.source_label({"doc": "a.pdf", "page": 12, "end_page": 13}) == "a.pdf (pages 12-13)"
+    assert engine.source_label({"doc": "a.pdf", "page": 12, "end_page": 12}) == "a.pdf (page 12)"
+    assert engine.source_label({"doc": "Lecture on heaps", "page": None}) == "Lecture on heaps"  # never "(page None)"
+    ctx = engine.format_context([{"doc": "notes.md", "page": None, "text": "t"}])
+    assert ctx == "- [notes.md] t" and "None" not in ctx
+
+
+def test_the_labels_in_the_prompt_are_accepted_by_the_citation_checker(engine):
+    from backend.citations import extract_citations
+
+    chunks = [{"doc": "Dsa.pdf", "page": 12, "end_page": 13, "text": "x"}, {"doc": "notes.md", "page": None, "text": "y"}]
+    prompt_labels = [engine.source_label(c) for c in chunks]
+    answer = " and ".join(f"[{label}]" for label in prompt_labels)
+    assert [c.status for c in extract_citations(answer, chunks)] == ["ok", "ok"]
