@@ -88,7 +88,7 @@ The live index holds the three textbooks in `data/uploaded_files` (3,867 chunks,
 |---|---|
 | `GET /health` after a cold start | 200, `semantic_search: true`, 3,867 chunks |
 | Cold start (steady state, model loaded) | about 23 s |
-| Very first cold start after deploying the image | 114 s, because Lambda fetches a large image lazily and this was the first run to read PyTorch |
+| Very first start after each new image is deployed | 114-125 s (seen twice), because Lambda fetches a large image lazily and this was the first run to read PyTorch |
 | Warm request | about 0.13 s for `/health` |
 | `GET /api/v1/search?query=hash table collisions` | returns real passages from the textbooks |
 | Gemini key read from Secrets Manager | works: Google accepted it and listed its models |
