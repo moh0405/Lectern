@@ -89,6 +89,16 @@ def require_api_key(request: Request) -> None:
 common_dependencies = [Depends(rate_limit), Depends(require_api_key)]
 
 
+QUOTA_MESSAGE = (
+    "The language model provider says its quota is used up (a free API key allows only a few calls per day). "
+    "Try again later."
+)
+
+
+def is_quota_error(msg: str) -> bool:
+    return "RESOURCE_EXHAUSTED" in msg or "exceeded your current quota" in msg.lower()
+
+
 def raise_if_failed(result: Dict[str, Any]) -> Dict[str, Any]:
     """Turn an {"ok": False, "error": ...} result from the LLM layer into an HTTP error."""
     if result.get("ok", True):
@@ -96,6 +106,8 @@ def raise_if_failed(result: Dict[str, Any]) -> Dict[str, Any]:
     msg = str(result.get("error") or "The language model request failed")
     if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
         raise ApiError(429, msg, code="daily_limit")
+    if is_quota_error(msg):
+        raise ApiError(429, QUOTA_MESSAGE, code="quota_exhausted")
     if "_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg:
         raise ApiError(503, msg, code="llm_unavailable")
     raise ApiError(502, msg, code="llm_error")

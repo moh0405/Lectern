@@ -4,6 +4,8 @@
 
 Full stack: Python/FastAPI backend with a hand-built vector store and hybrid search, a TypeScript/Next.js frontend, and an evaluation harness that measures every retrieval decision.
 
+**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, flashcards, progress and history are switched off because they would be shared between all visitors. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
+
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
 > **About the screenshots.** They are captured from `scripts/demo_server.py`, which runs the real API, real chunking, real MiniLM embeddings and real hybrid retrieval over a small committed corpus, but uses a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
@@ -89,7 +91,7 @@ How the pieces fit:
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (340), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (340), Vitest (84), Playwright + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -127,13 +129,14 @@ Streaming events from `POST /ask/stream`: `meta` (retrieved passages) → `token
 
 ## Deployed on AWS
 
-The API runs in the cloud as a **container on AWS Lambda**, with its state in **S3**, infrastructure written as **Terraform**, and a spend alert on the account. The web app is still run locally; hosting it is the next step.
+The API runs in the cloud as a **container on AWS Lambda**, with its state in **S3**, infrastructure written as **Terraform**, and a spend alert on the account. The web app is hosted on **Vercel** and reaches the API through a server-side proxy, so the API key never reaches a visitor's browser.
 
 ```mermaid
 flowchart LR
   Dev[docker build + push] --> ECR[(ECR<br/>image registry)]
   ECR --> L
-  U[Browser / curl] -->|HTTPS| FU[Lambda Function URL<br/>streams answers]
+  W[Browser] --> V[Vercel<br/>Next.js + proxy adds the key]
+  V -->|HTTPS + key| FU[Lambda Function URL<br/>streams answers]
   FU --> L[Lambda<br/>FastAPI + MiniLM, 2 GB]
   L <-->|restore at start,<br/>save after changes| S3[(S3<br/>index + study.db)]
   L -->|reads key at start| SM[Secrets Manager]
@@ -149,6 +152,7 @@ flowchart LR
 | **Secrets Manager** | Holds the Gemini API key; it never appears in the image, the repo or Terraform state. |
 | **IAM** | One least-privilege role: write logs, use its own bucket prefix, read its own secret. |
 | **Budgets** | A monthly spend alert ($15) by email. |
+| **Vercel** (not AWS) | Hosts the Next.js app. Its `/api/backend` route forwards calls to the API, adds the key, and only lets read and ask routes through. |
 | **API key + daily cap** | Callers must send `X-API-Key`; model calls are capped per day (counted in S3). |
 | **Terraform** | The whole setup is one reviewable file (`infra/main.tf`); `terraform destroy` removes it. |
 

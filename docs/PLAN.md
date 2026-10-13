@@ -155,10 +155,10 @@ Originally deferred; done after v1's core because the user asked for it. **Accou
 ## Phase 6: Deploy and operate (3–4 days)
 - [x] Backend Dockerfile (CPU torch, model baked in, non-root). **Deviation:** deployed to AWS Lambda (container image + Function URL), not Cloud Run/Fly/Render, because a cloud-provider portfolio piece was wanted. App Runner was tried first and is not enabled on the account; EC2 was ruled out as an always-on cost. See `docs/AWS.md`.
 - [x] State in S3 (index and study database), restored at start and saved after changes; secrets in Secrets Manager; infrastructure as Terraform (`infra/`); monthly budget alert ($15).
-- [ ] Frontend on Vercel, pointed at the API (add its origin to `CORS_ORIGINS`).
+- [x] Frontend on Vercel (`ai-study-mentor-two.vercel.app`). **Deviation:** the browser does not call the API directly; a server-side proxy adds the API key and restricts the public demo to read and ask routes (no CORS change needed). See `docs/AWS.md`.
 - [x] An API key on the public endpoint (Secrets Manager) and a daily cap on model calls (counted in S3). **Still to do:** a spend limit in Google's own billing settings. Known gap: the function cannot be capped at one copy on this account, so overlapping writes can race.
 - [ ] CI deploy on merge (GitHub Actions with OIDC, no stored AWS keys); preview deployments per PR.
-- [ ] A live demo link in the README (the endpoint is protected now; a public demo still needs a way for visitors to use it without the key, e.g. the hosted web app calling it server-side).
+- [x] A live demo link in the README.
 
 ## Phase 7: Docs and release
 - [ ] Fill in `docs/ARCHITECTURE.md`; add an API guide and a contributor guide.
