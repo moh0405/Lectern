@@ -234,3 +234,34 @@ def test_cli_pushes_and_pulls(tmp_path, cloud, monkeypatch, capsys):
     monkeypatch.setattr(settings, "study_db", dst.study_db)
     assert cs.main(["pull"]) == 0
     assert (dst.store_dir / "manifest.json").exists()
+
+
+def test_both_secrets_are_loaded_and_the_api_key_turns_on_authentication(monkeypatch, tmp_path, cloud):
+    from fastapi.testclient import TestClient
+
+    import backend.cloud_sync as cs
+    from backend.api.settings import settings
+
+    app_mod = importlib.import_module("backend.api.app")
+
+    class SM:
+        def get_secret_value(self, SecretId):
+            return {"SecretString": {"g/key": "gem", "a/key": "s3cret"}[SecretId]}
+
+    monkeypatch.setattr("boto3.client", lambda name: SM(), raising=False)
+    monkeypatch.setattr(cs, "_client", lambda: cloud)
+    for var in ("GEMINI_API_KEY", "API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("GEMINI_SECRET_ID", "g/key")
+    monkeypatch.setenv("API_KEY_SECRET_ID", "a/key")
+    monkeypatch.setattr(settings, "api_key", None)
+    monkeypatch.setattr(settings, "s3_bucket", "b")
+    monkeypatch.setattr(settings, "store_dir", tmp_path / "s")
+    monkeypatch.setattr(settings, "study_db", tmp_path / "d.db")
+    monkeypatch.setattr(app_mod, "make_engine", lambda: type("E", (), {"warm": lambda self: None, "semantic_ready": False, "store": []})())
+    with TestClient(app_mod.create_app()) as client:
+        assert client.get("/api/v1/stats").status_code == 401
+        assert client.get("/api/v1/stats", headers={"X-API-Key": "wrong"}).status_code == 401
+        assert client.get("/health").status_code == 200  # liveness stays open
+        assert os.environ["GEMINI_API_KEY"] == "gem"
+    monkeypatch.setattr(settings, "api_key", None)

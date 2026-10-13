@@ -7,6 +7,7 @@ Docs:  /docs (Swagger UI), /redoc, /openapi.json
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
@@ -37,6 +38,8 @@ async def lifespan(app: FastAPI):
         from ..cloud_sync import ON_LAMBDA, S3Sync, load_secret_env
 
         await run_in_threadpool(load_secret_env)
+        if not settings.api_key:  # settings were read at import, before the secret was fetched
+            settings.api_key = os.getenv("API_KEY") or None
 
         sync = S3Sync(settings.s3_bucket, settings.s3_prefix, settings.store_dir, settings.study_db)
         await run_in_threadpool(sync.pull)  # before the engine loads the index

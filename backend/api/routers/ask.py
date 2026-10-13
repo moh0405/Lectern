@@ -154,6 +154,8 @@ def ask_stream(
         except Exception as e:
             msg = str(e)
             code = "llm_unavailable" if ("_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg) else "llm_error"
+            if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
+                code = "daily_limit"
             _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return

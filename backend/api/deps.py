@@ -94,6 +94,8 @@ def raise_if_failed(result: Dict[str, Any]) -> Dict[str, Any]:
     if result.get("ok", True):
         return result
     msg = str(result.get("error") or "The language model request failed")
+    if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
+        raise ApiError(429, msg, code="daily_limit")
     if "_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg:
         raise ApiError(503, msg, code="llm_unavailable")
     raise ApiError(502, msg, code="llm_error")
