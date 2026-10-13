@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const askStream = vi.fn();
 const httpGet = vi.fn();
+const httpPost = vi.fn();
+const httpDelete = vi.fn();
 vi.mock("@/lib/api", async () => {
   class ApiError extends Error {
     constructor(
@@ -15,7 +17,7 @@ vi.mock("@/lib/api", async () => {
     }
   }
   return {
-    api: { askStream: (...a: unknown[]) => askStream(...a), http: { GET: (...a: unknown[]) => httpGet(...a) } },
+    api: { askStream: (...a: unknown[]) => askStream(...a), http: { GET: (...a: unknown[]) => httpGet(...a), POST: (...a: unknown[]) => httpPost(...a), DELETE: (...a: unknown[]) => httpDelete(...a) } },
     ApiError,
     unwrap: (r: { data?: unknown; error?: unknown }) => {
       if (r.error !== undefined || r.data === undefined) throw new ApiError(500, "x", "failed");
@@ -38,6 +40,8 @@ async function* events(...evs: object[]) {
 beforeEach(() => {
   askStream.mockReset();
   httpGet.mockReset();
+  httpPost.mockReset();
+  httpDelete.mockReset();
   localStorage.clear();
 });
 
@@ -196,5 +200,62 @@ describe("useAskSession", () => {
     });
     act(() => result.current.clear());
     expect(result.current.turns).toEqual([]);
+  });
+
+  describe("server-side history", () => {
+    const finish = () => askStream.mockImplementation(() => events({ event: "token", data: { text: "A heap." } }, { event: "done", data: { model: "m" } }));
+
+    it("saves a finished turn on the server, and deleting it there too", async () => {
+      finish();
+      httpPost.mockResolvedValue({ data: { id: 41 } });
+      const { result } = renderHook(() => useAskSession());
+      await act(async () => {
+        await result.current.ask(params);
+      });
+      await waitFor(() => expect(httpPost).toHaveBeenCalledTimes(1));
+      expect(httpPost.mock.calls[0]![0]).toBe("/api/v1/history");
+      expect(httpPost.mock.calls[0]![1].body).toMatchObject({ question: "what is a heap", answer: "A heap.", model: "m" });
+      const id = result.current.turns[0]!.id;
+      await act(async () => result.current.remove(id));
+      expect(httpDelete).toHaveBeenCalledWith("/api/v1/history/{turn_id}", { params: { path: { turn_id: 41 } } });
+    });
+
+    it("does not save the same turn twice, nor retrieval-only lookups", async () => {
+      finish();
+      httpPost.mockResolvedValue({ data: { id: 1 } });
+      httpGet.mockResolvedValue({ data: { chunks: [chunk] } });
+      const { result } = renderHook(() => useAskSession());
+      await act(async () => {
+        await result.current.ask({ ...params, retrievalOnly: true });
+      });
+      await act(async () => {
+        await result.current.ask(params);
+      });
+      await waitFor(() => expect(httpPost).toHaveBeenCalledTimes(1));
+    });
+
+    it("restores history from the server when this browser has none", async () => {
+      httpGet.mockResolvedValue({ data: { turns: [{ id: 7, ts: 1, question: "old q", answer: "old a", chunks: [], citations: [], cached: false, uncited: false }] } });
+      const { result } = renderHook(() => useAskSession());
+      await waitFor(() => expect(result.current.turns).toHaveLength(1));
+      expect(result.current.turns[0]).toMatchObject({ id: "srv-7", question: "old q", status: "done" });
+      expect(httpPost).not.toHaveBeenCalled(); // restored turns are not saved again
+      await act(async () => result.current.remove("srv-7"));
+      expect(httpDelete).toHaveBeenCalledWith("/api/v1/history/{turn_id}", { params: { path: { turn_id: 7 } } });
+    });
+
+    it("keeps working when the server is unreachable", async () => {
+      finish();
+      httpGet.mockRejectedValue(new TypeError("down"));
+      httpPost.mockRejectedValue(new TypeError("down"));
+      httpDelete.mockRejectedValue(new TypeError("down"));
+      const { result } = renderHook(() => useAskSession());
+      await act(async () => {
+        await result.current.ask(params);
+      });
+      expect(result.current.turns[0]!.status).toBe("done");
+      await act(async () => result.current.clear());
+      expect(result.current.turns).toHaveLength(0);
+    });
   });
 });

@@ -31,7 +31,9 @@ export type Action =
   | { type: "stop"; id: string }
   | { type: "remove"; id: string }
   | { type: "clear" }
-  | { type: "hydrate"; turns: Turn[] };
+  | { type: "hydrate"; turns: Turn[] }
+  /** Turns loaded from the server; applied only while this browser has none of its own. */
+  | { type: "restore"; turns: Turn[] };
 
 const update = (turns: Turn[], id: string, fn: (t: Turn) => Turn) => turns.map((t) => (t.id === id ? fn(t) : t));
 
@@ -66,6 +68,8 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
       return [];
     case "hydrate":
       return action.turns;
+    case "restore":
+      return turns.length === 0 ? action.turns : turns;
   }
 }
 
@@ -106,4 +110,38 @@ export function loadTurns(): Turn[] {
   } catch {
     return [];
   }
+}
+
+type SavedTurn = components["schemas"]["SavedTurn"];
+type HistoryTurn = components["schemas"]["HistoryTurn"];
+
+/** The body that saves a finished turn on the server. */
+export function toHistoryTurn(t: Turn): HistoryTurn {
+  return {
+    question: t.question,
+    answer: t.answer,
+    mode: t.mode ?? null,
+    model: t.model ?? null,
+    cached: t.cached ?? false,
+    chunks: t.chunks,
+    citations: t.citations ?? [],
+    unverified_citations: (t.citations ?? []).filter((c) => c.status !== "ok").length,
+    uncited: t.uncited ?? false,
+  };
+}
+
+/** A turn restored from the server. Ids are prefixed so they cannot collide with locally made ones. */
+export function fromSavedTurn(s: SavedTurn): Turn {
+  return {
+    id: `srv-${s.id}`,
+    question: s.question,
+    answer: s.answer ?? "",
+    mode: (s.mode as Mode | null) ?? undefined,
+    model: s.model ?? undefined,
+    cached: s.cached ?? false,
+    chunks: s.chunks ?? [],
+    citations: s.citations ?? [],
+    uncited: s.uncited ?? false,
+    status: "done",
+  };
 }
