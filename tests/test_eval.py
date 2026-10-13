@@ -86,15 +86,65 @@ class TestLabels:
 
 
 class TestRegressionFloors:
-    """Cheap, deterministic configurations on the committed corpus. Floors sit a little below today's
-    results (see eval/reports/synthetic.md) so noise does not fail CI but a real regression does."""
+    """Cheap, deterministic configurations on the committed corpus. Floors sit a little below today's results
+    (see eval/reports/synthetic.md) so noise does not fail CI but a real regression does. The neural configurations
+    need a model download and are checked by running `python -m eval.run` locally."""
 
-    def test_keyword_retrieval_floor(self):
-        res = evaluate(CORPORA["synthetic"], CONFIGS["keyword"])
+    def test_production_fallback_path_floor(self):
+        """What the app does with the non-semantic hashing embedder: v2 chunks, auto mode (= BM25)."""
+        res = evaluate(CORPORA["synthetic"], CONFIGS["default-hashing"])
         s = res["summary"]
-        assert s.hit[3] >= 0.90 and s.hit[5] >= 0.90 and s.mrr >= 0.80
+        assert s.hit[1] >= 0.75 and s.hit[3] >= 0.90 and s.hit[5] >= 0.95 and s.mrr >= 0.85
         assert s.abstain_auroc >= 0.95  # unanswerable questions score clearly lower
+
+    def test_bm25_beats_the_original_keyword_scorer(self):
+        bm25 = evaluate(CORPORA["synthetic"], CONFIGS["bm25"])["summary"]
+        old = evaluate(CORPORA["synthetic"], CONFIGS["keyword"])["summary"]
+        assert bm25.mrr > old.mrr and bm25.hit[3] >= old.hit[3]
+
+    def test_bm25_is_far_faster_than_the_original_scorer(self):
+        bm25 = evaluate(CORPORA["synthetic"], CONFIGS["bm25"])
+        old = evaluate(CORPORA["synthetic"], CONFIGS["keyword"])
+        assert bm25["query_ms"] <= old["query_ms"]
+
+    def test_auto_mode_does_not_fuse_in_a_non_semantic_embedder(self):
+        """Measured: hybrid with the hashing embedder is worse than BM25 alone, so auto must pick BM25."""
+        auto = evaluate(CORPORA["synthetic"], CONFIGS["default-hashing"])["summary"]
+        forced = evaluate(CORPORA["synthetic"], CONFIGS["hybrid-hashing-v2"])["summary"]
+        assert auto.mrr > forced.mrr
 
     def test_hashing_dense_is_not_catastrophically_broken(self):
         s = evaluate(CORPORA["synthetic"], CONFIGS["hashing-dense"])["summary"]
         assert s.hit[5] >= 0.70
+
+
+class TestBootstrap:
+    def test_clear_improvement_has_an_interval_above_zero(self):
+        from eval.metrics import paired_bootstrap
+
+        a = [0.0] * 40
+        b = [1.0] * 40
+        r = paired_bootstrap(a, b)
+        assert r["diff"] == 1.0 and r["lo"] > 0.9 and r["p_better"] == 1.0
+
+    def test_noise_straddles_zero(self):
+        from eval.metrics import paired_bootstrap
+
+        a = [1.0, 0.0] * 10
+        b = [0.0, 1.0] * 10
+        r = paired_bootstrap(a, b)
+        assert abs(r["diff"]) < 1e-9 and r["lo"] < 0 < r["hi"]
+
+    def test_one_flipped_question_out_of_many_is_not_significant(self):
+        from eval.metrics import paired_bootstrap
+
+        a = [1.0] * 30 + [0.0]
+        b = [1.0] * 30 + [1.0]
+        r = paired_bootstrap(a, b)
+        assert r["diff"] > 0 and r["lo"] <= 0  # one question is not evidence
+
+    def test_deterministic_and_handles_empty_input(self):
+        from eval.metrics import paired_bootstrap
+
+        assert paired_bootstrap([1.0, 0.0], [0.0, 1.0]) == paired_bootstrap([1.0, 0.0], [0.0, 1.0])
+        assert paired_bootstrap([], [])["diff"] == 0.0

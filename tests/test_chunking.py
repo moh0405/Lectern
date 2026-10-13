@@ -28,9 +28,11 @@ def test_chunk_text_empty_and_whitespace():
     assert chunk_text("   \n  ") == []
 
 
-def test_base_source_chunk_text_matches_pdf_chunker():
-    text = "word " * 600
-    assert _Dummy().chunk_text(text) == chunk_text(text)
+def test_base_source_chunks_on_sentence_boundaries():
+    text = " ".join(f"Sentence {i} explains topic {i} in some detail." for i in range(60))
+    chunks = _Dummy().chunk_text(text)
+    assert len(chunks) > 2
+    assert all(c.startswith("Sentence ") and c.endswith(".") for c in chunks)  # never cut mid-sentence
 
 
 def test_detect_source_urls_and_files(tmp_path):

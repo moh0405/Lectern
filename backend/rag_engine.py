@@ -1,10 +1,13 @@
 import logging
+import os
 import re
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .embeddings import DEFAULT_MODEL, Embedder, get_embedder_by_name
+from .lexical import BM25Index, reciprocal_rank_fusion
+from .rerank import Reranker, get_reranker
 from .vector_store import VectorStore
 
 logger = logging.getLogger("ai-study-mentor.rag")
@@ -48,6 +51,7 @@ class RAGEngine:
         use_embeddings: bool = True,
         embedder: Optional[Embedder] = None,
         input_dir: str = "data/uploaded_files",
+        retrieval_mode: Optional[str] = None,
     ):
         self.store_dir = str(Path(store_dir).resolve())
         self.input_dir = str(Path(input_dir).resolve())
@@ -56,6 +60,13 @@ class RAGEngine:
         self._embedder = embedder
         self._embedder_failed = False
         self._fallback_items: Optional[List[Dict[str, Any]]] = None
+        # "auto" (default): hybrid search when the index has semantic embeddings, BM25 otherwise.
+        # Or force "dense" (vector search), "bm25" (keyword ranking), "hybrid" (both, fused), or "keyword"
+        # (the original term-coverage scorer, kept only as an evaluation baseline).
+        # Override with the RETRIEVAL_MODE environment variable.
+        self.retrieval_mode = retrieval_mode or os.getenv("RETRIEVAL_MODE", "auto")
+        self._lexical_cache: Optional[tuple] = None
+        self._reranker: Optional[Reranker] = get_reranker(os.getenv("RERANKER"))
         self.store = VectorStore.load(self.store_dir)
         if auto_embeddings:
             self.warm()
@@ -210,14 +221,55 @@ class RAGEngine:
             )
         return self._create_prompt_template()
 
+    # ------------------------------------------------------------------
+    # Retrieval
+    # ------------------------------------------------------------------
+    def _lexical_index(self) -> tuple:
+        """(BM25 index, items) over the current corpus, rebuilt only when the corpus changes."""
+        items = self._docstore_iter()
+        key = (id(self.store), self.store.revision, id(items), len(items))
+        if self._lexical_cache is None or self._lexical_cache[0] != key:
+            self._lexical_cache = (key, BM25Index(i.get("text", "") for i in items), items)
+        return self._lexical_cache[1], self._lexical_cache[2]
+
+    def _bm25_retrieve(self, query: str, k: int) -> List[Dict[str, Any]]:
+        index, items = self._lexical_index()
+        return [self._result(items[i], score) for i, score in index.search(query, k)]
+
     def retrieve_context(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
-        """Top-k chunks for a query, each with its own relevance score (0..1)."""
-        embedder = self._get_embedder()
-        if embedder is not None:
-            qv = embedder.encode([query])[0]
-            hits = self.store.search(qv, k)
-            return [self._result(self.store.chunks[i], score) for i, score in hits]
-        return self._keyword_retrieve(query, k)
+        """Top-k chunks for a query, best first. `score` is each chunk's own relevance in 0..1: cosine
+        similarity when embeddings are in use, normalized BM25 otherwise."""
+        mode = self.retrieval_mode
+        if mode == "keyword":
+            return self._keyword_retrieve(query, k)
+        embedder = None if mode == "bm25" else self._get_embedder()
+        if mode == "auto":
+            # Fusing in a non-semantic (hashing) ranker is worse than BM25 alone (see eval/reports), so
+            # hybrid search is only used when the index really has semantic embeddings.
+            mode = "hybrid" if embedder is not None and not embedder.name.startswith("hashing") else "bm25"
+        if mode in {"dense", "hybrid"} and embedder is None:
+            mode = "bm25"  # no semantic search available
+        if mode == "bm25":
+            return self._bm25_retrieve(query, k)
+        qv = embedder.encode([query])[0]
+        pool = max(50, k * 10)
+        if mode == "hybrid":
+            dense = [i for i, _ in self.store.search(qv, pool)]
+            index, _items = self._lexical_index()
+            lexical = [i for i, _ in index.search(query, pool)]
+            order = [i for i, _ in reciprocal_rank_fusion([dense, lexical])]
+        else:
+            order = [i for i, _ in self.store.search(qv, pool if self._reranker else k)]
+        if self._reranker is not None and order:
+            candidates = order[: max(20, k * 4)]
+            try:
+                ranked = self._reranker.order(query, [self.store.chunks[i].get("text", "") for i in candidates])
+                order = [candidates[j] for j in ranked]
+            except Exception as e:  # reranking is an enhancement: never fail a search because of it
+                logger.warning("Reranker unavailable (%s); keeping the first-stage order", e)
+                self._reranker = None
+        # each chunk shows its cosine similarity: one semantic scale, whichever stage ranked it
+        return [self._result(self.store.chunks[i], float(self.store.embeddings[i] @ qv)) for i in order[:k]]
 
     @staticmethod
     def _result(item: Dict[str, Any], score: float) -> Dict[str, Any]:

@@ -88,7 +88,10 @@ class SentenceTransformerEmbedder:
     @property
     def dim(self) -> int:  # type: ignore[override]
         if self._dim is None:
-            self._dim = int(self._load().get_sentence_embedding_dimension())
+            model = self._load()
+            # renamed in sentence-transformers 5; support both
+            get_dim = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
+            self._dim = int(get_dim())
         return self._dim
 
     def encode(self, texts: List[str]) -> np.ndarray:

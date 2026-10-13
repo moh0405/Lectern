@@ -39,6 +39,7 @@ def test_empty_store_has_no_items(tmp_path, monkeypatch):
 
 
 def test_semantic_retrieval_ranks_relevant_chunk_first(engine):
+    engine.retrieval_mode = "dense"
     results = engine.retrieve_context("how does a hash table map keys to values", k=2)
     assert engine.semantic_ready
     assert results[0]["doc"] == "ds.pdf" and results[0]["page"] == 9
@@ -124,3 +125,74 @@ def test_results_carry_citation_url_with_timestamp(tmp_path):
     eng.store = store
     hit = eng.retrieve_context("binary search", k=1)[0]
     assert hit["citation_url"].endswith("&t=95s") and hit["url"] == "https://youtu.be/abc"
+
+
+class SemanticStub:
+    """Pretends to be a real (non-hashing) embedder so the engine's auto mode picks hybrid search."""
+
+    name = "stub-semantic"
+
+    def __init__(self):
+        self._inner = EMB
+        self.dim = EMB.dim
+
+    def encode(self, texts):
+        return self._inner.encode(texts)
+
+
+def make_store(tmp_path, embedder_name, chunks):
+    store = VectorStore(tmp_path / "s")
+    store.set_embedder(embedder_name, EMB.dim)
+    store.add([{**c, "source_type": "pdf"} for c in chunks], EMB.encode([c["text"] for c in chunks]), "src")
+    store.save()
+    return tmp_path / "s"
+
+
+def test_auto_uses_bm25_with_a_non_semantic_index(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    d = make_store(tmp_path, EMB.name, CHUNKS)
+    eng = RAGEngine(store_dir=str(d), embedder=EMB, input_dir=str(tmp_path / "in"))
+    assert eng.retrieval_mode == "auto"
+    res = eng.retrieve_context("linked list nodes pointers", k=3)
+    assert res[0]["doc"] == "ds.pdf" and res[0]["page"] == 3
+    assert all(0 < r["score"] <= 1 for r in res)  # normalized BM25
+    assert eng.retrieve_context("quantum chromodynamics") == []
+
+
+def test_auto_uses_hybrid_with_a_semantic_index(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    stub = SemanticStub()
+    d = make_store(tmp_path, stub.name, CHUNKS)
+    eng = RAGEngine(store_dir=str(d), embedder=stub, input_dir=str(tmp_path / "in"))
+    # a keyword the vectors cannot know about is found by the BM25 half
+    extra = [{"text": "Zygomorphic flowers are bilaterally symmetric.", "doc": "bio.pdf", "page": 1}]
+    eng.store.add([{**c, "source_type": "pdf"} for c in extra], EMB.encode([extra[0]["text"]]), "bio")
+    res = eng.retrieve_context("zygomorphic", k=3)
+    assert res[0]["doc"] == "bio.pdf"
+    assert all(-1.0 <= r["score"] <= 1.0 for r in res)  # cosine similarity is what is shown
+
+
+def test_forced_modes_and_fallback_without_an_embedder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    d = make_store(tmp_path, EMB.name, CHUNKS)
+    eng = RAGEngine(store_dir=str(d), embedder=EMB, input_dir=str(tmp_path / "in"), retrieval_mode="dense")
+    assert eng.retrieve_context("dijkstra shortest paths graph", k=1)[0]["doc"] == "algo.pdf"
+    eng.retrieval_mode = "hybrid"
+    assert eng.retrieve_context("dijkstra shortest paths graph", k=1)[0]["doc"] == "algo.pdf"
+    eng.use_embeddings = False  # dense/hybrid fall back to BM25 when no embedder is available
+    eng.retrieval_mode = "dense"
+    assert eng.retrieve_context("dijkstra shortest paths graph", k=1)[0]["doc"] == "algo.pdf"
+
+
+def test_bm25_index_is_rebuilt_when_the_store_changes(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    d = make_store(tmp_path, EMB.name, CHUNKS)
+    eng = RAGEngine(store_dir=str(d), embedder=EMB, input_dir=str(tmp_path / "in"), retrieval_mode="bm25")
+    assert eng.retrieve_context("zygomorphic") == []
+    eng.store.add(
+        [{"text": "Zygomorphic flowers are bilaterally symmetric.", "doc": "bio.pdf", "page": 1, "source_type": "pdf"}],
+        EMB.encode(["Zygomorphic flowers are bilaterally symmetric."]), "bio",
+    )
+    assert eng.retrieve_context("zygomorphic")[0]["doc"] == "bio.pdf"
+    eng.remove_source("bio", save=False)
+    assert eng.retrieve_context("zygomorphic") == []

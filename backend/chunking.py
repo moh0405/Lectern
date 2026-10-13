@@ -245,6 +245,12 @@ def chunk_document_pieces(text: str, max_chars: int = MAX_CHARS, heading_context
             continue
         prefix = f"{heading}\n" if heading_context and heading else ""
         pieces.append(Piece(prefix + body, start))
+    if not pieces and merged:
+        # Noise filtering must never reduce a whole (tiny) document to nothing: keep its longest piece.
+        body, start, heading, _atomic = max(merged, key=lambda m: _alnum(m[0]))
+        if _alnum(body) >= 5:
+            prefix = f"{heading}\n" if heading_context and heading else ""
+            pieces.append(Piece(prefix + body, start))
     return pieces
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .metrics import KS
+from .metrics import KS, paired_bootstrap
 
 
 def pct(x: float) -> str:
@@ -40,6 +40,23 @@ def render_report(corpus_name: str, questions: List[Dict[str, Any]], runs: List[
                 + " | ".join(pct(s.hit[k]) for k in KS)
                 + f" | {s.mrr:.3f} | {pct(s.coverage_at_5)} | {pct(s.strict_hit[3])} | {auc} | {r['query_ms']:.1f} |"
             )
+        baseline = next((r for r in runs if r["config"].name == "minilm-dense"), runs[0])
+        if len(runs) > 1:
+            lines += ["", f"## Change versus `{baseline['config'].name}` (paired bootstrap over questions, 95% interval)", "",
+                      "An interval that contains 0 means the data do not show a real difference.", "",
+                      "| config | Δ hit@3 | 95% interval | P(better) | Δ MRR | 95% interval |", "|---|---:|---:|---:|---:|---:|"]
+            base_ans = [x for x in baseline["results"] if x.answerable]
+            for r in runs:
+                if r is baseline:
+                    continue
+                ans = [x for x in r["results"] if x.answerable]
+                h3 = paired_bootstrap([1.0 if x.rank and x.rank <= 3 else 0.0 for x in base_ans],
+                                      [1.0 if x.rank and x.rank <= 3 else 0.0 for x in ans])
+                mr = paired_bootstrap([1 / x.rank if x.rank else 0.0 for x in base_ans], [1 / x.rank if x.rank else 0.0 for x in ans])
+                lines.append(
+                    f"| **{r['config'].name}** | {h3['diff'] * 100:+.0f} pts | [{h3['lo'] * 100:+.0f}, {h3['hi'] * 100:+.0f}] | "
+                    f"{h3['p_better']:.2f} | {mr['diff']:+.3f} | [{mr['lo']:+.3f}, {mr['hi']:+.3f}] |"
+                )
         lines += ["", "## hit@3 by question type", ""]
         cats = sorted({c for r in runs for c in r["summary"].by_category})
         lines += ["| config | " + " | ".join(f"{c} (n={int(runs[0]['summary'].by_category[c]['n'])})" for c in cats) + " |",

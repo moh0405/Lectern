@@ -96,6 +96,7 @@ class VectorStore:
         self._hashes: set[str] = set()
         self._index = None
         self._disk_index_ok = False  # index.faiss on disk matches the in-memory chunks
+        self.revision = 0  # bumped on every change; lets derived indexes (BM25) know when to rebuild
         self._lock = threading.RLock()
 
     # ------------------------------------------------------------------
@@ -186,6 +187,7 @@ class VectorStore:
             self._hashes = set()
             self._index = None
             self._disk_index_ok = False
+            self.revision += 1
 
     # ------------------------------------------------------------------
     # Mutation
@@ -233,6 +235,7 @@ class VectorStore:
                 self.chunks.extend(records)
                 self._index = None
                 self._disk_index_ok = False
+                self.revision += 1
             entry = self.sources.setdefault(source_key, {"fingerprint": None, "chunks": 0})
             entry["fingerprint"] = fingerprint
             entry["chunks"] = sum(1 for c in self.chunks if c.get("source_key") == source_key)
@@ -248,6 +251,7 @@ class VectorStore:
                 self._hashes = {c["chunk_hash"] for c in self.chunks}
                 self._index = None
                 self._disk_index_ok = False
+                self.revision += 1
             return removed
 
     def remove_source(self, source_key: str) -> int:

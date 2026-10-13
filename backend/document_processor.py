@@ -31,6 +31,8 @@ def read_pdf(path: str) -> List[Tuple[int, str]]:
 
 
 def chunk_text(text: str, chunk_size: int = 800, overlap: int = 160) -> List[str]:
+    """Legacy fixed-window chunker (800 characters, 160 overlap). Kept as the evaluation baseline;
+    indexing uses backend/chunking.py."""
     chunks = []
     start = 0
     while start < len(text):
@@ -45,22 +47,26 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int = 160) -> List[str
 
 
 def build_chunks_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
+    """Chunk a PDF with the structure-aware chunker: running headers and licence boilerplate are removed,
+    paragraphs may continue across a page break, and a chunk records the page it starts on (plus
+    `extra.end_page` when it runs onto the next one)."""
+    from .chunking import chunk_pages
+
     doc_name = Path(pdf_path).name
-    page_texts = read_pdf(pdf_path)
     chunks: List[Dict[str, Any]] = []
-    for page_num, text in page_texts:
-        for idx, c in enumerate(chunk_text(text)):
-            chunks.append(
-                {
-                    "text": c,
-                    "doc": doc_name,
-                    "page": page_num,
-                    "chunk_id": f"{doc_name}-p{page_num}-c{idx}",
-                    "source_type": "pdf",
-                    "url": None,
-                    "extra": {},
-                }
-            )
+    for idx, item in enumerate(chunk_pages(read_pdf(pdf_path))):
+        page = item["page"]
+        chunks.append(
+            {
+                "text": item["text"],
+                "doc": doc_name,
+                "page": page,
+                "chunk_id": f"{doc_name}-p{page}-c{idx}",
+                "source_type": "pdf",
+                "url": None,
+                "extra": {"end_page": item["end_page"]} if item.get("end_page") else {},
+            }
+        )
     return chunks
 
 

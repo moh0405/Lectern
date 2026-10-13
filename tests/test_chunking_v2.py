@@ -97,3 +97,13 @@ def test_paragraphs_continue_across_page_breaks_and_pages_are_the_start_page():
 def test_empty_and_whitespace_input():
     assert chunk_document("") == [] and chunk_document("   \n\n ") == []
     assert chunk_pages([]) == [] and chunk_pages([(1, "  ")]) == []
+
+
+def test_a_tiny_document_is_kept_not_filtered_away():
+    assert chunk_document("Graphs have nodes and edges.") == ["Graphs have nodes and edges."]
+    assert [c["text"] for c in chunk_pages([(1, "Graphs have nodes and edges.")])] == ["Graphs have nodes and edges."]
+
+
+def test_noise_is_still_dropped_when_real_content_exists():
+    text = "Figure 4.6\n\n" + "A real paragraph about heaps and priority queues that explains the heap property clearly. " * 2
+    assert all("Figure 4.6" not in c.split(".")[0] or len(c) > 100 for c in chunk_document(text))

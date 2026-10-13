@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from backend.embeddings import HashingEmbedder, get_embedder_by_name
 from backend.rag_engine import RAGEngine
+from backend.rerank import Reranker
 from backend.vector_store import VectorStore, chunk_hash
 
 from .metrics import QuestionResult, evidence_coverage, first_relevant_rank, norm, summarize
@@ -43,6 +44,21 @@ CONFIGS: Dict[str, Config] = {
     "keyword": Config("keyword", embedder="hashing-512", retrieval="keyword"),
     "hashing-dense": Config("hashing-dense", embedder="hashing-512", retrieval="dense"),
     "minilm-dense": Config("minilm-dense", embedder=MINILM, retrieval="dense"),
+    # BM25 keyword ranking and hybrid (dense + BM25, fused with reciprocal rank fusion)
+    "bm25": Config("bm25", embedder="hashing-512", retrieval="bm25"),
+    "hybrid-hashing": Config("hybrid-hashing", embedder="hashing-512", retrieval="hybrid"),
+    "hybrid-minilm": Config("hybrid-minilm", embedder=MINILM, retrieval="hybrid"),
+    "hybrid-hashing-v2": Config("hybrid-hashing-v2", embedder="hashing-512", chunker="v2", retrieval="hybrid"),
+    "bm25-v2": Config("bm25-v2", embedder="hashing-512", chunker="v2", retrieval="bm25"),
+    "hybrid-minilm-v2": Config("hybrid-minilm-v2", embedder=MINILM, chunker="v2", retrieval="hybrid"),
+    "hybrid-minilm-v2-perpage": Config("hybrid-minilm-v2-perpage", embedder=MINILM, chunker="v2-perpage", retrieval="hybrid"),
+    # what the application does by default: v2 chunks, "auto" retrieval (hybrid with a semantic index, BM25 otherwise)
+    "default-minilm": Config("default-minilm", embedder=MINILM, chunker="v2", retrieval="auto"),
+    "default-minilm-rerank": Config("default-minilm-rerank", embedder=MINILM, chunker="v2", retrieval="auto", rerank=True),
+    "default-hashing": Config("default-hashing", embedder="hashing-512", chunker="v2", retrieval="auto"),
+    # cross-encoder reranking of the top candidates
+    "hybrid-minilm-rerank": Config("hybrid-minilm-rerank", embedder=MINILM, retrieval="hybrid", rerank=True),
+    "hybrid-minilm-v2-rerank": Config("hybrid-minilm-v2-rerank", embedder=MINILM, chunker="v2", retrieval="hybrid", rerank=True),
     # chunking v2: sentences and headings, boilerplate stripped, paragraphs may cross pages
     "keyword-v2": Config("keyword-v2", embedder="hashing-512", chunker="v2", retrieval="keyword"),
     "hashing-dense-v2": Config("hashing-dense-v2", embedder="hashing-512", chunker="v2", retrieval="dense"),
@@ -53,6 +69,17 @@ CONFIGS: Dict[str, Config] = {
     "minilm-dense-v2-600": Config("minilm-dense-v2-600", embedder=MINILM, chunker="v2-600", retrieval="dense"),
     "keyword-v2-400": Config("keyword-v2-400", embedder="hashing-512", chunker="v2-400", retrieval="keyword"),
     "minilm-dense-v2-400": Config("minilm-dense-v2-400", embedder=MINILM, chunker="v2-400", retrieval="dense"),
+}
+
+
+# `python -m eval.run --configs headline` is what the committed reports show; `ablations` explains the decisions.
+HEADLINE = ["keyword", "bm25", "minilm-dense", "hybrid-minilm", "default-minilm", "default-minilm-rerank", "default-hashing"]
+GROUPS: Dict[str, List[str]] = {
+    "headline": HEADLINE,
+    "ablations": ["minilm-dense"] + [
+        n for n in CONFIGS if n not in HEADLINE
+    ],
+    "all": list(CONFIGS),
 }
 
 
@@ -199,8 +226,20 @@ def make_embedder(name: str):
     return get_embedder_by_name(name)
 
 
-def build_engine(corpus: Corpus, config: Config, store_dir: Path) -> RAGEngine:
-    """Chunk and embed every document of `corpus` with `config` and wrap it in an engine."""
+_store_cache: Dict[Tuple[str, str, str], Path] = {}
+_cache_root: Optional[tempfile.TemporaryDirectory] = None
+
+
+def build_store(corpus: Corpus, config: Config) -> Path:
+    """Chunk and embed every document of `corpus` with `config`. Cached per (corpus, embedder, chunker),
+    because dense, BM25 and hybrid retrieval all read the same index."""
+    global _cache_root
+    key = (corpus.name, config.embedder, config.chunker)
+    if key in _store_cache:
+        return _store_cache[key]
+    if _cache_root is None:
+        _cache_root = tempfile.TemporaryDirectory(prefix="asm-eval-")
+    store_dir = Path(_cache_root.name) / "-".join(k.replace("/", "_") for k in key)
     chunker = CHUNKERS[config.chunker]
     embedder = make_embedder(config.embedder)
     store = VectorStore(store_dir)
@@ -211,15 +250,20 @@ def build_engine(corpus: Corpus, config: Config, store_dir: Path) -> RAGEngine:
             c["chunk_hash"] = chunk_hash(c)
         store.add(chunks, embedder.encode([c["text"] for c in chunks]), doc)
     store.save()
-    return make_engine(store_dir, config, embedder)
+    _store_cache[key] = store_dir
+    return store_dir
+
+
+def build_engine(corpus: Corpus, config: Config) -> RAGEngine:
+    return make_engine(build_store(corpus, config), config, make_embedder(config.embedder))
 
 
 def make_engine(store_dir: Path, config: Config, embedder) -> RAGEngine:
     engine = RAGEngine(store_dir=str(store_dir), embedder=embedder, input_dir=str(store_dir / "none"))
-    if config.retrieval == "keyword":
+    engine.retrieval_mode = config.retrieval
+    if config.retrieval in {"keyword", "bm25"}:
         engine.use_embeddings = False
-    elif config.retrieval != "dense":
-        engine.retrieval_mode = config.retrieval  # filled in by later steps
+    engine._reranker = Reranker() if config.rerank else None
     if config.rerank:
         engine.rerank = True
     return engine
@@ -249,13 +293,12 @@ def run_questions(engine: RAGEngine, questions: List[Dict[str, Any]], k: int = T
 
 def evaluate(corpus: Corpus, config: Config) -> Dict[str, Any]:
     questions = corpus.resolve(load_questions(corpus.questions))
-    with tempfile.TemporaryDirectory(prefix="asm-eval-") as tmp:
-        t0 = time.time()
-        engine = build_engine(corpus, config, Path(tmp) / "store")
-        build_s = time.time() - t0
-        t1 = time.time()
-        results = run_questions(engine, questions, loose=corpus.loose)
-        query_ms = (time.time() - t1) * 1000 / max(len(questions), 1)
-        n_chunks = len(engine.store)
-    return {"config": config, "summary": summarize(results), "results": results, "chunks": n_chunks,
+    t0 = time.time()
+    engine = build_engine(corpus, config)
+    build_s = time.time() - t0  # near zero when the index was already built for another config
+    engine.retrieve_context("warm up", k=1)  # first call builds lazy indexes (BM25); keep that out of the timing
+    t1 = time.time()
+    results = run_questions(engine, questions, loose=corpus.loose)
+    query_ms = (time.time() - t1) * 1000 / max(len(questions), 1)
+    return {"config": config, "summary": summarize(results), "results": results, "chunks": len(engine.store),
             "build_s": build_s, "query_ms": query_ms, "loose": corpus.loose}

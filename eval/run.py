@@ -1,8 +1,10 @@
 """Run the retrieval evaluation and write a report.
 
-    python -m eval.run                         # all configs on the synthetic corpus
-    python -m eval.run --configs hashing-dense,keyword
-    python -m eval.run --write                 # also update eval/reports/synthetic.md
+    python -m eval.run                          # headline configs on the synthetic corpus
+    python -m eval.run --corpus real            # your textbooks
+    python -m eval.run --configs ablations      # the experiments behind the decisions
+    python -m eval.run --configs keyword,bm25   # specific configs
+    python -m eval.run --corpus both --write    # update eval/reports/*.md
 
 Configs that need sentence-transformers are skipped (and listed) if it is not installed.
 """
@@ -13,7 +15,7 @@ import argparse
 import sys
 from typing import Any, Dict, List
 
-from .harness import CONFIGS, CORPORA, ROOT, evaluate, load_questions
+from .harness import CONFIGS, CORPORA, GROUPS, ROOT, evaluate, load_questions
 from .report import render_report
 
 
@@ -30,11 +32,13 @@ def available(config) -> bool:
 def main(argv: List[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--corpus", choices=[*CORPORA, "both"], default="synthetic")
-    ap.add_argument("--configs", help="comma-separated config names (default: all)")
-    ap.add_argument("--write", action="store_true", help="write eval/reports/<corpus>.md")
+    ap.add_argument("--configs", default="headline",
+                    help=f"a group ({', '.join(GROUPS)}) or comma-separated config names (default: headline)")
+    ap.add_argument("--write", action="store_true", help="write eval/reports/<corpus>[-ablations].md (groups only)")
     args = ap.parse_args(argv)
 
-    wanted = args.configs.split(",") if args.configs else list(CONFIGS)
+    group = args.configs if args.configs in GROUPS else None
+    wanted = GROUPS[group] if group else args.configs.split(",")
     unknown = [w for w in wanted if w not in CONFIGS]
     if unknown:
         print(f"unknown configs: {unknown}. available: {list(CONFIGS)}", file=sys.stderr)
@@ -59,8 +63,8 @@ def main(argv: List[str] | None = None) -> int:
             runs.append(evaluate(corpus, cfg))
         report = render_report(cname, load_questions(corpus.questions), runs, skipped)
         print(report)
-        if args.write:
-            out = ROOT / "reports" / f"{cname}.md"
+        if args.write and group in {"headline", "ablations"}:
+            out = ROOT / "reports" / (f"{cname}.md" if group == "headline" else f"{cname}-ablations.md")
             out.write_text(report, encoding="utf-8")
             print(f"wrote {out}")
     return status

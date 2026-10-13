@@ -126,3 +126,29 @@ def test_urls_are_indexed_once_unless_refreshed(dirs, fake_extract):
     assert first.indexed == [url]
     assert run(dirs).skipped == [url]
     assert run(dirs, refresh_urls=True).indexed == [url]
+
+
+def test_sources_indexed_with_an_older_chunker_are_reprocessed(dirs, fake_extract):
+    inp, store = dirs
+    (inp / "a.pdf").write_text("one line")
+    run(dirs)
+    # pretend the store was built by the previous chunker version
+    s = VectorStore.load(store)
+    s.sources["a.pdf"]["chunker"] = "v1"
+    s.save()
+    fake_extract.clear()
+    report = run(dirs)
+    assert report.indexed == ["a.pdf"] and not report.skipped and fake_extract  # unchanged file, still re-chunked
+    assert VectorStore.load(store).sources["a.pdf"]["chunker"] == indexer.CHUNKER_VERSION
+    fake_extract.clear()
+    assert run(dirs).skipped == ["a.pdf"]  # and now it is up to date
+
+
+def test_sources_without_a_chunker_record_are_reprocessed(dirs, fake_extract):
+    inp, store = dirs
+    (inp / "a.pdf").write_text("one line")
+    run(dirs)
+    s = VectorStore.load(store)
+    s.sources["a.pdf"].pop("chunker", None)  # stores written before chunkers were versioned
+    s.save()
+    assert run(dirs).indexed == ["a.pdf"]

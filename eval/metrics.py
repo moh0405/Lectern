@@ -115,3 +115,28 @@ def summarize(results: Iterable[QuestionResult]) -> Summary:
         misses=[r.id for r in answerable if r.rank is None or r.rank > 5],
         strict_hit={k: sum(1 for r in answerable if r.rank_strict is not None and r.rank_strict <= k) / n for k in KS},
     )
+
+
+def paired_bootstrap(a: Sequence[float], b: Sequence[float], resamples: int = 4000, seed: int = 0) -> Dict[str, float]:
+    """Paired bootstrap of the mean difference b - a over the same questions.
+
+    Returns the observed difference, a 95% interval, and the share of resamples where b beats a. With a few dozen
+    questions the interval is wide; if it contains 0, the data do not show that one config is better.
+    """
+    import random
+
+    n = len(a)
+    if n == 0 or n != len(b):
+        return {"diff": 0.0, "lo": 0.0, "hi": 0.0, "p_better": 0.5}
+    rng = random.Random(seed)
+    diffs = [x - y for x, y in zip(b, a)]
+    means = []
+    for _ in range(resamples):
+        means.append(sum(diffs[rng.randrange(n)] for _ in range(n)) / n)
+    means.sort()
+    return {
+        "diff": sum(diffs) / n,
+        "lo": means[int(0.025 * resamples)],
+        "hi": means[int(0.975 * resamples) - 1],
+        "p_better": sum(1 for m in means if m > 0) / resamples,
+    }
