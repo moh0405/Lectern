@@ -13,6 +13,7 @@ from typing import Any, Dict
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from .. import __version__
 from .deps import make_engine
@@ -88,6 +89,10 @@ def create_app() -> FastAPI:
             except Exception as e:  # the answer is still good; the next change retries the upload
                 logger.warning("S3 save failed: %s", e)
         return response
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
 
     @app.get("/health", response_model=Health, tags=["meta"], summary="Liveness and basic index status")
     def health() -> Health:
