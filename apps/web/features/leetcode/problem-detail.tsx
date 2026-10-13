@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge, ErrorNotice, Notice, Skeleton, Spinner } from "@/components/ui/feedback";
 import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
 import { DifficultyBadge } from "./difficulty-badge";
+import { ProgressPanel } from "./progress";
 
 export function ProblemDetail({ pid, onClose }: { pid: string; onClose: () => void }) {
   const problem = useQuery({
@@ -62,6 +63,8 @@ export function ProblemDetail({ pid, onClose }: { pid: string; onClose: () => vo
             </div>
           </div>
 
+          <ProgressPanel pid={pid} />
+
           {/* Scrollable, so it must be reachable by keyboard (WCAG 2.1.1) */}
           <div
             tabIndex={0}
@@ -81,7 +84,7 @@ export function ProblemDetail({ pid, onClose }: { pid: string; onClose: () => vo
           </div>
 
           {noKey ? (
-            <Notice>The server has no <code>GEMINI_API_KEY</code>, so it cannot write study guides.</Notice>
+            <Notice>The server has no language-model key configured, so it cannot write study guides.</Notice>
           ) : guide.isError ? (
             <ErrorNotice>{errorMessage(guide.error)}</ErrorNotice>
           ) : null}

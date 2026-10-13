@@ -1,8 +1,24 @@
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
+const post = vi.fn();
+vi.mock("@/lib/api", () => ({
+  api: { http: { POST: (...a: unknown[]) => post(...a) } },
+  unwrap: (r: { data?: unknown; error?: unknown }) => {
+    if (r.error !== undefined) throw new Error("server said no");
+    return r.data;
+  },
+  errorMessage: (e: unknown) => (e instanceof Error ? e.message : "unknown"),
+}));
+
 import { TurnCard } from "./turn-card";
 import type { Turn } from "./session";
+
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const render = (ui: React.ReactElement) =>
+  rtlRender(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
 
 const turn = (over: Partial<Turn>): Turn => ({ id: "1", question: "what is a heap", answer: "", chunks: [], status: "done", ...over });
 const chunks = [{ text: "heap text", doc: "heaps.pdf", page: 1, score: 0.7 }];
@@ -16,7 +32,7 @@ describe("TurnCard", () => {
         onRemove={() => {}}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/no GEMINI_API_KEY/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/no language-model key/i);
     expect(screen.getByText("Sources (1)")).toBeInTheDocument();
     expect(screen.getByRole("article")).toHaveTextContent("heap text");
   });
@@ -114,5 +130,18 @@ describe("TurnCard citation checks", () => {
     rerender(<TurnCard turn={done({ cached: false })} onStop={() => {}} onRemove={() => {}} onFresh={onFresh} />);
     expect(screen.queryByText("cached")).toBeNull();
     expect(screen.queryByRole("button", { name: "Fresh answer" })).toBeNull();
+  });
+
+  it("saves a finished answer as a flashcard", async () => {
+    post.mockResolvedValue({ data: { id: 1 } });
+    render(<TurnCard turn={turn({ answer: "A **heap** is a tree.", chunks })} onStop={() => {}} onRemove={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Save as flashcard" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saved as flashcard" })).toBeDisabled());
+    expect(post).toHaveBeenCalledWith("/api/v1/cards", { body: { front: "what is a heap", back: "A heap is a tree.", source: "heaps.pdf" } });
+  });
+
+  it("does not offer to save an unfinished or empty answer", () => {
+    render(<TurnCard turn={turn({ status: "streaming", answer: "partial" })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.queryByRole("button", { name: /flashcard/i })).toBeNull();
   });
 });

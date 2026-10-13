@@ -1,13 +1,16 @@
 "use client";
 
-import { Check, Copy, Square, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check, Copy, Layers, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ChunkCard } from "@/components/chunk-card";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
+import { api, errorMessage, unwrap } from "@/lib/api";
 import { pageLabel } from "@/lib/format";
+import { plainText } from "./flashcards";
 import type { Turn } from "./session";
 
 const MODE_LABEL = { eli5: "ELI5", technical: "Technical", interview: "Interview", summary: "Summary" } as const;
@@ -30,6 +33,32 @@ function CopyButton({ text }: { text: string }) {
       }}
     >
       {copied ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
+    </Button>
+  );
+}
+
+/** Adds this question and answer to the spaced-repetition deck. */
+function SaveCardButton({ turn }: { turn: Turn }) {
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.http.POST("/api/v1/cards", {
+          body: { front: turn.question.slice(0, 1200), back: plainText(turn.answer).slice(0, 1200), source: turn.chunks[0]?.doc ?? null },
+        }),
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["cards"] }),
+  });
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={save.isSuccess ? "Saved as flashcard" : save.isError ? `Could not save: ${errorMessage(save.error)}` : "Save as flashcard"}
+      title={save.isError ? errorMessage(save.error) : "Save as flashcard"}
+      disabled={save.isPending || save.isSuccess}
+      onClick={() => save.mutate()}
+    >
+      {save.isSuccess ? <Check className="h-4 w-4 text-good" /> : <Layers className="h-4 w-4" />}
     </Button>
   );
 }
@@ -103,6 +132,7 @@ export function TurnCard({
                 </Button>
               ) : null}
               {turn.answer ? <CopyButton text={turn.answer} /> : null}
+              {turn.answer && turn.status === "done" ? <SaveCardButton turn={turn} /> : null}
               <Button variant="ghost" size="icon" aria-label="Remove" onClick={onRemove}>
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -113,7 +143,7 @@ export function TurnCard({
 
       {noKey ? (
         <Notice>
-          The server has no <code>GEMINI_API_KEY</code>, so it cannot write an answer. Retrieval still works: the sources
+          The server has no language-model key configured, so it cannot write an answer. Retrieval still works: the sources
           below are the passages it found.
         </Notice>
       ) : turn.error ? (
