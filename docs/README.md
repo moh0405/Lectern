@@ -18,8 +18,9 @@ Start with the [project README](../README.md) for the overview, then read in thi
    10. [Testing and CI](concepts/10-testing-and-ci.md)
    11. [Glossary](concepts/11-glossary.md)
    12. [Spaced repetition, study tracking and LLM providers](concepts/12-study-features.md)
-3. **[Phase by phase](phases/README.md)**: how the project was built, in order, with the bugs and decisions of each phase.
-4. **[API reference](API.md)**: all 40 operations with examples.
+3. **[AWS deployment](AWS.md)**: Lambda, S3, ECR, Secrets Manager, Terraform; what was built, measured, and what it costs.
+4. **[Phase by phase](phases/README.md)**: how the project was built, in order, with the bugs and decisions of each phase.
+5. **[API reference](API.md)**: all 40 operations with examples.
 
 ## Reference
 

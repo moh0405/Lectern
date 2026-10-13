@@ -8,13 +8,16 @@
 | **Chunk / passage** | A piece of a document (about 300-900 characters) that is embedded, stored and retrieved on its own. |
 | **Citation check** | Verifying that `[doc (page N)]` in an answer refers to a passage that was in the prompt. |
 | **Anki** | Flashcard software; imports CSV and `.apkg` files. |
+| **Cold start** | The extra delay when a serverless function starts a fresh copy (here ~23 s: load the model, restore the index). See [AWS](../AWS.md). |
 | **Context window** | The maximum prompt size a model can read. |
 | **Cosine similarity** | Cosine of the angle between two vectors; the standard similarity measure for embeddings. |
 | **Cross-encoder** | A model that scores a (query, passage) pair together; accurate but slow; used for reranking. |
 | **Dense retrieval** | Search by embedding similarity (vectors are "dense" lists of numbers). |
 | **Dimension** | Length of a vector. MiniLM: 384. |
+| **ECR** | Elastic Container Registry: AWS's private store for Docker images. |
 | **Embedding** | A vector representing the meaning of a text. See [embeddings](02-embeddings.md). |
 | **Fine-tuning** | Further training a model's weights on your data. Not used here; see [LLMs](06-llms-and-prompting.md). |
+| **Function URL** | A public HTTPS address AWS gives a Lambda function, no gateway needed. |
 | **Hallucination** | A fluent but unsupported or false model statement. |
 | **Hit@k** | Share of questions with a relevant passage in the top k. |
 | **Hybrid search** | Combining dense and keyword retrieval. |
@@ -23,6 +26,7 @@
 | **JSON mode** | Asking the model to emit valid JSON; used for structured tutor tools. |
 | **k (top-k)** | How many passages to retrieve. Default 3. |
 | **L2 normalization** | Scaling a vector to length 1. Makes dot product equal cosine similarity. |
+| **Lambda** | AWS service that runs code only while a request is handled and bills per millisecond. |
 | **LLM** | Large language model (here Gemini). |
 | **MRR** | Mean reciprocal rank: average of 1/rank of the first relevant result. |
 | **NumPy** | Python library for fast array maths; powers vector search here. |
@@ -33,11 +37,14 @@
 | **Rate limiting** | Capping how many requests a client can make per minute. |
 | **Reranking** | Re-ordering a short candidate list with a slower, more accurate model. |
 | **RRF** | Reciprocal rank fusion: merge ranked lists by summing 1/(k + rank). |
+| **S3** | Simple Storage Service: AWS object storage (files in buckets). Holds the index and study database. |
+| **Secrets Manager** | AWS service that stores secrets such as API keys and hands them to the running code. |
 | **SSE** | Server-Sent Events: a one-way event stream over HTTP, used to stream answers. |
 | **SM-2** | The spaced-repetition scheduling algorithm behind Anki's classic mode. See [study features](12-study-features.md). |
 | **Stemming** | Reducing words to a base form (`collisions` → `collision`) so they match. |
 | **Stopword** | A very common word ("the", "is") ignored by keyword search. |
 | **Temperature** | Sampling randomness of a model; lower is more deterministic. |
+| **Terraform** | Infrastructure as code: describe cloud resources in files, preview with `plan`, create with `apply`. |
 | **Token** | A word piece; the unit models read and write. Not the same as a word. |
 | **TanStack Query** | React library for fetching and caching server data. |
 | **Vector** | An ordered list of numbers; here, an embedding. |
