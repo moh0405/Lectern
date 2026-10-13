@@ -7,7 +7,7 @@ Every capability reachable over HTTP in a form a TypeScript client can use safel
 ## What was built
 
 - A FastAPI package under `/api/v1` split into routers (`sources`, `ask`, `tutor`, `leetcode`, `study`, `viz`) with shared dependencies ([backend stack](../concepts/07-backend-stack.md)).
-- **26 operations**, listed in the README and [API.md](../API.md).
+- **26 operations** at the end of this phase (40 after Phase 5), listed in [API.md](../API.md).
 - **Streaming**: `POST /ask/stream` over SSE with typed events `meta`, `token`, `done`, `error` ([LLMs](../concepts/06-llms-and-prompting.md)).
 - **Ingestion as jobs**: upload returns `202` and a job id; the client polls `GET /jobs/{id}`.
 - **Security**: sanitized file names, allow-listed types, `%PDF-` signature check, size and count limits, CORS limited to configured origins, optional `X-API-Key`, per-IP rate limit, one error schema with no internal exception text, `eval` replaced by a whitelist parser in a timed worker process, HTML export sanitizer.

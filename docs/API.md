@@ -8,7 +8,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 {"error": {"code": "not_found", "message": "No such job", "details": null}}
 ```
 
-## All 26 operations
+## All 40 operations
 
 ### Health and corpus
 
@@ -56,6 +56,35 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 | GET | `/api/v1/leetcode/problems/{pid}` | one problem with description |
 | POST | `/api/v1/leetcode/problems/{pid}/explain` | AI study guide (Markdown) |
 
+### Flashcards (spaced repetition)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/cards?due=&limit=` | the deck (or only cards due now) plus `{total, due, new_cards, mature, reviews}` |
+| POST | `/api/v1/cards` | add a card `{front, back, source?}` |
+| POST | `/api/v1/cards/generate` | the model writes up to `n` cards from your material (`{topic?, n, temperature}`); needs a model key and indexed sources |
+| POST | `/api/v1/cards/{id}/review` | `{grade: 0..5}`; reschedules with SM-2 (the UI sends again=1, hard=3, good=4, easy=5) |
+| GET | `/api/v1/cards/export?format=csv\|apkg` | download the deck; `apkg` needs the optional `anki` extra (`503 export_unavailable` otherwise) |
+| DELETE | `/api/v1/cards/{id}` | delete a card (204) |
+
+### LeetCode progress and plan
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/leetcode/progress` | every problem you marked, plus `{solved, attempted, todo, solved_by_difficulty}` |
+| PUT | `/api/v1/leetcode/progress/{pid}` | `{status: todo\|attempted\|solved, notes?}`; omitting `notes` keeps the existing ones |
+| DELETE | `/api/v1/leetcode/progress/{pid}` | forget a problem (204) |
+| GET | `/api/v1/leetcode/plan?size=` | `{weak_topics, topics[], items[]}`: unsolved problems from the topics you solve least, easiest first |
+
+### Saved Ask history
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/history?limit=` | saved turns, newest first (question, answer, passages, checked citations) |
+| POST | `/api/v1/history` | save a finished turn |
+| DELETE | `/api/v1/history/{id}` | delete one (204) |
+| DELETE | `/api/v1/history` | delete all (204) |
+
 ### Notes, export, analytics, visualisation
 
 | Method | Path | Purpose |
@@ -65,6 +94,16 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 | GET | `/api/v1/analytics?limit=` | totals, average latency and score, document usage, streak, recent questions |
 | DELETE | `/api/v1/analytics` | clear recorded analytics |
 | GET | `/api/v1/embeddings/projection?limit=` | 3D PCA points with doc/page/text for the embedding map |
+
+## Flashcard review example
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/cards -H 'Content-Type: application/json' \
+  -d '{"front":"What does LIFO stand for?","back":"Last in, first out."}'
+# {"id":1,"interval_days":0,"ef":2.5,"repetitions":0,...,"due_at":<now>}
+curl -X POST http://127.0.0.1:8000/api/v1/cards/1/review -H 'Content-Type: application/json' -d '{"grade":4}'
+# {"id":1,"interval_days":1,"repetitions":1,"due_at":<tomorrow>,...}
+```
 
 ## `POST /api/v1/ask`
 
@@ -136,4 +175,4 @@ Returns `{"chunks": [...]}` with the same `Chunk` objects as above; useful for d
 
 ## Limits
 
-Uploads: allowed types only, `%PDF-` signature checked, `MAX_UPLOAD_MB` (50) per file, bounded file count. Requests: `RATE_LIMIT_PER_MIN` (60) per IP, answered with `429` in the standard error shape.
+Flashcards, progress and history are stored in `data/study.db` (`STUDY_DB`); there are no accounts. Uploads: allowed types only, `%PDF-` signature checked, `MAX_UPLOAD_MB` (50) per file, bounded file count. Requests: `RATE_LIMIT_PER_MIN` (60) per IP, answered with `429` in the standard error shape.
