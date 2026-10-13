@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional
 import json
 
 from .rag_engine import RAGEngine
-from .llm_config import GeminiClient
+from .llm_providers import create_llm
 
 
 # -----------------------------
@@ -51,7 +51,7 @@ def build_concept_map(topic: str, context_override: Optional[str] = None, temper
     )
 
     try:
-        client = GeminiClient(temperature=temperature)
+        client = create_llm(temperature=temperature)
         resp = client.generate(prompt, json_mode=True)
         if resp.get("ok"):
             text = resp.get("answer", "").strip()
@@ -113,7 +113,7 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
         f"DEPTH: {depth} (higher depth means the student has struggled more)."
     )
     try:
-        client = GeminiClient(temperature=temperature)
+        client = create_llm(temperature=temperature)
         resp = client.generate(template, json_mode=True)
         if resp.get("ok"):
             text = (resp.get("answer") or "").strip()
@@ -171,7 +171,7 @@ def multi_document_synthesis(topic: str, k_per_doc: int = 2, temperature: float 
         f"TOPIC: {topic}\n\n" + "\n\n".join(comparison_blocks)
     )
     try:
-        client = GeminiClient(temperature=temperature)
+        client = create_llm(temperature=temperature)
         resp = client.generate(prompt, json_mode=True)
         if resp.get("ok"):
             text = resp.get("answer", "")
@@ -223,7 +223,7 @@ def adaptive_explain(question: str, level: str = "Undergrad", temperature: float
         "Produce a clear explanation and end with 3 short quiz questions." 
     )
     try:
-        client = GeminiClient(temperature=temperature)
+        client = create_llm(temperature=temperature)
         resp = client.generate(prompt)
         if resp.get("ok"):
             return {"ok": True, "answer": resp.get("answer"), "chunks": chunks, "model": resp.get("model")}

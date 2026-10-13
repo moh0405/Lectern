@@ -207,9 +207,9 @@ def main() -> None:
     if src.exists():
         shutil.copy(src, work / "data" / "leetcode" / "normalized_problems.jsonl")
 
-    for module_name in ("backend.llm_config", "backend.advanced_ai", "backend.leetcode_handler", "backend.api.routers.ask"):
+    for module_name in ("backend.llm_providers", "backend.advanced_ai", "backend.leetcode_handler", "backend.api.routers.ask"):
         __import__(module_name)
-        sys.modules[module_name].GeminiClient = DemoModel
+        sys.modules[module_name].create_llm = DemoModel
 
     from eval.harness import CONFIGS, CORPORA, build_store
 

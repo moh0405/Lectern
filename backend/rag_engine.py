@@ -331,8 +331,8 @@ class RAGEngine:
         template = self._prompt_for_mode(mode)
         prompt = template.format(context=context, question=question)
         try:
-            from .llm_config import GeminiClient
-            client = GeminiClient(model=model, temperature=temperature)
+            from .llm_providers import create_llm
+            client = create_llm(model=model, temperature=temperature)
             res = client.generate(prompt, temperature=temperature)
             return {"ok": bool(res.get("ok", True)), "answer": res.get("answer", ""), "model": res.get("model"), "prompt": prompt}
         except Exception as e:
@@ -353,8 +353,8 @@ class RAGEngine:
             chunks = self.retrieve_context(question, k=k)
         prompt = self.generate_prompt(question, chunks, mode=mode)
         try:
-            from .llm_config import GeminiClient
-            client = GeminiClient(model=model, temperature=temperature)
+            from .llm_providers import create_llm
+            client = create_llm(model=model, temperature=temperature)
         except Exception as e:
             return {"prompt": prompt, "chunks": chunks, "ok": False, "error": str(e), "model": model}
         result = client.generate(prompt, temperature=temperature)
@@ -404,8 +404,8 @@ class RAGEngine:
             "question mark and nothing else.\n\nStudy corpus:\n{ctx}"
         ).format(n=max_questions, ctx=ctx or "(empty)")
         try:
-            from .llm_config import GeminiClient
-            client = GeminiClient(model=model, temperature=temperature)
+            from .llm_providers import create_llm
+            client = create_llm(model=model, temperature=temperature)
             res = client.generate(prompt, temperature=temperature)
             qs = self.parse_questions(res.get("answer") or "", max_questions) if res.get("ok", True) else []
             return qs or _FALLBACK_QUESTIONS[:max_questions]
@@ -435,8 +435,8 @@ class RAGEngine:
             f"Transcript:\n{joined}\n\n"
         )
         try:
-            from .llm_config import GeminiClient
-            client = GeminiClient(model=model, temperature=temperature)
+            from .llm_providers import create_llm
+            client = create_llm(model=model, temperature=temperature)
             res = client.generate(prompt, temperature=temperature)
             text = (res.get("answer") or res.get("text") or "").strip()
             if text:
@@ -495,8 +495,8 @@ class RAGEngine:
             "Instructions:\n- Note where sources agree\n- Highlight conflicting claims\n- Provide citations like [doc (page N)] after statements\n- Be concise\n\nAnswer:"
         ).format(context=context, question=question)
         try:
-            from .llm_config import GeminiClient
-            client = GeminiClient(model=model, temperature=temperature)
+            from .llm_providers import create_llm
+            client = create_llm(model=model, temperature=temperature)
             res = client.generate(synth_prompt, temperature=temperature)
             ans = res.get("answer") or ""
             # naive citations list

@@ -24,10 +24,10 @@ def _never_load_torch(monkeypatch):
 def fake_gemini(monkeypatch):
     FakeGemini.handler, FakeGemini.fail_with, FakeGemini.calls = None, None, []
     for target in (
-        "backend.llm_config.GeminiClient",
-        "backend.api.routers.ask.GeminiClient",
-        "backend.advanced_ai.GeminiClient",
-        "backend.leetcode_handler.GeminiClient",
+        "backend.llm_providers.create_llm",
+        "backend.api.routers.ask.create_llm",
+        "backend.advanced_ai.create_llm",
+        "backend.leetcode_handler.create_llm",
     ):
         monkeypatch.setattr(target, FakeGemini)
     return FakeGemini
