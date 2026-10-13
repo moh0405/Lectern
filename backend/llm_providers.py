@@ -139,4 +139,6 @@ def create_llm(model: Optional[str] = None, temperature: float = 0.2, **kwargs: 
     factory = PROVIDERS.get(name)
     if factory is None:
         raise RuntimeError(f"Unknown LLM_PROVIDER '{name}'. Choose one of: {', '.join(sorted(PROVIDERS))}")
-    return factory(model=model, temperature=temperature, **kwargs)
+    from .spend_cap import wrap
+
+    return wrap(factory(model=model, temperature=temperature, **kwargs))

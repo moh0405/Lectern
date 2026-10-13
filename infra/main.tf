@@ -40,6 +40,12 @@ variable "create_function" {
   description = "Create the Lambda function. Needs an image in the registry and the Gemini key stored first."
 }
 
+variable "daily_llm_limit" {
+  type        = number
+  default     = 200
+  description = "Most language-model calls per UTC day, across all copies of the function. 0 means no limit."
+}
+
 variable "memory_mb" {
   type        = number
   default     = 2048
@@ -124,6 +130,11 @@ resource "aws_secretsmanager_secret" "gemini" {
   recovery_window_in_days = 0
 }
 
+resource "aws_secretsmanager_secret" "api_key" {
+  name                    = "${var.name}/API_KEY"
+  recovery_window_in_days = 0
+}
+
 # --- Spend alert -------------------------------------------------------------------------------
 resource "aws_budgets_budget" "monthly" {
   name         = "${var.name}-monthly"
@@ -181,7 +192,7 @@ data "aws_iam_policy_document" "function" {
   }
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.gemini.arn]
+    resources = [aws_secretsmanager_secret.gemini.arn, aws_secretsmanager_secret.api_key.arn]
   }
 }
 
@@ -204,10 +215,12 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      S3_BUCKET        = aws_s3_bucket.data.bucket
-      S3_PREFIX        = var.name
-      GEMINI_SECRET_ID = aws_secretsmanager_secret.gemini.name
-      CORS_ORIGINS     = var.cors_origins
+      S3_BUCKET         = aws_s3_bucket.data.bucket
+      S3_PREFIX         = var.name
+      GEMINI_SECRET_ID  = aws_secretsmanager_secret.gemini.name
+      API_KEY_SECRET_ID = aws_secretsmanager_secret.api_key.name
+      DAILY_LLM_LIMIT   = tostring(var.daily_llm_limit)
+      CORS_ORIGINS      = var.cors_origins
       # Lambda only allows writing under /tmp
       UPLOAD_DIR   = "/tmp/data/uploaded_files"
       STORE_DIR    = "/tmp/data/vector_store"
@@ -251,5 +264,6 @@ resource "aws_lambda_permission" "invoke" {
 
 output "ecr_repository" { value = aws_ecr_repository.api.repository_url }
 output "bucket" { value = aws_s3_bucket.data.bucket }
+output "api_key_secret" { value = aws_secretsmanager_secret.api_key.name }
 output "gemini_secret" { value = aws_secretsmanager_secret.gemini.name }
 output "api_url" { value = var.create_function ? aws_lambda_function_url.api[0].function_url : null }

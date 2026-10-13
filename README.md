@@ -89,7 +89,7 @@ How the pieces fit:
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (331), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (340), Vitest, Playwright + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -149,11 +149,12 @@ flowchart LR
 | **Secrets Manager** | Holds the Gemini API key; it never appears in the image, the repo or Terraform state. |
 | **IAM** | One least-privilege role: write logs, use its own bucket prefix, read its own secret. |
 | **Budgets** | A monthly spend alert ($15) by email. |
+| **API key + daily cap** | Callers must send `X-API-Key`; model calls are capped per day (counted in S3). |
 | **Terraform** | The whole setup is one reviewable file (`infra/main.tf`); `terraform destroy` removes it. |
 
 Measured on the live deployment: a cold start takes about 23 s (loading the model and restoring the index), a warm request about 0.13 s, peak memory about 970 MB of 2 GB. The estimated cost is about $1 a month (AWS list prices, not yet checked against a bill).
 
-Honest limits: Lambda can run several copies at once and this account's quota does not allow capping it at one, so overlapping writes to the study database could overwrite each other (fine for one person, not for many). The endpoint is public with only rate limiting in front, so its address is deliberately not published here. There is no automatic deploy from GitHub yet. Full explanation, including a first attempt on App Runner that this account could not use: [`docs/AWS.md`](docs/AWS.md).
+Honest limits: Lambda can run several copies at once and this account's quota does not allow capping it at one, so overlapping writes to the study database could overwrite each other (fine for one person, not for many). Every API call needs a secret key (stored in Secrets Manager) and the model is capped at a fixed number of calls per day, so a leaked address cannot run up the bill; the address is still not published here because visitors would not have a key. There is no automatic deploy from GitHub yet. Full explanation, including a first attempt on App Runner that this account could not use: [`docs/AWS.md`](docs/AWS.md).
 
 ---
 

@@ -138,19 +138,23 @@ class S3Sync:
             logger.warning("Final S3 sync failed: %s", e)
 
 
+SECRETS = [("GEMINI_SECRET_ID", "GEMINI_API_KEY"), ("API_KEY_SECRET_ID", "API_KEY")]
+
+
 def load_secret_env(client: Optional[Any] = None) -> None:
-    """If ``GEMINI_SECRET_ID`` names a Secrets Manager secret and ``GEMINI_API_KEY`` is unset, fetch it.
+    """For each ``<X>_SECRET_ID`` that names a Secrets Manager secret, fetch it into ``<X>`` unless that is already set.
 
-    Lambda cannot inject secrets as environment variables the way App Runner can, so the code asks for it.
+    Lambda cannot inject secrets as environment variables the way App Runner can, so the code asks for them.
     """
-    secret_id = os.getenv("GEMINI_SECRET_ID")
-    if not secret_id or os.getenv("GEMINI_API_KEY"):
-        return
-    if client is None:
-        import boto3
+    for secret_var, target in SECRETS:
+        secret_id = os.getenv(secret_var)
+        if not secret_id or os.getenv(target):
+            continue
+        if client is None:
+            import boto3
 
-        client = boto3.client("secretsmanager")
-    os.environ["GEMINI_API_KEY"] = client.get_secret_value(SecretId=secret_id)["SecretString"].strip()
+            client = boto3.client("secretsmanager")
+        os.environ[target] = client.get_secret_value(SecretId=secret_id)["SecretString"].strip()
 
 
 def main(argv: Optional[List[str]] = None) -> int:

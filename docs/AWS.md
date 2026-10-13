@@ -39,6 +39,7 @@ The first request after a quiet period is slower (a "cold start") because a fres
 | **Lambda** | Runs a function (here, a whole container) only while a request is being handled | Hosts the API: 2 GB memory, 2 GB scratch disk, 120 s timeout. A **Function URL** gives it a public HTTPS address and streams answers token by token. The **Lambda Web Adapter** (added to the image) lets Lambda talk to an ordinary web server | `ai-study-mentor` |
 | **Secrets Manager** | Stores secrets, hands them to a service at start | Holds `GEMINI_API_KEY`; it never appears in the image, repo or Terraform state | `ai-study-mentor/GEMINI_API_KEY` |
 | **IAM roles** | Permissions for AWS services themselves | One role for the function: write logs, read/write **only** its own bucket prefix, read **only** its own secret | `ai-study-mentor-lambda` |
+| **Secrets Manager** (second secret) | Also holds the API key (`ai-study-mentor/API_KEY`) that callers must send | `ai-study-mentor/API_KEY` |
 | **Budgets** | Spend alerts | Emails `mp2319@scarletmail.rutgers.edu` at 50% of actual and 100% of forecast spend of the monthly limit | `ai-study-mentor-monthly` |
 | **Terraform** | Infrastructure as code | Describes all of the above in one file so it can be reviewed, repeated and deleted | `infra/` |
 
@@ -90,6 +91,8 @@ The live index holds the three textbooks in `data/uploaded_files` (3,867 chunks,
 | Cold start (steady state, model loaded) | about 23 s |
 | Very first start after each new image is deployed | 114-125 s (seen twice), because Lambda fetches a large image lazily and this was the first run to read PyTorch |
 | Warm request | about 0.13 s for `/health` |
+| Request with no key / wrong key / right key | 401 / 401 / 200 |
+| Daily call counter | `{"calls": 1}` written to S3 after one model call |
 | `GET /api/v1/search?query=hash table collisions` | returns real passages from the textbooks |
 | Gemini key read from Secrets Manager | works: Google accepted it and listed its models |
 | `POST /api/v1/ask` end to end | **works**: "What is a hash table?" returned a cited answer from the textbooks (HTTP 200, 39.6 s on a copy that had to start up and retry). Earlier attempts failed with `503 UNAVAILABLE: high demand` from Google for both `gemini-3.8-flash` and `gemini-flash-latest`; that was Google's service, not AWS, and cleared later. During such spikes the API returns an error after about 70 s of retries |
@@ -106,13 +109,14 @@ Rough figures from AWS list prices as I remember them; check the AWS pricing pag
 | S3, ECR, Secrets Manager (about $0.40 per secret), logs | $1 or less |
 | **Total** | **about $1 a month** |
 
-Gemini usage is billed by Google, not AWS. The budget alert is **$15 a month** and emails `mp2319@scarletmail.rutgers.edu`. A budget **alerts**, it does not stop spending. Because the function is public, someone who finds the URL can run up Lambda and Gemini usage; the per-IP rate limit helps, and `API_KEY` can be set to require a key.
+Gemini usage is billed by Google, not AWS. The budget alert is **$15 a month** and emails `mp2319@scarletmail.rutgers.edu`. A budget **alerts**, it does not stop spending; the API key and the daily call cap are what limit it.
 
 ## Operating it
 
 ```bash
-# the live address
+# the live address, and calling it with the key
 cd infra && terraform output api_url
+curl -H "X-API-Key: $(cat ~/.ai-study-mentor-api-key)" <api_url>api/v1/stats
 
 # deploy a new version of the code
 REPO=249946084409.dkr.ecr.us-east-1.amazonaws.com/ai-study-mentor
@@ -131,13 +135,17 @@ cd infra && terraform destroy -var budget_email=<email>
 
 - The bucket blocks all public access and is encrypted at rest.
 - The function's role is least-privilege: write logs, read/write its own prefix, read one secret.
-- The Function URL is public (no AWS login needed to call it). Protection today is the per-IP rate limit and CORS. Set `API_KEY` if you want every request authenticated.
+- The Function URL itself is public (AWS does not check who calls it), so the **application** checks. Every `/api/v1` request must send `X-API-Key`; without it, or with a wrong one, the answer is `401`. `/health` and `/docs` stay open: they cost nothing and expose no data.
+- The key is generated randomly, stored in Secrets Manager (not in the image, repo or Terraform state) and kept on your computer in `~/.ai-study-mentor-api-key` (readable only by you). Rotate it with `aws secretsmanager put-secret-value --secret-id ai-study-mentor/API_KEY --secret-string <new>` and also update the file; a fresh start of the function picks it up.
+- A **daily cap on model calls** (`daily_llm_limit`, default 200 per UTC day, counted in S3 so every copy of the function shares it). Past the cap the API answers `429` with code `daily_limit`, and a streamed answer ends with an error event. If the counter itself cannot be read, calls are refused rather than allowed. The count is a guard rail, not exact accounting: two calls in the same instant can count as one. Calls Google rejects still count.
+- This protects the AWS side. Google has its own spend limits in the Google Cloud / AI Studio billing settings; set a budget there too, because the cap limits how many calls the API makes, not what each costs.
+- A web page cannot keep a key secret: anything in browser code can be read. The hosted web app (not built yet) should call the API from its own server side so the key never reaches the browser.
 - The Gemini key was pasted into a chat session while setting this up. Rotate it in Google AI Studio and store the new value with `aws secretsmanager put-secret-value`.
 - Terraform state (`terraform.tfstate`) is local and git-ignored. It does not contain the secret value, but it does list resource ids; do not commit it.
 
 ## Not done / honest gaps
 
 - The web app (Next.js) is not hosted on AWS; only the API is.
-- No custom domain, no WAF, no CI deploy (a GitHub Actions workflow using OIDC is the planned next step).
+- No custom domain, no WAF, no per-user keys (one shared key), no CI deploy (a GitHub Actions workflow using OIDC is the planned next step).
 - The study data is not safe against overlapping copies of the function (see Known limits).
 - The OpenAI-compatible provider has not been run against a live endpoint.
