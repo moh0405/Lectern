@@ -1,11 +1,11 @@
-# AWS infrastructure for the API. Two steps (see infra/README.md):
-#   1. terraform apply                          -> bucket, registry, secrets, budget alert
+# AWS infrastructure for the API, running as a Lambda function. Two steps (see infra/README.md):
+#   1. terraform apply                           -> bucket, registry, secret, budget alert
 #   2. push the image, then
-#      terraform apply -var create_service=true -> App Runner service
+#      terraform apply -var create_function=true -> Lambda function + public HTTPS URL
 terraform {
   required_version = ">= 1.5"
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
 }
 
@@ -34,10 +34,16 @@ variable "monthly_budget_usd" {
   default = 15
 }
 
-variable "create_service" {
+variable "create_function" {
   type        = bool
   default     = false
-  description = "Create the App Runner service. Needs an image in the registry and the Gemini key stored first."
+  description = "Create the Lambda function. Needs an image in the registry and the Gemini key stored first."
+}
+
+variable "memory_mb" {
+  type        = number
+  default     = 2048
+  description = "Lambda memory. CPU scales with it; the embedding model needs about 1 GB."
 }
 
 variable "image_tag" {
@@ -142,45 +148,29 @@ resource "aws_budgets_budget" "monthly" {
   }
 }
 
-# --- App Runner --------------------------------------------------------------------------------
-data "aws_iam_policy_document" "build_trust" {
+# --- Lambda ------------------------------------------------------------------------------------
+data "aws_iam_policy_document" "lambda_trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
-      identifiers = ["build.apprunner.amazonaws.com"]
+      identifiers = ["lambda.amazonaws.com"]
     }
   }
 }
 
-data "aws_iam_policy_document" "tasks_trust" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["tasks.apprunner.amazonaws.com"]
-    }
-  }
+# what the running function may do: write logs, use its own bucket prefix, read its own secret
+resource "aws_iam_role" "function" {
+  name               = "${var.name}-lambda"
+  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
 }
 
-# lets App Runner pull the image
-resource "aws_iam_role" "access" {
-  name               = "${var.name}-apprunner-access"
-  assume_role_policy = data.aws_iam_policy_document.build_trust.json
+resource "aws_iam_role_policy_attachment" "logs" {
+  role       = aws_iam_role.function.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "access" {
-  role       = aws_iam_role.access.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
-}
-
-# what the running container may do: its own bucket prefix and its own secret, nothing else
-resource "aws_iam_role" "instance" {
-  name               = "${var.name}-apprunner-instance"
-  assume_role_policy = data.aws_iam_policy_document.tasks_trust.json
-}
-
-data "aws_iam_policy_document" "instance" {
+data "aws_iam_policy_document" "function" {
   statement {
     actions   = ["s3:GetObject", "s3:PutObject"]
     resources = ["${aws_s3_bucket.data.arn}/${var.name}/*"]
@@ -195,61 +185,71 @@ data "aws_iam_policy_document" "instance" {
   }
 }
 
-resource "aws_iam_role_policy" "instance" {
-  role   = aws_iam_role.instance.id
-  policy = data.aws_iam_policy_document.instance.json
+resource "aws_iam_role_policy" "function" {
+  role   = aws_iam_role.function.id
+  policy = data.aws_iam_policy_document.function.json
 }
 
-resource "aws_apprunner_service" "api" {
-  count        = var.create_service ? 1 : 0
-  service_name = var.name
+resource "aws_lambda_function" "api" {
+  count         = var.create_function ? 1 : 0
+  function_name = var.name
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.api.repository_url}:${var.image_tag}"
+  role          = aws_iam_role.function.arn
+  memory_size   = var.memory_mb
+  timeout       = 120
+  architectures = ["x86_64"]
 
-  source_configuration {
-    authentication_configuration { access_role_arn = aws_iam_role.access.arn }
-    auto_deployments_enabled = false
-    image_repository {
-      image_identifier      = "${aws_ecr_repository.api.repository_url}:${var.image_tag}"
-      image_repository_type = "ECR"
-      image_configuration {
-        port = "8000"
-        runtime_environment_variables = {
-          S3_BUCKET    = aws_s3_bucket.data.bucket
-          S3_PREFIX    = var.name
-          CORS_ORIGINS = var.cors_origins
-          AWS_REGION   = var.region
-        }
-        runtime_environment_secrets = {
-          GEMINI_API_KEY = aws_secretsmanager_secret.gemini.arn
-        }
-      }
+  ephemeral_storage { size = 2048 }
+
+  environment {
+    variables = {
+      S3_BUCKET        = aws_s3_bucket.data.bucket
+      S3_PREFIX        = var.name
+      GEMINI_SECRET_ID = aws_secretsmanager_secret.gemini.name
+      CORS_ORIGINS     = var.cors_origins
+      # Lambda only allows writing under /tmp
+      UPLOAD_DIR   = "/tmp/data/uploaded_files"
+      STORE_DIR    = "/tmp/data/vector_store"
+      ANALYTICS_DB = "/tmp/data/analytics.db"
+      STUDY_DB     = "/tmp/data/study.db"
+      # Lambda Web Adapter: stream answers token by token, and wait for /health before serving
+      AWS_LWA_INVOKE_MODE          = "response_stream"
+      AWS_LWA_READINESS_CHECK_PATH = "/health"
+      AWS_LWA_PORT                 = "8000"
     }
   }
 
-  instance_configuration {
-    cpu               = "1024"
-    memory            = "2048"
-    instance_role_arn = aws_iam_role.instance.arn
-  }
-
-  health_check_configuration {
-    protocol = "HTTP"
-    path     = "/health"
-  }
-
-  # one instance only: the SQLite study database and the index are single-writer
-  auto_scaling_configuration_arn = aws_apprunner_auto_scaling_configuration_version.single[0].arn
-
-  depends_on = [aws_iam_role_policy_attachment.access]
+  depends_on = [aws_iam_role_policy_attachment.logs, aws_iam_role_policy.function]
 }
 
-resource "aws_apprunner_auto_scaling_configuration_version" "single" {
-  count                           = var.create_service ? 1 : 0
-  auto_scaling_configuration_name = "${var.name}-single"
-  min_size                        = 1
-  max_size                        = 1
+resource "aws_lambda_function_url" "api" {
+  count              = var.create_function ? 1 : 0
+  function_name      = aws_lambda_function.api[0].function_name
+  authorization_type = "NONE"
+  invoke_mode        = "RESPONSE_STREAM"
+}
+
+# A public function URL needs both permissions since late 2025.
+resource "aws_lambda_permission" "url" {
+  count                  = var.create_function ? 1 : 0
+  statement_id           = "AllowPublicUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.api[0].function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "invoke" {
+  count                    = var.create_function ? 1 : 0
+  statement_id             = "AllowPublicInvoke"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.api[0].function_name
+  principal                = "*"
+  invoked_via_function_url = true
 }
 
 output "ecr_repository" { value = aws_ecr_repository.api.repository_url }
 output "bucket" { value = aws_s3_bucket.data.bucket }
 output "gemini_secret" { value = aws_secretsmanager_secret.gemini.name }
-output "service_url" { value = var.create_service ? "https://${aws_apprunner_service.api[0].service_url}" : null }
+output "api_url" { value = var.create_function ? aws_lambda_function_url.api[0].function_url : null }

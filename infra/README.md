@@ -1,9 +1,10 @@
 # AWS deployment
 
-Terraform for the API: an S3 bucket (search index + study database), an ECR registry, a Secrets Manager
-secret for the Gemini key, a monthly budget alert, and an App Runner service.
+Terraform for the API, which runs as an AWS Lambda function with a public HTTPS Function URL. It also creates an S3 bucket
+(search index + study database), an ECR registry, a Secrets Manager secret for the Gemini key, and a monthly budget alert.
+See [docs/AWS.md](../docs/AWS.md) for the explanation.
 
-Run in two steps because the service needs an image and a key to exist first. Use `--profile` or `AWS_PROFILE` if you have several.
+Two steps, because the function needs an image and a key to exist first. Use `AWS_PROFILE` if you have several profiles.
 
 ```bash
 cd infra
@@ -13,17 +14,19 @@ terraform apply -var budget_email=you@example.com        # 1. bucket, registry, 
 # store the key (kept out of Terraform state)
 aws secretsmanager put-secret-value --secret-id ai-study-mentor/GEMINI_API_KEY --secret-string "$GEMINI_API_KEY"
 
-# build and push the image (linux/amd64 is what App Runner runs)
+# build and push the image (Lambda here is x86; use --provenance=false)
 REPO=$(terraform output -raw ecr_repository)
 aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
-docker buildx build --platform linux/amd64 -t "$REPO:latest" --push ..
+docker buildx build --platform linux/amd64 --provenance=false -t "${REPO}:latest" --push ..
 
-terraform apply -var budget_email=you@example.com -var create_service=true   # 2. the service
-terraform output service_url
+terraform apply -var budget_email=you@example.com -var create_function=true   # 2. the function
+terraform output api_url
+
+# upload the search index built on your computer
+S3_BUCKET=$(terraform output -raw bucket) S3_PREFIX=ai-study-mentor python -m backend.cloud_sync push
 ```
 
-Stop paying for compute between demos: `aws apprunner pause-service --service-arn ...` (resume with `resume-service`).
+Variables: `monthly_budget_usd` (default 15), `memory_mb` (default 2048), `cors_origins`, `region`.
 Remove everything: `terraform destroy -var budget_email=x`.
 
-Design notes: one instance only, because SQLite and the index are single-writer. The container's role can read and
-write only its own bucket prefix and read only its own secret. The bucket is private, encrypted and versioned.
+Note the shell quirk: write `"${REPO}:latest"`, not `$REPO:latest`; zsh reads `:l` as a lowercase modifier.
