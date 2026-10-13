@@ -10,9 +10,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from .. import __version__
 from .deps import make_engine
@@ -30,6 +31,15 @@ if not logging.getLogger().handlers:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    sync = None
+    app.state.request_sync = None
+    if settings.s3_bucket:
+        from ..cloud_sync import ON_LAMBDA, S3Sync, load_secret_env
+
+        await run_in_threadpool(load_secret_env)
+
+        sync = S3Sync(settings.s3_bucket, settings.s3_prefix, settings.store_dir, settings.study_db)
+        await run_in_threadpool(sync.pull)  # before the engine loads the index
     app.state.engine = make_engine()
     app.state.jobs = JobManager()
     try:
@@ -37,8 +47,14 @@ async def lifespan(app: FastAPI):
         await run_in_threadpool(app.state.engine.warm)
     except Exception as e:  # semantic search is optional; keyword fallback still works
         logger.warning("Embedder warm-up failed: %s", e)
+    if sync and ON_LAMBDA:
+        app.state.request_sync = sync  # frozen between requests: save after each change instead of on a timer
+    elif sync:
+        sync.start(settings.s3_sync_seconds)
     yield
     app.state.jobs.shutdown()
+    if sync:
+        await run_in_threadpool(sync.stop)
 
 
 def create_app() -> FastAPI:
@@ -62,6 +78,21 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type", "X-API-Key"],
     )
     install_error_handlers(app)
+
+    @app.middleware("http")
+    async def save_changes_to_s3(request: Request, call_next):
+        response = await call_next(request)
+        sync = getattr(app.state, "request_sync", None)
+        if sync and request.method not in ("GET", "HEAD", "OPTIONS"):
+            try:
+                await run_in_threadpool(sync.push)
+            except Exception as e:  # the answer is still good; the next change retries the upload
+                logger.warning("S3 save failed: %s", e)
+        return response
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
 
     @app.get("/health", response_model=Health, tags=["meta"], summary="Liveness and basic index status")
     def health() -> Health:

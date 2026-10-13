@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+apps
+packages
+docs
+eval
+data
+tests
+**/__pycache__
+*.egg-info
+.env
+.env.*
+!.env.example
+.venv
+*.log
+Emergency Hackathon Context.md

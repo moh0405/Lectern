@@ -181,3 +181,8 @@ def test_openapi_documents_errors_and_streaming(api):
     for name in ("ErrorResponse", "SseMeta", "SseToken", "SseDone", "SseError", "AskRequest"):
         assert name in schemas
     assert "text/event-stream" in spec["paths"]["/api/v1/ask/stream"]["post"]["responses"]["200"]["content"]
+
+
+def test_root_redirects_to_the_interactive_docs(api):
+    r = api.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/docs"
