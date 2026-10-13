@@ -47,9 +47,12 @@ def _doc_keys(name: str) -> set:
     return {base, stem}
 
 
+_NO_PAGE = re.compile(r"\s*\(\s*(?:pages?|pp?\.?)\s*(?:none|n/?a|null|-)\s*\)\s*$", re.I)
+
+
 def _parse(inner: str) -> Optional[Dict[str, Any]]:
     """(doc, page, has_page_suffix) from the text inside brackets, or None if it cannot be a citation."""
-    text = inner.strip()
+    text = _NO_PAGE.sub("", inner.strip())  # "(page None)": a source without pages, cited as written
     for pattern in (_WITH_PAGE_PAREN, _WITH_PAGE_COMMA):
         m = pattern.match(text)
         if m:

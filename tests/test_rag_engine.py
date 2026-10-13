@@ -196,3 +196,56 @@ def test_bm25_index_is_rebuilt_when_the_store_changes(tmp_path, monkeypatch):
     assert eng.retrieve_context("zygomorphic")[0]["doc"] == "bio.pdf"
     eng.remove_source("bio", save=False)
     assert eng.retrieve_context("zygomorphic") == []
+
+
+def test_source_labels_match_what_a_model_should_cite(engine):
+    assert engine.source_label({"doc": "a.pdf", "page": 12}) == "a.pdf (page 12)"
+    assert engine.source_label({"doc": "a.pdf", "page": 12, "end_page": 13}) == "a.pdf (pages 12-13)"
+    assert engine.source_label({"doc": "a.pdf", "page": 12, "end_page": 12}) == "a.pdf (page 12)"
+    assert engine.source_label({"doc": "Lecture on heaps", "page": None}) == "Lecture on heaps"  # never "(page None)"
+    ctx = engine.format_context([{"doc": "notes.md", "page": None, "text": "t"}])
+    assert ctx == "- [notes.md] t" and "None" not in ctx
+
+
+def test_the_labels_in_the_prompt_are_accepted_by_the_citation_checker(engine):
+    from backend.citations import extract_citations
+
+    chunks = [{"doc": "Dsa.pdf", "page": 12, "end_page": 13, "text": "x"}, {"doc": "notes.md", "page": None, "text": "y"}]
+    prompt_labels = [engine.source_label(c) for c in chunks]
+    answer = " and ".join(f"[{label}]" for label in prompt_labels)
+    assert [c.status for c in extract_citations(answer, chunks)] == ["ok", "ok"]
+
+
+def test_parse_questions_keeps_only_question_shaped_lines():
+    reply = (
+        "Here are some questions:\n"
+        "1. What is a hash table?\n"
+        "2) How does BFS differ from DFS?\n"
+        "- Why is merge sort stable?\n"
+        "* **When** should I use a heap?\n"
+        "| Data structure | queue | stack |\n"
+        "|---|---|---|\n"
+        "Both visit every vertex in O(V + E) time; the difference is the order of exploration.\n"
+        "3. Explain recursion.\n"
+        "4. What is a hash table?\n"
+        "5. ok?\n"
+    )
+    qs = RAGEngine.parse_questions(reply, 10)
+    assert qs == ["What is a hash table?", "How does BFS differ from DFS?", "Why is merge sort stable?", "When should I use a heap?"]
+    assert RAGEngine.parse_questions(reply, 2) == qs[:2]
+    assert RAGEngine.parse_questions("", 5) == [] and RAGEngine.parse_questions("just prose, no questions", 5) == []
+
+
+def test_suggestions_ignore_a_reply_with_no_usable_questions(engine, monkeypatch):
+    import backend.llm_config as cfg
+
+    class Rambler:
+        def __init__(self, **kw):
+            pass
+
+        def generate(self, prompt, temperature=None, json_mode=False):
+            return {"ok": True, "model": "x", "answer": "| a | b |\n|---|---|\nSome prose without any question."}
+
+    monkeypatch.setattr(cfg, "GeminiClient", Rambler)
+    qs = engine.generate_query_suggestions(max_questions=3)
+    assert len(qs) == 3 and all(q.endswith(("?",)) or q for q in qs) and "|" not in "".join(qs)

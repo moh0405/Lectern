@@ -302,12 +302,19 @@ class RAGEngine:
         scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
         return [self._result(item, cov) for cov, _j, item in scored[:k]]
 
+    @staticmethod
+    def source_label(chunk: Dict[str, Any]) -> str:
+        """How a passage is named in the prompt, and so how the model is likely to cite it:
+        "Dsa.pdf (page 12)", "Dsa.pdf (pages 12-13)", or just the name for sources without pages."""
+        page, end = chunk.get("page"), chunk.get("end_page")
+        if not page:
+            return str(chunk["doc"])
+        if end and end != page:
+            return f"{chunk['doc']} (pages {page}-{end})"
+        return f"{chunk['doc']} (page {page})"
+
     def format_context(self, chunks: List[Dict[str, Any]]) -> str:
-        lines = []
-        for c in chunks:
-            src = f"{c['doc']} (page {c['page']})"
-            lines.append(f"- [{src}] {c['text']}")
-        return "\n".join(lines)
+        return "\n".join(f"- [{self.source_label(c)}] {c['text']}" for c in chunks)
 
     def generate_prompt(self, question: str, chunks: List[Dict[str, Any]], mode: str | None = None) -> str:
         template = self._prompt_for_mode(mode)
@@ -370,31 +377,38 @@ class RAGEngine:
             size += len(t)
         return "\n\n".join(texts)
 
-    def generate_query_suggestions(self, max_questions: int = 5, model: str | None = None, temperature: float = 0.2) -> List[str]:
-        """Use Gemini to propose study questions from current corpus.
+    @staticmethod
+    def parse_questions(text: str, limit: int) -> List[str]:
+        """Questions from a model's reply: numbered or bulleted lines that read as a question.
 
-        Falls back to static examples on error.
+        Anything else (a table, a paragraph, a heading) is dropped, so a rambling reply can never put markup or
+        prose into the suggestion chips. Returns [] if nothing qualifies.
+        """
+        out: List[str] = []
+        for line in (text or "").splitlines():
+            line = re.sub(r"^\s*(?:\d+\s*[.)]|[-*\u2022])\s*", "", line).strip().strip("\"'").strip()
+            line = re.sub(r"\*\*|__", "", line)  # **bold** markers
+            if 8 <= len(line) <= 160 and line.endswith("?") and "|" not in line and line not in out:
+                out.append(line)
+        return out[:limit]
+
+    def generate_query_suggestions(self, max_questions: int = 5, model: str | None = None, temperature: float = 0.2) -> List[str]:
+        """Ask the model for study questions about the current material.
+
+        Falls back to generic examples if the model is unavailable or returns nothing usable.
         """
         ctx = self._collect_context_snippet(max_chars=2500)
         prompt = (
-            "From the following study corpus, propose {n} diverse, high-impact questions "
-            "about data structures & algorithms. Cover fundamentals and advanced topics. "
-            "Return as a numbered list, one question per line.\n\nCorpus:\n{ctx}"
+            "From the following study material, propose {n} diverse, specific questions a student could ask about it. "
+            "Cover fundamentals and harder topics. Return a numbered list, one question per line, each ending in a "
+            "question mark and nothing else.\n\nStudy corpus:\n{ctx}"
         ).format(n=max_questions, ctx=ctx or "(empty)")
         try:
             from .llm_config import GeminiClient
             client = GeminiClient(model=model, temperature=temperature)
             res = client.generate(prompt, temperature=temperature)
-            text = (res.get("answer") or "").strip()
-            qs = []
-            for line in text.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                # strip leading numbering
-                line = line.split(". ", 1)[-1] if line[0].isdigit() else line
-                qs.append(line)
-            return (qs or _FALLBACK_QUESTIONS)[:max_questions]
+            qs = self.parse_questions(res.get("answer") or "", max_questions) if res.get("ok", True) else []
+            return qs or _FALLBACK_QUESTIONS[:max_questions]
         except Exception:
             return _FALLBACK_QUESTIONS[:max_questions]
 

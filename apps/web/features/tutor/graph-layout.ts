@@ -14,13 +14,13 @@ export interface Positioned extends GraphNode {
   y: number;
 }
 
-export const NODE_W = 170;
+export const NODE_W = 150;
 export const NODE_H = 44;
 
 /** Left-to-right layered layout; returns top-left positions suitable for React Flow. */
 export function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]): Positioned[] {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "LR", nodesep: 28, ranksep: 70 });
+  g.setGraph({ rankdir: "LR", nodesep: 24, ranksep: 56 });
   g.setDefaultEdgeLabel(() => ({}));
   for (const n of nodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
   const ids = new Set(nodes.map((n) => n.id));

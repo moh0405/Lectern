@@ -84,7 +84,7 @@ export function VisualizeView() {
 
           <Card>
             <h2 className="mb-2 text-sm font-semibold text-muted">Documents</h2>
-            <ul className="grid gap-1 text-sm sm:grid-cols-2">
+            <ul className="grid gap-x-12 gap-y-1.5 text-sm sm:grid-cols-2">
               {docs.map(([doc, pts]) => (
                 <li key={doc} className="flex justify-between gap-2">
                   <span className="min-w-0 truncate" title={doc}>
