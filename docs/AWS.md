@@ -92,7 +92,7 @@ The live index holds the three textbooks in `data/uploaded_files` (3,867 chunks,
 | Warm request | about 0.13 s for `/health` |
 | `GET /api/v1/search?query=hash table collisions` | returns real passages from the textbooks |
 | Gemini key read from Secrets Manager | works: Google accepted it and listed its models |
-| `POST /api/v1/ask` end to end | **not verified.** Google returned `503 UNAVAILABLE: high demand` for both `gemini-3.8-flash` and `gemini-flash-latest` while I tested. That is Google's service, not AWS, but I have no successful answer to show yet. Retry later |
+| `POST /api/v1/ask` end to end | **works**: "What is a hash table?" returned a cited answer from the textbooks (HTTP 200, 39.6 s on a copy that had to start up and retry). Earlier attempts failed with `503 UNAVAILABLE: high demand` from Google for both `gemini-3.8-flash` and `gemini-flash-latest`; that was Google's service, not AWS, and cleared later. During such spikes the API returns an error after about 70 s of retries |
 
 Peak memory used was about 970 MB of the 2,048 MB allocated.
 
