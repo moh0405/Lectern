@@ -183,7 +183,7 @@ AI-study-mentor-/
 ├── docs/
 │   ├── LEARNING_GUIDE.md       # Step-by-step RAG tutorial using this codebase
 │   ├── demo_guide.md           # 3-minute demo script
-│   └── ARCHITECTURE.md         # (placeholder, currently empty)
+│   └── ARCHITECTURE.md         # architecture deep dive
 ├── eval/                       # Retrieval evaluation: corpora, questions, metrics, committed reports
 ├── tests/                      # pytest suite (chunking, retrieval, prompt modes, API, exports, LeetCode)
 ├── pyproject.toml              # dependencies (core + extras), ruff, mypy, pytest config
@@ -616,7 +616,7 @@ The canned-answer "Demo Mode" from the original Streamlit app was not carried ov
 - [`docs/demo_guide.md`](demo_guide.md): a short script for presenting the project.
 - [`docs/PLAN.md`](PLAN.md): the completion plan and what was decided along the way.
 - [`eval/README.md`](../eval/README.md): how retrieval is evaluated, what it found, and the caveats.
-- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md): placeholder (empty). The architecture is documented above.
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md): the full architecture write-up.
 
 ---
 
