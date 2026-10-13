@@ -42,6 +42,9 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
 
   // 4) the finished session survives a reload, and can be cleared
   const heading = page.getByRole("heading", { name: "What is a binary heap used for?" });
+  // Only finished turns are saved (a half-streamed answer must not come back after a reload), so wait for the
+  // end of the stream, which is when the Copy button replaces Stop, instead of racing it on a slow machine.
+  await expect(page.getByRole("button", { name: "Copy answer" }).first()).toBeVisible();
   await page.reload();
   await expect(heading).toBeVisible();
   await expect(page.locator(".md-body").first()).toContainText("[heaps.pdf (page 1)]");
