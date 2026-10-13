@@ -62,3 +62,19 @@ def test_expensive_expression_times_out_and_worker_recovers():
     assert res["ok"] is False and "timed out" in res["error"]
     # the pool was replaced, so normal requests still work
     assert math_solve("integrate x")["ok"]
+
+
+def test_subprocess_fallback_when_the_pool_cannot_start(monkeypatch):
+    """AWS Lambda has no shared memory, so the process pool raises OSError; math must still work."""
+    import backend.safe_math as m
+
+    def broken():
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(m, "_get_pool", broken)
+    monkeypatch.setattr(m, "_use_subprocess", False)
+    assert m.solve_request("2+3*4")["ok"] is True
+    assert m._use_subprocess is True
+    assert m.solve_request("differentiate sin(x)")["ok"] is True
+    slow = m._compute_in_subprocess("9**9**9**9", 1.0)
+    assert slow["ok"] is False and "timed out" in slow["error"]

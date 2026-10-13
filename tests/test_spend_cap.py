@@ -123,3 +123,13 @@ def test_a_refused_call_becomes_a_429_with_its_own_code():
     with pytest.raises(ApiError) as e:
         raise_if_failed({"ok": False, "error": "503 UNAVAILABLE"})
     assert e.value.status_code == 502  # other failures are unchanged
+
+
+def test_provider_quota_errors_become_a_short_429():
+    from backend.api.deps import QUOTA_MESSAGE, raise_if_failed
+    from backend.api.errors import ApiError
+
+    raw = "429 RESOURCE_EXHAUSTED. {'error': {'message': 'You exceeded your current quota ... limit: 20'}}"
+    with pytest.raises(ApiError) as e:
+        raise_if_failed({"ok": False, "error": raw})
+    assert e.value.status_code == 429 and e.value.code == "quota_exhausted" and e.value.detail == QUOTA_MESSAGE

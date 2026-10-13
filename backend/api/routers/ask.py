@@ -16,7 +16,16 @@ from ...llm_providers import create_llm
 from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
 from ..answer_cache import AnswerCache, make_key
-from ..deps import common_dependencies, get_analytics, get_answer_cache, get_engine, raise_if_failed, store_version
+from ..deps import (
+    QUOTA_MESSAGE,
+    common_dependencies,
+    get_analytics,
+    get_answer_cache,
+    get_engine,
+    is_quota_error,
+    raise_if_failed,
+    store_version,
+)
 from ..errors import ERROR_RESPONSES, ApiError
 from ..schemas import AskRequest, AskResponse, Chunk, Models, SearchResponse, Suggestions
 
@@ -156,6 +165,8 @@ def ask_stream(
             code = "llm_unavailable" if ("_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg) else "llm_error"
             if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
                 code = "daily_limit"
+            elif is_quota_error(msg):
+                code, msg = "quota_exhausted", QUOTA_MESSAGE
             _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return

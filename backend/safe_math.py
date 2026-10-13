@@ -10,12 +10,16 @@ reach them unchecked. Three layers here:
 2. Parsing uses empty builtins and a local dict containing only whitelisted SymPy objects.
 3. `solve_request()` runs the computation in a separate worker process with a
    timeout, so expressions such as `9**9**9**9` cannot hang the server; a stuck
-   worker is killed and replaced.
+   worker is killed and replaced. Where the process pool cannot run (AWS Lambda has
+   no shared memory for its locks) a one-shot subprocess is used instead.
 """
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
 from concurrent.futures import ProcessPoolExecutor, TimeoutError as FutureTimeout
 from multiprocessing import get_context
 from typing import Any, Dict, List, Optional, Tuple
@@ -193,6 +197,23 @@ def _kill_pool() -> None:
             pass
 
 
+def _compute_in_subprocess(user_input: str, timeout: float) -> Dict[str, Any]:
+    """Run `_compute` in a fresh interpreter; needs no shared memory, and a timeout kills it."""
+    try:
+        done = subprocess.run(
+            [sys.executable, "-m", "backend.safe_math", "--worker"],
+            input=json.dumps(user_input), capture_output=True, text=True, timeout=timeout,
+        )
+        return json.loads(done.stdout)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"Computation timed out after {timeout:g}s", "steps": ["Expression too expensive."]}
+    except Exception as e:
+        return {"ok": False, "error": f"Math worker failed: {e}", "steps": ["Computation failed."]}
+
+
+_use_subprocess = False
+
+
 def solve_request(user_input: str, timeout: float = TIMEOUT_SECONDS) -> Dict[str, Any]:
     """Validate and compute `user_input` in a worker process, with a timeout."""
     if sp is None:
@@ -204,11 +225,22 @@ def solve_request(user_input: str, timeout: float = TIMEOUT_SECONDS) -> Dict[str
             validate(part)
     except MathInputError as e:
         return {"ok": False, "error": str(e), "steps": ["Could not parse expression."]}
+    global _use_subprocess
+    if _use_subprocess:
+        return _compute_in_subprocess(user_input, timeout)
     try:
         return _get_pool().submit(_compute, user_input).result(timeout=timeout)
+    except OSError:  # no shared memory for the pool's locks (e.g. AWS Lambda)
+        _kill_pool()
+        _use_subprocess = True
+        return _compute_in_subprocess(user_input, timeout)
     except FutureTimeout:
         _kill_pool()
         return {"ok": False, "error": f"Computation timed out after {timeout:g}s", "steps": ["Expression too expensive."]}
     except Exception as e:  # broken pool, etc.
         _kill_pool()
         return {"ok": False, "error": f"Math worker failed: {e}", "steps": ["Computation failed."]}
+
+
+if __name__ == "__main__" and "--worker" in sys.argv:
+    print(json.dumps(_compute(json.loads(sys.stdin.read()))))
