@@ -71,7 +71,7 @@ export interface paths {
          *
          *     - `meta`: `{chunks, prompt?}` (retrieved context, sent first)
          *     - `token`: `{text}` (zero or more answer fragments)
-         *     - `done`: `{model}` (end of a successful answer)
+         *     - `done`: `{model, citations, unverified_citations, uncited, cached}` (end of a successful answer; the citations are checked against the retrieved passages)
          *     - `error`: `{code, message}` (terminal; `code` is `llm_unavailable`, `llm_error` or `retrieval_error`)
          */
         post: operations["ask_stream_api_v1_ask_stream_post"];
@@ -538,6 +538,12 @@ export interface components {
             mode?: ("eli5" | "technical" | "interview" | "summary") | null;
             /** Model */
             model?: string | null;
+            /**
+             * No Cache
+             * @description Skip the answer cache and ask the model again
+             * @default false
+             */
+            no_cache?: boolean;
             /** Question */
             question: string;
             /**
@@ -550,12 +556,32 @@ export interface components {
         AskResponse: {
             /** Answer */
             answer: string;
+            /**
+             * Cached
+             * @description True when this answer came from the cache instead of a new model call
+             */
+            cached: boolean;
             /** Chunks */
             chunks: components["schemas"]["Chunk"][];
+            /**
+             * Citations
+             * @description Citations found in the answer, each checked against the retrieved passages
+             */
+            citations: components["schemas"]["CitationCheck"][];
             /** Model */
             model?: string | null;
             /** Prompt */
             prompt?: string | null;
+            /**
+             * Uncited
+             * @description True when passages were retrieved and the answer is long but cites none of them
+             */
+            uncited: boolean;
+            /**
+             * Unverified Citations
+             * @description How many citations are not among the retrieved passages
+             */
+            unverified_citations: number;
         };
         /** Body_upload_files_api_v1_sources_files_post */
         Body_upload_files_api_v1_sources_files_post: {
@@ -576,6 +602,12 @@ export interface components {
             /** Doc */
             doc: string;
             /**
+             * End Page
+             * @description Set when the passage runs onto the next page of a PDF (so it spans page..end_page)
+             * @default null
+             */
+            end_page?: number | null;
+            /**
              * Page
              * @default null
              */
@@ -589,6 +621,27 @@ export interface components {
              * @default null
              */
             url?: string | null;
+        };
+        /** CitationCheck */
+        CitationCheck: {
+            /** Doc */
+            doc: string;
+            /**
+             * Label
+             * @description The citation as the model wrote it, e.g. 'Dsa.pdf (page 12)'
+             */
+            label: string;
+            /**
+             * Page
+             * @default null
+             */
+            page?: number | null;
+            /**
+             * Status
+             * @description ok: among the retrieved passages. page_not_retrieved: that document was retrieved, but not this page. unknown_source: that document was not retrieved at all (possibly invented).
+             * @enum {string}
+             */
+            status: "ok" | "page_not_retrieved" | "unknown_source";
         };
         /** Cleared */
         Cleared: {
@@ -974,11 +1027,19 @@ export interface components {
         };
         /** SseDone */
         SseDone: {
+            /** Cached */
+            cached: boolean;
+            /** Citations */
+            citations: components["schemas"]["CitationCheck"][];
             /**
              * Model
              * @default null
              */
             model?: string | null;
+            /** Uncited */
+            uncited: boolean;
+            /** Unverified Citations */
+            unverified_citations: number;
         };
         /** SseError */
         SseError: {

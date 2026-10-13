@@ -202,7 +202,13 @@ export function AskView() {
 
       <div className="space-y-4">
         {turns.map((t) => (
-          <TurnCard key={t.id} turn={t} onStop={() => stop(t.id)} onRemove={() => remove(t.id)} />
+          <TurnCard
+            key={t.id}
+            turn={t}
+            onStop={() => stop(t.id)}
+            onRemove={() => remove(t.id)}
+            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true })}
+          />
         ))}
         <NotesPanel turns={turns} />
       </div>

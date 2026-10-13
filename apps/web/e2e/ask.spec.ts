@@ -85,6 +85,27 @@ test("advanced options: pick a model, see the prompt, skip the model, export fla
   expect((await md).suggestedFilename()).toBe("study-notes.md");
 });
 
+test("flags a citation the model invented, and reuses a repeated answer", async ({ page }) => {
+  await page.goto("/ask");
+  await page.getByLabel("Your question").fill("Please hallucinate about binary heaps");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const warning = page.getByRole("status").filter({ hasText: "cites something it was not given" });
+  await expect(warning).toBeVisible({ timeout: 20_000 });
+  await expect(warning).toContainText("[Invented Notes.pdf (page 9)]");
+  await expect(warning).not.toContainText("heaps.pdf"); // the genuine citation is not accused
+  await expect(page.getByText("cached", { exact: true })).toHaveCount(0);
+
+  // the same question again is served from the cache; a fresh answer can be requested
+  await page.getByLabel("Your question").fill("please hallucinate about binary heaps");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await expect(page.getByText("cached", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Fresh answer" }).click();
+  const turns = page.getByRole("heading", { name: /hallucinate about binary heaps/i });
+  await expect(turns).toHaveCount(3, { timeout: 20_000 }); // the fresh answer is a new turn
+  await expect(page.locator(".md-body").first()).toContainText("From your material", { timeout: 20_000 });
+  await expect(page.getByText("cached", { exact: true })).toHaveCount(1); // only the earlier repeat was cached; the new one is not
+});
+
 test("a source can be deleted (with confirmation)", async ({ page }) => {
   await page.goto("/sources");
   await page.getByRole("button", { name: "Delete heaps.pdf" }).click();

@@ -27,6 +27,8 @@ def test_ask_returns_answer_chunks_and_prompt(indexed, fake_gemini):
     assert body["chunks"][0]["doc"] == "heaps.pdf"
     assert "Interview Prep mode" in body["prompt"] and "binary heap" in body["prompt"]
     assert len(fake_gemini.calls) == 1  # retrieval happened once, one model call
+    assert body["cached"] is False and body["uncited"] is False and body["unverified_citations"] == 0
+    assert body["citations"] == [{"label": "heaps.pdf (page 1)", "doc": "heaps.pdf", "page": 1, "status": "ok"}]
 
 
 def test_ask_hides_prompt_by_default_and_rejects_bad_mode(indexed, fake_gemini):
@@ -55,7 +57,9 @@ def test_ask_stream_event_order_and_content(indexed, fake_gemini):
     assert names[0] == "meta" and names[-1] == "done" and set(names[1:-1]) == {"token"}
     assert events[0][1]["chunks"][0]["doc"] == "heaps.pdf" and "binary heap" in events[0][1]["prompt"]
     assert "".join(d["text"] for e, d in events if e == "token").startswith("A linked list is a chain")
-    assert events[-1][1] == {"model": "fake-model"}
+    done = events[-1][1]
+    assert done["model"] == "fake-model" and done["cached"] is False and done["unverified_citations"] == 0
+    assert done["citations"][0]["status"] == "ok" and done["uncited"] is False
 
 
 def test_ask_stream_reports_errors_as_events(indexed, fake_gemini):
@@ -234,3 +238,82 @@ def test_models_without_a_key_is_503(api, fake_gemini):
     fake_gemini.fail_with = RuntimeError("GEMINI_API_KEY is not set")
     r = api.get("/api/v1/models")
     assert r.status_code == 503 and r.json()["error"]["code"] == "llm_unavailable"
+
+
+# ----------------------------------------------------------------- citation checking
+def test_invented_and_wrong_page_citations_are_flagged(indexed, fake_gemini):
+    fake_gemini.handler = lambda p, j: "Heaps are trees [heaps.pdf (page 1)], [Operating Systems.pdf (page 3)] and [heaps.pdf (page 40)]."
+    body = indexed.post("/api/v1/ask", json={"question": "what is a binary heap"}).json()
+    by_label = {c["label"]: c["status"] for c in body["citations"]}
+    assert by_label == {
+        "heaps.pdf (page 1)": "ok",
+        "Operating Systems.pdf (page 3)": "unknown_source",
+        "heaps.pdf (page 40)": "page_not_retrieved",
+    }
+    assert body["unverified_citations"] == 2
+
+
+def test_a_long_answer_that_cites_nothing_is_marked_uncited(indexed, fake_gemini):
+    fake_gemini.handler = lambda p, j: "A heap is a tree with an ordering property. " * 10
+    assert indexed.post("/api/v1/ask", json={"question": "what is a binary heap"}).json()["uncited"] is True
+
+
+def test_stream_reports_flagged_citations_in_the_done_event(indexed, fake_gemini):
+    fake_gemini.handler = lambda p, j: "See [Invented.pdf (page 2)] for details."
+    done = parse_sse(indexed.post("/api/v1/ask/stream", json={"question": "what is a binary heap"}).text)[-1]
+    assert done[0] == "done" and done[1]["unverified_citations"] == 1
+    assert done[1]["citations"][0]["status"] == "unknown_source"
+
+
+# ----------------------------------------------------------------- answer cache
+def test_repeating_a_question_reuses_the_answer_without_calling_the_model(indexed, fake_gemini):
+    q = {"question": "what is a binary heap"}
+    first = indexed.post("/api/v1/ask", json=q).json()
+    second = indexed.post("/api/v1/ask", json={"question": "  What is a  binary HEAP "}).json()  # same question, different spacing
+    assert first["cached"] is False and second["cached"] is True
+    assert second["answer"] == first["answer"] and second["citations"] == first["citations"]
+    assert len(fake_gemini.calls) == 1
+
+
+def test_no_cache_asks_again(indexed, fake_gemini):
+    q = {"question": "what is a binary heap"}
+    indexed.post("/api/v1/ask", json=q)
+    fresh = indexed.post("/api/v1/ask", json={**q, "no_cache": True}).json()
+    assert fresh["cached"] is False and len(fake_gemini.calls) == 2
+
+
+@pytest.mark.parametrize("change", [{"mode": "eli5"}, {"k": 2}, {"temperature": 0.9}, {"model": "gemini-3.7-flash"}])
+def test_anything_that_can_change_the_answer_is_part_of_the_cache_key(indexed, fake_gemini, change):
+    q = {"question": "what is a binary heap"}
+    indexed.post("/api/v1/ask", json=q)
+    assert indexed.post("/api/v1/ask", json={**q, **change}).json()["cached"] is False
+
+
+def test_changing_the_index_invalidates_cached_answers(indexed, fake_gemini, pdf_bytes):
+    q = {"question": "what is a binary heap"}
+    indexed.post("/api/v1/ask", json=q)
+    assert indexed.post("/api/v1/ask", json=q).json()["cached"] is True
+    res = indexed.post("/api/v1/sources/files", files={"files": ("graphs.pdf", pdf_bytes("a graph has vertices and edges joined together"), "application/pdf")})
+    indexed.app_state.jobs.wait(res.json()["job_id"])
+    assert indexed.post("/api/v1/ask", json=q).json()["cached"] is False  # the material changed, so ask again
+
+
+def test_failures_and_empty_answers_are_never_cached(indexed, fake_gemini):
+    q = {"question": "what is a binary heap"}
+    fake_gemini.fail_with = ValueError("boom")
+    assert indexed.post("/api/v1/ask", json=q).status_code == 502
+    fake_gemini.fail_with = None
+    assert indexed.post("/api/v1/ask", json=q).json()["cached"] is False  # the failure was not remembered
+
+
+def test_streaming_replays_a_cached_answer_and_a_stream_fills_the_cache(indexed, fake_gemini):
+    q = {"question": "what is a binary heap"}
+    live = parse_sse(indexed.post("/api/v1/ask/stream", json=q).text)
+    replay = parse_sse(indexed.post("/api/v1/ask/stream", json=q).text)
+    text = lambda evs: "".join(d["text"] for e, d in evs if e == "token")  # noqa: E731
+    assert live[-1][1]["cached"] is False and replay[-1][1]["cached"] is True
+    assert text(replay) == text(live)
+    assert [e for e, _ in replay][0] == "meta" and replay[-1][0] == "done"
+    assert len(fake_gemini.calls) == 1
+    # and a non-streaming request reuses what the stream produced
+    assert indexed.post("/api/v1/ask", json=q).json()["cached"] is True

@@ -71,3 +71,13 @@ describe("prompt display", () => {
     expect(s[0]!.prompt).toBe("You are a tutor...");
   });
 });
+
+
+describe("citation checks", () => {
+  it("stores the citation report and cached flag that arrive with done", () => {
+    const citations = [{ label: "x.pdf (page 1)", doc: "x.pdf", page: 1, status: "unknown_source" as const }];
+    let s = reducer([], { type: "start", id: "a", question: "q" });
+    s = reducer(s, { type: "done", id: "a", model: "m", citations, uncited: false, cached: true });
+    expect(s[0]).toMatchObject({ status: "done", citations, uncited: false, cached: true });
+  });
+});

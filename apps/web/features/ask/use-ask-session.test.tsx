@@ -175,6 +175,19 @@ describe("useAskSession", () => {
     expect(result.current.turns[0]).toMatchObject({ status: "error" });
   });
 
+  it("carries the citation report and cached flag from the done event, and can bypass the cache", async () => {
+    const citations = [{ label: "heaps.pdf (page 1)", doc: "heaps.pdf", page: 1, status: "ok" }];
+    askStream.mockImplementation(() =>
+      events({ event: "token", data: { text: "x" } }, { event: "done", data: { model: "m", citations, uncited: false, cached: true } }),
+    );
+    const { result } = renderHook(() => useAskSession());
+    await act(async () => {
+      await result.current.ask({ ...params, noCache: true });
+    });
+    expect(askStream.mock.calls[0]![0]).toMatchObject({ no_cache: true });
+    expect(result.current.turns[0]).toMatchObject({ citations, uncited: false, cached: true });
+  });
+
   it("clear removes everything", async () => {
     askStream.mockImplementation(() => events({ event: "done", data: {} }));
     const { result } = renderHook(() => useAskSession());

@@ -10,10 +10,12 @@ from typing import Any, Dict, Iterator, List
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
+from ...citations import check_answer
 from ...llm_config import DEFAULT_MODEL, GeminiClient
 from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
-from ..deps import common_dependencies, get_analytics, get_engine, raise_if_failed
+from ..answer_cache import AnswerCache, make_key
+from ..deps import common_dependencies, get_analytics, get_answer_cache, get_engine, raise_if_failed, store_version
 from ..errors import ERROR_RESPONSES, ApiError
 from ..schemas import AskRequest, AskResponse, Chunk, Models, SearchResponse, Suggestions
 
@@ -39,9 +41,24 @@ def _record(analytics: AnalyticsStore, req: AskRequest, chunks: List[Dict[str, A
         pass
 
 
+def _cache_key(req: AskRequest, engine: RAGEngine):
+    return make_key(req.question, req.mode, req.k, req.model, req.temperature, store_version(engine))
+
+
 @router.post("/ask", response_model=AskResponse, summary="Answer a question from the indexed material")
-def ask(req: AskRequest, engine: RAGEngine = Depends(get_engine), analytics: AnalyticsStore = Depends(get_analytics)):
+def ask(
+    req: AskRequest,
+    engine: RAGEngine = Depends(get_engine),
+    analytics: AnalyticsStore = Depends(get_analytics),
+    cache: AnswerCache = Depends(get_answer_cache),
+):
     t0 = time.time()
+    key = _cache_key(req, engine)
+    hit = None if req.no_cache else cache.get(key)
+    if hit is not None:
+        _record(analytics, req, hit["chunks"], t0, hit["prompt"], hit["answer"], True)
+        return _response(req, hit, cached=True)
+
     chunks = engine.retrieve_context(req.question, k=req.k)
     prompt = engine.generate_prompt(req.question, chunks, mode=req.mode)
     result = engine.answer_with_gemini(
@@ -50,11 +67,24 @@ def ask(req: AskRequest, engine: RAGEngine = Depends(get_engine), analytics: Ana
     ok = bool(result.get("ok", False))
     _record(analytics, req, chunks, t0, prompt, result.get("answer") or "", ok)
     raise_if_failed(result)
+    answer = result.get("answer") or ""
+    entry = {"answer": answer, "chunks": chunks, "model": result.get("model"), "prompt": prompt, "check": check_answer(answer, chunks)}
+    if answer.strip():
+        cache.put(key, entry)
+    return _response(req, entry, cached=False)
+
+
+def _response(req: AskRequest, entry: Dict[str, Any], cached: bool) -> AskResponse:
+    check = entry["check"]
     return AskResponse(
-        answer=result.get("answer") or "",
-        chunks=[Chunk(**c) for c in chunks],
-        model=result.get("model"),
-        prompt=prompt if req.include_prompt else None,
+        answer=entry["answer"],
+        chunks=[Chunk(**c) for c in entry["chunks"]],
+        model=entry.get("model"),
+        prompt=entry["prompt"] if req.include_prompt else None,
+        citations=check["citations"],
+        unverified_citations=check["unverified"],
+        uncited=check["uncited"],
+        cached=cached,
     )
 
 
@@ -70,14 +100,37 @@ def sse(event: str, data: Dict[str, Any]) -> str:
         "Same input as `/ask`. The response is `text/event-stream` with these events, in order:\n\n"
         "- `meta`: `{chunks, prompt?}` (retrieved context, sent first)\n"
         "- `token`: `{text}` (zero or more answer fragments)\n"
-        "- `done`: `{model}` (end of a successful answer)\n"
+        "- `done`: `{model, citations, unverified_citations, uncited, cached}` (end of a successful answer; the citations are checked against the retrieved passages)\n"
         "- `error`: `{code, message}` (terminal; `code` is `llm_unavailable`, `llm_error` or `retrieval_error`)"
     ),
     responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
 )
-def ask_stream(req: AskRequest, engine: RAGEngine = Depends(get_engine), analytics: AnalyticsStore = Depends(get_analytics)):
+def ask_stream(
+    req: AskRequest,
+    engine: RAGEngine = Depends(get_engine),
+    analytics: AnalyticsStore = Depends(get_analytics),
+    cache: AnswerCache = Depends(get_answer_cache),
+):
+    def done_event(model, check, cached):
+        return sse("done", {"model": model, "citations": check["citations"], "unverified_citations": check["unverified"],
+                            "uncited": check["uncited"], "cached": cached})
+
     def events() -> Iterator[str]:
         t0 = time.time()
+        key = _cache_key(req, engine)
+        hit = None if req.no_cache else cache.get(key)
+        if hit is not None:
+            chunks, prompt = hit["chunks"], hit["prompt"]
+            meta: Dict[str, Any] = {"chunks": [Chunk(**c).model_dump() for c in chunks]}
+            if req.include_prompt:
+                meta["prompt"] = prompt
+            yield sse("meta", meta)
+            text = hit["answer"]
+            for i in range(0, len(text), 48):  # replay in small pieces so the client behaves as it does for a live answer
+                yield sse("token", {"text": text[i : i + 48]})
+            _record(analytics, req, chunks, t0, prompt, text, True)
+            yield done_event(hit.get("model"), hit["check"], True)
+            return
         try:
             chunks = engine.retrieve_context(req.question, k=req.k)
             prompt = engine.generate_prompt(req.question, chunks, mode=req.mode)
@@ -85,7 +138,7 @@ def ask_stream(req: AskRequest, engine: RAGEngine = Depends(get_engine), analyti
             logger.exception("Retrieval failed for streamed question")
             yield sse("error", {"code": "retrieval_error", "message": "Retrieval failed"})
             return
-        meta: Dict[str, Any] = {"chunks": [Chunk(**c).model_dump() for c in chunks]}
+        meta = {"chunks": [Chunk(**c).model_dump() for c in chunks]}
         if req.include_prompt:
             meta["prompt"] = prompt
         yield sse("meta", meta)
@@ -103,8 +156,11 @@ def ask_stream(req: AskRequest, engine: RAGEngine = Depends(get_engine), analyti
             _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return
-        _record(analytics, req, chunks, t0, prompt, "".join(parts), True)
-        yield sse("done", {"model": client.model})
+        text = "".join(parts)
+        check = check_answer(text, chunks)
+        _record(analytics, req, chunks, t0, prompt, text, True)
+        cache.put(key, {"answer": text, "chunks": chunks, "model": client.model, "prompt": prompt, "check": check})
+        yield done_event(client.model, check, False)
 
     return StreamingResponse(
         events(),

@@ -11,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from ..rag_engine import RAGEngine
 from .analytics_store import AnalyticsStore
+from .answer_cache import AnswerCache
 from .errors import ApiError
 from .jobs import JobManager
 from .settings import settings
@@ -42,6 +43,18 @@ def get_analytics(request: Request) -> AnalyticsStore:
     if store is None:
         store = request.app.state.analytics = AnalyticsStore(settings.analytics_db)
     return store
+
+
+def get_answer_cache(request: Request) -> AnswerCache:
+    cache = getattr(request.app.state, "answer_cache", None)
+    if cache is None:
+        cache = request.app.state.answer_cache = AnswerCache()
+    return cache
+
+
+def store_version(engine: RAGEngine) -> str:
+    """Changes whenever the index, or how it is searched, changes, so cached answers never outlive their sources."""
+    return f"{engine.store.embedder_name}:{engine.store.revision}:{engine.retrieval_mode}:{bool(engine._reranker)}"
 
 
 def rate_limit(request: Request) -> None:

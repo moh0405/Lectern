@@ -7,6 +7,7 @@ import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
+import { pageLabel } from "@/lib/format";
 import type { Turn } from "./session";
 
 const MODE_LABEL = { eli5: "ELI5", technical: "Technical", interview: "Interview", summary: "Summary" } as const;
@@ -33,7 +34,48 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () => void; onRemove: () => void }) {
+const CITE_PROBLEM: Record<string, string> = {
+  unknown_source: "that source was not among the passages it was given",
+  page_not_retrieved: "that page was not among the passages it was given",
+};
+
+function CitationWarnings({ turn }: { turn: Turn }) {
+  const bad = (turn.citations ?? []).filter((c) => c.status !== "ok");
+  if (bad.length === 0 && !turn.uncited) return null;
+  return (
+    <Notice>
+      {bad.length > 0 ? (
+        <>
+          <p className="font-medium">
+            {bad.length === 1 ? "This answer cites something it was not given." : "This answer cites things it was not given."} Check
+            before relying on it.
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {bad.map((c) => (
+              <li key={c.label}>
+                <span className="font-mono text-xs">[{c.label}]</span>: {CITE_PROBLEM[c.status]}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p>This answer does not cite any of the sources it was given, so you cannot tell where it came from.</p>
+      )}
+    </Notice>
+  );
+}
+
+export function TurnCard({
+  turn,
+  onStop,
+  onRemove,
+  onFresh,
+}: {
+  turn: Turn;
+  onStop: () => void;
+  onRemove: () => void;
+  onFresh?: () => void;
+}) {
   const streaming = turn.status === "streaming";
   const noKey = turn.error?.code === "llm_unavailable";
   return (
@@ -44,6 +86,7 @@ export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () =>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {turn.mode ? <Badge>{MODE_LABEL[turn.mode]}</Badge> : null}
             {turn.model ? <Badge>{turn.model}</Badge> : null}
+            {turn.cached ? <Badge title="Served from the cache; nothing new was sent to the model">cached</Badge> : null}
             {turn.status === "stopped" ? <Badge>stopped</Badge> : null}
           </div>
         </div>
@@ -54,6 +97,11 @@ export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () =>
             </Button>
           ) : (
             <>
+              {turn.cached && onFresh ? (
+                <Button variant="ghost" size="sm" onClick={onFresh}>
+                  Fresh answer
+                </Button>
+              ) : null}
               {turn.answer ? <CopyButton text={turn.answer} /> : null}
               <Button variant="ghost" size="icon" aria-label="Remove" onClick={onRemove}>
                 <Trash2 className="h-4 w-4" />
@@ -78,6 +126,8 @@ export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () =>
         </div>
       ) : null}
 
+      {turn.status === "done" ? <CitationWarnings turn={turn} /> : null}
+
       {turn.prompt ? (
         <details>
           <summary className="cursor-pointer select-none text-sm text-muted hover:text-fg">Prompt sent to the model</summary>
@@ -93,7 +143,7 @@ export function TurnCard({ turn, onStop, onRemove }: { turn: Turn; onStop: () =>
               {turn.chunks.map((c, i) => (
                 <Badge key={i} title={`Relevance ${c.score.toFixed(2)}`} className="font-mono">
                   [{i + 1}] {c.doc}
-                  {c.page ? ` · p.${c.page}` : ""}
+                  {c.page ? ` · ${pageLabel(c.page, c.end_page, true)}` : ""}
                 </Badge>
               ))}
             </span>

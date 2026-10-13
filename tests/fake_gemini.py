@@ -45,6 +45,8 @@ class FakeGemini:
             # Answer from the first retrieved passage so end-to-end tests can see real retrieval.
             m = re.search(r"^- \[(.+?)\] (.+)$", prompt, re.MULTILINE)
             if m:
+                if "hallucinate" in prompt.lower():  # e2e: a model that invents a source
+                    return f"From your material: {m.group(2)[:100]} [{m.group(1)}] and also [Invented Notes.pdf (page 9)]"
                 return f"From your material: {m.group(2)[:140]} [{m.group(1)}]"
             return "I could not find that in your sources."
         return "A linked list is a chain of nodes. [heaps.pdf (page 1)]"
