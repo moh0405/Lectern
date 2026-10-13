@@ -73,8 +73,17 @@ describe("forward", () => {
 
   it("only serves the versioned API path", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    expect((await forward(new Request("https://app.example/x"), ["health"], cfg)).status).toBe(404);
+    expect((await forward(new Request("https://app.example/x"), ["history"], cfg)).status).toBe(404);
     expect((await forward(new Request("https://app.example/x"), ["api", "v2", "search"], cfg)).status).toBe(404);
+  });
+
+  it("serves the health check, and only as a GET", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ status: "ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const ok = await forward(new Request("https://app.example/x"), ["health"], cfg);
+    expect(ok.status).toBe(200);
+    expect(String((fetchMock.mock.calls[0] as unknown as [URL])[0])).toBe("https://api.example.com/health");
+    expect((await forward(new Request("https://app.example/x", { method: "POST" }), ["health"], cfg)).status).toBe(404);
   });
 
   it("reports an unreachable API as 502", async () => {

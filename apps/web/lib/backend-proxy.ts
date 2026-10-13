@@ -46,16 +46,17 @@ const RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control"
 
 /** `segments` is the URL after /api/backend, as the API client builds it: ["api", "v1", "ask", "stream"]. */
 export async function forward(req: Request, segments: string[], config: ProxyConfig): Promise<Response> {
-  if (segments[0] !== "api" || segments[1] !== "v1") return errorResponse(404, "not_found", "Not found");
-  segments = segments.slice(2);
+  const isHealth = segments.length === 1 && segments[0] === "health" && req.method === "GET"; // the status light in the sidebar
+  if (!isHealth && (segments[0] !== "api" || segments[1] !== "v1")) return errorResponse(404, "not_found", "Not found");
+  segments = isHealth ? segments : segments.slice(2);
   const path = segments.join("/");
   if (!config.backendUrl) return errorResponse(503, "not_configured", "The API address (BACKEND_URL) is not set on this deployment.");
   if (segments.some((s) => s === ".." || s === "." || s === "")) return errorResponse(400, "bad_path", "Invalid path");
-  if (!isAllowed(req.method, path, config.allowWrites)) {
+  if (!isHealth && !isAllowed(req.method, path, config.allowWrites)) {
     return errorResponse(403, "disabled_in_demo", "This feature is turned off in the public demo. Run the project locally to use it.");
   }
 
-  const url = new URL(`/api/v1/${path}`, config.backendUrl);
+  const url = new URL(isHealth ? "/health" : `/api/v1/${path}`, config.backendUrl);
   url.search = new URL(req.url).search;
   const headers = new Headers();
   for (const name of REQUEST_HEADERS) {
