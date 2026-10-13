@@ -1,7 +1,9 @@
 import importlib
 import os
 import shutil
+import sys
 import sqlite3
+import types
 
 import pytest
 
@@ -248,7 +250,7 @@ def test_both_secrets_are_loaded_and_the_api_key_turns_on_authentication(monkeyp
         def get_secret_value(self, SecretId):
             return {"SecretString": {"g/key": "gem", "a/key": "s3cret"}[SecretId]}
 
-    monkeypatch.setattr("boto3.client", lambda name: SM(), raising=False)
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda name: SM()))  # boto3 is an optional extra
     monkeypatch.setattr(cs, "_client", lambda: cloud)
     for var in ("GEMINI_API_KEY", "API_KEY"):
         monkeypatch.delenv(var, raising=False)
