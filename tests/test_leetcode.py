@@ -92,3 +92,10 @@ def test_filters_combine_with_a_query(handler):
     res = handler.search("binary tree", top_k=10, difficulty=["Medium"], topics=["Tree"])
     assert res and all(r["difficulty"] == "Medium" for r in res)
     assert res[0]["score"] >= res[-1]["score"]
+
+
+def test_constructing_a_handler_does_not_touch_the_filesystem(tmp_path):
+    missing = tmp_path / "nope" / "leetcode"
+    h = LeetCodeHandler(cache_dir=str(missing))
+    assert not missing.exists()
+    assert not h.is_loaded()
