@@ -6,6 +6,8 @@
  * read and "ask" routes pass. The owner can lift that with BACKEND_ALLOW_WRITES=1 on a private deployment.
  */
 
+import { DEMO_DISABLED_MESSAGE } from "./demo-message";
+
 const ALLOWED: Array<[method: string, pattern: RegExp]> = [
   ["GET", /^documents$/],
   ["GET", /^stats$/],
@@ -53,7 +55,7 @@ export async function forward(req: Request, segments: string[], config: ProxyCon
   if (!config.backendUrl) return errorResponse(503, "not_configured", "The API address (BACKEND_URL) is not set on this deployment.");
   if (segments.some((s) => s === ".." || s === "." || s === "")) return errorResponse(400, "bad_path", "Invalid path");
   if (!isHealth && !isAllowed(req.method, path, config.allowWrites)) {
-    return errorResponse(403, "disabled_in_demo", "This feature is turned off in the public demo. Run the project locally to use it.");
+    return errorResponse(403, "disabled_in_demo", DEMO_DISABLED_MESSAGE);
   }
 
   const url = new URL(isHealth ? "/health" : `/api/v1/${path}`, config.backendUrl);

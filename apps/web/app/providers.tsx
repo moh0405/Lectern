@@ -3,8 +3,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api";
+import { DemoContext } from "@/lib/demo";
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children, demo = false }: { children: ReactNode; demo?: boolean }) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -18,5 +19,9 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <DemoContext.Provider value={demo}>
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    </DemoContext.Provider>
+  );
 }

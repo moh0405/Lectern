@@ -13,11 +13,14 @@ export const metadata: Metadata = {
   description: "A RAG tutor for Computer Science: ask your own material, get cited answers.",
 };
 
+// The hosted app talks to the API through the key-holding proxy; unless the owner lifted the limits, it is the public demo.
+const isDemo = () => Boolean(process.env.BACKEND_URL) && process.env.BACKEND_ALLOW_WRITES !== "1";
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${mono.variable}`}>
       <body className="font-sans antialiased">
-        <Providers>
+        <Providers demo={isDemo()}>
           <AppShell>{children}</AppShell>
         </Providers>
       </body>

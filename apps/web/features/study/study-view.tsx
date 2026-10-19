@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorNotice, Notice, Skeleton, Spinner } from "@/components/ui/feedback";
 import { Input, Label, Textarea } from "@/components/ui/field";
+import { useDemo, demoDisabled } from "@/lib/demo";
 import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { plural } from "@/lib/format";
@@ -26,9 +27,10 @@ function Review({ onReviewed }: { onReviewed: () => void }) {
   const qc = useQueryClient();
   const [shown, setShown] = useState(false);
   const [last, setLast] = useState<string | null>(null);
+  const demo = useDemo();
   const due = useQuery({
     queryKey: ["cards", "due"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/cards", { params: { query: { due: true, limit: 100 } } })),
+    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { due: true, limit: 100 } } }))),
   });
   const review = useMutation({
     mutationFn: async ({ id, grade }: { id: number; grade: number }) =>
@@ -89,9 +91,10 @@ function Review({ onReviewed }: { onReviewed: () => void }) {
 
 export function StudyView() {
   const qc = useQueryClient();
+  const demo = useDemo();
   const deck = useQuery({
     queryKey: ["cards", "all"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/cards", { params: { query: { limit: 1000 } } })),
+    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { limit: 1000 } } }))),
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["cards"] });
 
