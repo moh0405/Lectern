@@ -5,7 +5,11 @@ apps
 packages
 docs
 eval
-data
+# Local data stays out of the image, except the LeetCode problem bank the API serves read-only.
+data/*
+!data/leetcode
+data/leetcode/*
+!data/leetcode/normalized_problems.jsonl
 tests
 **/__pycache__
 *.egg-info

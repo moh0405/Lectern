@@ -66,8 +66,9 @@ class LeetCodeHandler:
     """
 
     def __init__(self, cache_dir: str = "data/leetcode", model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        # Not created here: on a read-only filesystem (AWS Lambda) the directory comes with the image, and
+        # every method that writes into it creates it first.
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.model_name = model_name
         self._problems: List[LCProblem] = []
         self._id_index: Dict[str, int] = {}
@@ -334,6 +335,7 @@ class LeetCodeHandler:
                 pass
         texts = [f"{p.title}\n\n{p.description}" for p in self._problems]
         arr = embed_texts(texts, model_name=self.model_name)
+        emb_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(str(emb_path), arr)
         self._embeddings = arr
 

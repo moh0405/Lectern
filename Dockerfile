@@ -41,6 +41,8 @@ RUN useradd --create-home --uid 10001 app && mkdir -p /data && chown app /data
 USER app
 WORKDIR /app
 COPY --chown=app backend ./backend
+# LeetCode problem bank (read-only at runtime; the filesystem is read-only on Lambda).
+COPY --chown=app data/leetcode/normalized_problems.jsonl ./data/leetcode/normalized_problems.jsonl
 VOLUME /data
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
