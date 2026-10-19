@@ -3,15 +3,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, ErrorNotice, Skeleton } from "@/components/ui/feedback";
+import { useDemo, demoDisabled } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { DifficultyBadge } from "./difficulty-badge";
 import { useProgress } from "./progress";
 
 export function StudyPlan({ onOpen }: { onOpen: (pid: string) => void }) {
   const progress = useProgress();
+  const demo = useDemo();
   const plan = useQuery({
     queryKey: ["lc-plan"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/leetcode/plan", { params: { query: { size: 8 } } })),
+    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/leetcode/plan", { params: { query: { size: 8 } } }))),
   });
   const s = progress.data?.summary;
 

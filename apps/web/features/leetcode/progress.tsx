@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorNotice } from "@/components/ui/feedback";
 import { Label, Textarea } from "@/components/ui/field";
+import { useDemo, demoDisabled } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -15,9 +16,10 @@ export const STATUS_LABEL: Record<Status, string> = { todo: "To do", attempted: 
 
 /** Everything you have marked, by problem id. Shared by the list, the detail panel and the plan. */
 export function useProgress() {
+  const demo = useDemo();
   return useQuery({
     queryKey: ["lc-progress"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/leetcode/progress")),
+    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/leetcode/progress"))),
   });
 }
 

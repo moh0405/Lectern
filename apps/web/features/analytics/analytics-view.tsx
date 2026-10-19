@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorNotice, Skeleton } from "@/components/ui/feedback";
+import { useDemo, demoDisabled } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { plural } from "@/lib/format";
@@ -25,9 +26,10 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 export function AnalyticsView() {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState(false);
+  const demo = useDemo();
   const data = useQuery({
     queryKey: ["analytics"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/analytics", { params: { query: { limit: 50 } } })),
+    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/analytics", { params: { query: { limit: 50 } } }))),
   });
   const clear = useMutation({
     mutationFn: async () => unwrap(await api.http.DELETE("/api/v1/analytics")),

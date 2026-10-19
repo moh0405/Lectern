@@ -259,3 +259,21 @@ describe("useAskSession", () => {
     });
   });
 });
+
+describe("useAskSession on the public demo", () => {
+  it("never calls the server-side history endpoints", async () => {
+    const { DemoContext } = await import("@/lib/demo");
+    askStream.mockImplementation(() => events({ event: "token", data: { text: "Hi" } }, { event: "done", data: {} }));
+    const { result } = renderHook(() => useAskSession(), {
+      wrapper: ({ children }) => <DemoContext.Provider value={true}>{children}</DemoContext.Provider>,
+    });
+    await act(async () => {
+      await result.current.ask(params);
+    });
+    act(() => result.current.clear());
+    expect(result.current.turns).toHaveLength(0);
+    expect(httpGet).not.toHaveBeenCalled();
+    expect(httpPost).not.toHaveBeenCalled();
+    expect(httpDelete).not.toHaveBeenCalled();
+  });
+});

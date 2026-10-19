@@ -129,7 +129,7 @@ export function LeetCodeView() {
 
       {search.isError ? <ErrorNotice>{errorMessage(search.error)}</ErrorNotice> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <section aria-label="Results" className="space-y-2">
           {search.isPending ? (
             Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-16" />)

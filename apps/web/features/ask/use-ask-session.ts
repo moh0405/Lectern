@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
+import { useDemo } from "@/lib/demo";
 import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Mode, type Turn } from "./session";
 
 export interface AskParams {
@@ -39,6 +40,7 @@ let counter = 0;
 const newId = () => `${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 export function useAskSession() {
+  const demo = useDemo(); // the public demo keeps no server-side history, so do not ask it to
   const [{ turns, hydrated }, dispatch] = useReducer(sessionReducer, initialSession);
   const controllers = useRef(new Map<string, AbortController>());
   // Saving is gated on `hydrated` (state, not a ref): the first commit must not write the empty
@@ -52,7 +54,7 @@ export function useAskSession() {
     const loaded = loadTurns();
     loaded.forEach((t) => synced.current.add(t.id));
     dispatch({ type: "hydrate", turns: loaded });
-    if (loaded.length > 0) return;
+    if (loaded.length > 0 || demo) return;
     void (async () => {
       try {
         const res = await api.http.GET("/api/v1/history", { params: { query: { limit: 20 } } });
@@ -66,7 +68,7 @@ export function useAskSession() {
         /* offline: nothing to restore */
       }
     })();
-  }, []);
+  }, [demo]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -74,9 +76,9 @@ export function useAskSession() {
       if (t.status !== "done" || synced.current.has(t.id)) continue;
       synced.current.add(t.id);
       if (!t.answer) continue; // retrieval-only lookups are not history
-      void saveRemote(t, serverIds.current);
+      if (!demo) void saveRemote(t, serverIds.current);
     }
-  }, [turns, hydrated]);
+  }, [turns, hydrated, demo]);
 
   useEffect(() => {
     if (hydrated) saveTurns(turns);
@@ -142,15 +144,15 @@ export function useAskSession() {
     const serverId = serverIds.current.get(id);
     if (serverId !== undefined) {
       serverIds.current.delete(id);
-      void bestEffort(() => api.http.DELETE("/api/v1/history/{turn_id}", { params: { path: { turn_id: serverId } } }));
+      if (!demo) void bestEffort(() => api.http.DELETE("/api/v1/history/{turn_id}", { params: { path: { turn_id: serverId } } }));
     }
-  }, []);
+  }, [demo]);
   const clear = useCallback(() => {
     controllers.current.forEach((c) => c.abort());
     dispatch({ type: "clear" });
     serverIds.current.clear();
-    void bestEffort(() => api.http.DELETE("/api/v1/history"));
-  }, []);
+    if (!demo) void bestEffort(() => api.http.DELETE("/api/v1/history"));
+  }, [demo]);
 
   return { turns, ask, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
 }
