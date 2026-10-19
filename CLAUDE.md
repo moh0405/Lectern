@@ -15,6 +15,8 @@ Portfolio RAG tutor: FastAPI backend (`backend/`) + Next.js/TypeScript web app (
 
 The Lambda runs the fixed image: its code SHA matches ECR `latest` (pushed 2026-10-14 17:30 EDT). Live checks on 2026-10-19: `POST /api/v1/math` with `2+3*4` returns `kind`/`latex`/`steps`; `GET /health` is ok (3867 chunks; cold start about 35 s); `GET /api/v1/search?query=...` returns chunks (the parameter is `query`, not `q`); `POST /ask/stream` returns the `meta` event with sources, then a `quota_exhausted` error event because the Gemini free quota was used up.
 
+**2026-10-19 later:** `/leetcode` was returning 500 (LeetCodeHandler did `mkdir` on Lambda's read-only filesystem, and the image lacked the dataset). Fixed in PR #22 (`fix/leetcode-lambda`) and deployed from that branch (image digest `9959bb12...`, pushed 11:46 EDT). Verified live: stats (1,825 problems), search, problem detail, and the page. LeetCode search is keyword-only (no embeddings in the image). PR #21 fixes the openapi test on Python 3.13. **Merge #22 before deploying from `main` again, or the 500 returns.** Still open: the home and Ask pages log 403s for demo-disabled `/history` (and Flashcards `/cards`); the Ask page scrolls sideways by about 38 px at 390 px wide; Tutor tools were not seen succeeding (Gemini quota/503); `/visualize` crashed once with `toLocaleString` of undefined and could not be reproduced.
+
 To redeploy later (`docker version` must show a Server section; run `open -a Docker` first):
 
 ```sh
