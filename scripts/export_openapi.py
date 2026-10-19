@@ -19,8 +19,20 @@ from backend.api import app  # noqa: E402
 TARGET = PROJECT_ROOT / "packages" / "api-client" / "openapi.json"
 
 
+# Python 3.13 renamed these HTTPStatus phrases, which FastAPI copies into the schema. Pin them so the
+# output is the same on every Python version.
+STATUS_PHRASES = {"413": "Request Entity Too Large", "422": "Unprocessable Entity"}
+
+
 def render() -> str:
-    return json.dumps(app.openapi(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    schema = app.openapi()
+    for path_item in schema.get("paths", {}).values():
+        for operation in path_item.values():
+            for code, phrase in STATUS_PHRASES.items():
+                response = operation.get("responses", {}).get(code)
+                if response is not None:
+                    response["description"] = phrase
+    return json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
 def main() -> int:
