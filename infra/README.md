@@ -37,3 +37,14 @@ Variables: `monthly_budget_usd` (default 15), `daily_llm_limit` (default 200), `
 Remove everything: `terraform destroy -var budget_email=x`.
 
 Note the shell quirk: write `"${REPO}:latest"`, not `$REPO:latest`; zsh reads `:l` as a lowercase modifier.
+
+## CI deploy (optional)
+
+`ci.tf` creates a GitHub OIDC provider and a role that only the `main` branch of this repository can assume, with permission to push to the ECR repository and update this one function. Nothing is created until you run:
+
+```sh
+terraform apply -var enable_ci_deploy=true
+gh variable set AWS_DEPLOY_ROLE_ARN --body "$(terraform output -raw ci_deploy_role_arn)"
+```
+
+After that, `.github/workflows/deploy.yml` rebuilds and deploys the API when backend files change on `main` (or when run by hand). No AWS keys are stored in GitHub. Remove it with `terraform apply -var enable_ci_deploy=false`.
