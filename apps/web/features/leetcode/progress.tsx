@@ -6,8 +6,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorNotice } from "@/components/ui/feedback";
 import { Label, Textarea } from "@/components/ui/field";
-import { useDemo, demoDisabled } from "@/lib/demo";
+import { useDemo } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
+import { loadLocalProgress, saveLocalProgress, type ProblemMeta } from "@/lib/local-progress";
 import { cn } from "@/lib/utils";
 
 export type Status = "todo" | "attempted" | "solved";
@@ -19,7 +20,8 @@ export function useProgress() {
   const demo = useDemo();
   return useQuery({
     queryKey: ["lc-progress"],
-    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/leetcode/progress"))),
+    // In the public demo the marks live in this browser; the shared server database stays off.
+    queryFn: async () => (demo ? loadLocalProgress() : unwrap(await api.http.GET("/api/v1/leetcode/progress"))),
   });
 }
 
@@ -29,7 +31,9 @@ export function StatusIcon({ status, className }: { status?: Status; className?:
   return null;
 }
 
-export function ProgressPanel({ pid }: { pid: string }) {
+export function ProgressPanel({ problem }: { problem: ProblemMeta }) {
+  const { pid } = problem;
+  const demo = useDemo();
   const qc = useQueryClient();
   const progress = useProgress();
   const current = progress.data?.items.find((i) => i.pid === pid);
@@ -39,7 +43,7 @@ export function ProgressPanel({ pid }: { pid: string }) {
 
   const save = useMutation({
     mutationFn: async (v: { status: Status; notes?: string }) =>
-      unwrap(await api.http.PUT("/api/v1/leetcode/progress/{pid}", { params: { path: { pid } }, body: v })),
+      demo ? saveLocalProgress(problem, v) : unwrap(await api.http.PUT("/api/v1/leetcode/progress/{pid}", { params: { path: { pid } }, body: v })),
     onSuccess: () => {
       setDraft(null);
       void qc.invalidateQueries({ queryKey: ["lc-progress"] });

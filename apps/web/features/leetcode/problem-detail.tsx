@@ -63,7 +63,7 @@ export function ProblemDetail({ pid, onClose }: { pid: string; onClose: () => vo
             </div>
           </div>
 
-          <ProgressPanel pid={pid} />
+          <ProgressPanel problem={{ pid, title: problem.data.title, difficulty: problem.data.difficulty, topics: problem.data.topics }} />
 
           {/* Scrollable, so it must be reachable by keyboard (WCAG 2.1.1) */}
           <div
