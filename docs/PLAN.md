@@ -161,7 +161,7 @@ Originally deferred; done after v1's core because the user asked for it. **Accou
 - [x] A live demo link in the README.
 
 ## Phase 7: Docs and release
-- [ ] Fill in `docs/ARCHITECTURE.md`; add an API guide and a contributor guide.
+- [x] Fill in `docs/ARCHITECTURE.md` (now with deployment and demo mode); API guide in `docs/API.md`; contributor guide in `CONTRIBUTING.md`.
 - [ ] Refresh README screenshots and update "Known limitations".
 - [ ] Short demo video or GIF for the portfolio.
 - [ ] Tag `v1.0`.
