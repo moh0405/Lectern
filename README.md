@@ -4,7 +4,7 @@
 
 Full stack: Python/FastAPI backend with a hand-built vector store and hybrid search, a TypeScript/Next.js frontend, and an evaluation harness that measures every retrieval decision.
 
-**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, flashcards, progress and history are switched off because they would be shared between all visitors. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
+**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
 
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
@@ -30,7 +30,7 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 | ![Embedding map](docs/images/embedding-map.png) | ![LeetCode](docs/images/leetcode.png) |
 | 3D map of the real embeddings (PCA) | LeetCode search and study guide |
 
-More: [Socratic tutor](docs/images/socratic.png) · [Math](docs/images/math.png) · [Analytics](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
+More: [Flashcards](docs/images/flashcards.png) · [Socratic tutor](docs/images/socratic.png) · [Math](docs/images/math.png) · [Analytics](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
 
 ---
 
@@ -213,7 +213,7 @@ docs/            architecture, concepts, phases, API, plan
 
 ## Status and honest limits
 
-Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Phase 6 (deployment) is partly done: the API is live on AWS, while the hosted web app, automatic deploys and extra hardening are next. Phase 7 is release polish; see [`docs/PLAN.md`](docs/PLAN.md).
+Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Phase 6 (deployment) is done except automatic deploys: the API runs on AWS and the web app on Vercel, and a GitHub-OIDC deploy workflow is written but opt-in (see `infra/README.md`). Phase 7 is release polish: docs are filled in and screenshots refreshed; a demo video and the v1.0 tag are what remain. See [`docs/PLAN.md`](docs/PLAN.md). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 - The AWS deployment is a single-user demo design: study data is a SQLite file synced through S3, not a database that several users can write to at once.
 - Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).

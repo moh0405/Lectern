@@ -82,6 +82,17 @@ test("capture the app", async ({ page, request }) => {
   await page.waitForTimeout(400);
   await shot(page, "math");
 
+  // 7b. Flashcards: a due card with its answer shown
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/study");
+  await page.getByLabel("Front (question)").fill("What does a hash table trade for O(1) average lookup?");
+  await page.getByLabel("Back (answer)").fill("Extra memory and unordered keys; worst case is O(n) when many keys collide.");
+  await page.getByRole("button", { name: "Add card" }).click();
+  await page.getByRole("button", { name: "Show answer" }).click();
+  await expect(page.getByTestId("card-back")).toBeVisible();
+  await page.waitForTimeout(400);
+  await shot(page, "flashcards");
+
   // 8. Analytics
   await page.goto("/analytics");
   await expect(page.getByText("Most used sources")).toBeVisible();

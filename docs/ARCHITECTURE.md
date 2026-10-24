@@ -46,7 +46,7 @@ Plus `eval/` (retrieval evaluation), `tests/` (Python tests), `scripts/` (CLI to
 | Folder | Contents |
 |---|---|
 | `app/` | One tiny file per route; each renders a view from `features/` |
-| `features/` | One folder per feature: `ask`, `sources`, `leetcode`, `tutor`, `math`, `visualize`, `analytics` |
+| `features/` | One folder per feature: `ask`, `sources`, `leetcode`, `study` (flashcards), `tutor`, `math`, `visualize`, `analytics` |
 | `components/` | The shell (sidebar, status), command palette, Markdown renderer, UI primitives |
 | `lib/` | API helpers, URL-state hook, formatting, CSV and download helpers |
 | `e2e/`, `screenshots/` | Playwright browser tests; the README screenshot capture |
@@ -134,6 +134,7 @@ data/
     embeddings.npy       float32 matrix; row i belongs to chunk i; every row has length 1
     index.faiss          only when VECTOR_BACKEND=faiss
   analytics.db           SQLite: one row per asked question
+  study.db               SQLite: flashcards (SM-2 state), LeetCode progress, Ask history
   leetcode/
     normalized_problems.jsonl   1,825 problems (committed)
     kaggle/                     the raw CSVs it was built from (committed)
@@ -168,7 +169,7 @@ Full route list: see the README or [API reference](API.md).
 - **Server state** (anything that lives on the server: documents, stats, jobs, analytics) goes through **TanStack Query**: caching, de-duplication, retries (not on 4xx), polling for jobs.
 - **Streaming** is a small state machine: a pure *reducer* (`features/ask/session.ts`) turns events (`start`, `meta`, `token`, `done`, `error`, `stop`) into state, and a hook (`use-ask-session.ts`) feeds it from the SSE stream. Because the reducer is pure it is easy to unit-test.
 - **URL as state** for filters and selections (LeetCode, tutor tabs), so a view can be shared and survives a reload.
-- **Persistence:** finished Ask turns are saved to `localStorage`; a half-streamed answer is never saved.
+- **Persistence:** finished Ask turns are saved on the server (`/history`) and restored in a fresh browser; a half-streamed answer is never saved. In the public demo, where the shared database is off, LeetCode progress and flashcards are kept in the visitor's own `localStorage` instead (`lib/local-progress.ts`, `lib/local-cards.ts`; the card scheduler mirrors `backend/srs.py`).
 - **Markdown from the model is untrusted:** `react-markdown` does not render raw HTML, and exported HTML goes through a sanitizer on the server.
 
 ## 9. Quality architecture
@@ -215,6 +216,21 @@ Full route list: see the README or [API reference](API.md).
 ## 12. Limits and honest scale
 
 - Exact search compares the query with every vector: fine up to roughly 100,000 passages on one machine; beyond that you would want an approximate index (FAISS IVF/HNSW, or a vector database).
-- One process, in-memory jobs and rate limits: right for a portfolio deployment, not for many users. Phase 6 covers deployment; a real multi-user system would need auth, a shared job queue and a database.
+- One process, in-memory jobs and rate limits: right for a portfolio deployment, not for many users. Section 13 describes the deployment; a real multi-user system would need auth, a shared job queue and a database.
 - Retrieval quality is measured on 33 and 44 questions, so differences smaller than about 10 points are noise (see `eval/README.md`).
 - Answer *faithfulness* (does the model's claim match its source?) is not measured, only whether citations point at real retrieved passages.
+
+## 13. Deployment
+
+```
+Browser -> Vercel (Next.js) -> /api/backend/* proxy (adds X-API-Key) -> Lambda Function URL -> FastAPI container
+                                                                             |-> S3 (index + study.db, restored at start, saved after changes)
+                                                                             |-> Secrets Manager (Gemini key, API key)
+                                                                             `-> Gemini
+```
+
+- **API:** the same Docker image runs on AWS Lambda (CPU PyTorch, MiniLM baked in). State lives in S3 because a container's disk is wiped on restart. Infrastructure is Terraform (`infra/`); see [AWS.md](AWS.md) for costs and measurements.
+- **Web app:** Vercel. The browser never calls the API directly; `apps/web/lib/backend-proxy.ts` forwards allowed requests and adds the key, so the key never reaches a visitor.
+- **Public-demo rules:** the proxy allows reading and asking only. Routes that write to, or reveal, the shared study database answer `403 disabled_in_demo`, and the web app does not send them (`lib/demo.tsx`). Flashcards and LeetCode progress still work for each visitor through browser storage; history, analytics and the personalised study plan stay off.
+- **Delivery:** CI (GitHub Actions) tests every push, including a real-browser run in demo mode (`apps/web/playwright.demo.config.ts`). An optional OIDC deploy workflow (`.github/workflows/deploy.yml`, off until enabled in `infra/ci.tf`) updates the Lambda without stored AWS keys.
+- **Known limit:** Lambda may run several copies, each with its own disk, so concurrent writes to `study.db` could overwrite each other. Fine for one person, which is why the demo keeps visitor data in the browser.
