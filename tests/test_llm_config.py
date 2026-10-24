@@ -162,3 +162,16 @@ def test_stream_retries_before_first_delta_only():
 def test_list_supported_models_sorts_flash_latest_first():
     c = make(models=("gemini-pro-x", "gemini-3.8-flash", "gemini-flash-latest"))
     assert c.list_supported_models()[0] == "gemini-flash-latest"
+
+
+def test_timeout_comes_from_env_and_is_never_unbounded(monkeypatch):
+    from backend import llm_config
+
+    monkeypatch.delenv("GEMINI_TIMEOUT_S", raising=False)
+    assert llm_config._timeout_s() == llm_config.DEFAULT_TIMEOUT_S
+    monkeypatch.setenv("GEMINI_TIMEOUT_S", "12")
+    assert llm_config._timeout_s() == 12.0
+    monkeypatch.setenv("GEMINI_TIMEOUT_S", "nonsense")
+    assert llm_config._timeout_s() == llm_config.DEFAULT_TIMEOUT_S
+    monkeypatch.setenv("GEMINI_TIMEOUT_S", "0")
+    assert llm_config._timeout_s() == 1.0

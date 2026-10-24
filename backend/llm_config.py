@@ -9,7 +9,8 @@ The public surface is small and unchanged for callers:
     client.list_supported_models()
 
 Configuration (environment or `.env`):
-    GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.8-flash), GEMINI_TEMPERATURE
+    GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.8-flash), GEMINI_TEMPERATURE,
+    GEMINI_TIMEOUT_S (per attempt, default 30)
 """
 
 from __future__ import annotations
@@ -44,11 +45,21 @@ FALLBACK_MODELS = [
     "gemini-pro-latest",
 ]
 RETRY_ATTEMPTS = 3
+# Per-attempt limit. Without one a stalled model call outlives the host (Lambda stops at 120 s) and the user
+# sees a stream that just ends. 3 attempts of 30 s fit inside 120 s and end in a normal `llm_error` event.
+DEFAULT_TIMEOUT_S = 30.0
 _TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
 _TRANSIENT_MARKERS = ("unavailable", "timeout", "timed out", "rate limit", "resource exhausted", "overloaded")
 
 # (api key suffix, requested model) -> resolved model, so listing models is not repeated per request
 _resolved_models: Dict[tuple, str] = {}
+
+
+def _timeout_s() -> float:
+    try:
+        return max(1.0, float(os.getenv("GEMINI_TIMEOUT_S", str(DEFAULT_TIMEOUT_S))))
+    except ValueError:
+        return DEFAULT_TIMEOUT_S
 
 
 def _is_transient(exc: Exception) -> bool:
@@ -84,7 +95,7 @@ class GeminiClient:
             key = api_key or os.getenv("GEMINI_API_KEY")
             if not key:
                 raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment or .env file.")
-            client = genai.Client(api_key=key)
+            client = genai.Client(api_key=key, http_options=genai_types.HttpOptions(timeout=int(_timeout_s() * 1000)))
             self._key_id = key[-6:]
         else:
             self._key_id = "injected"
