@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, ErrorNotice, Skeleton } from "@/components/ui/feedback";
-import { useDemo, demoDisabled } from "@/lib/demo";
+import { useDemo } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { DifficultyBadge } from "./difficulty-badge";
 import { useProgress } from "./progress";
@@ -13,7 +13,8 @@ export function StudyPlan({ onOpen }: { onOpen: (pid: string) => void }) {
   const demo = useDemo();
   const plan = useQuery({
     queryKey: ["lc-plan"],
-    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/leetcode/plan", { params: { query: { size: 8 } } }))),
+    enabled: !demo, // the plan is computed on the server from the shared database, so it is off in the demo
+    queryFn: async () => unwrap(await api.http.GET("/api/v1/leetcode/plan", { params: { query: { size: 8 } } })),
   });
   const s = progress.data?.summary;
 
@@ -27,7 +28,11 @@ export function StudyPlan({ onOpen }: { onOpen: (pid: string) => void }) {
           </p>
         ) : null}
       </div>
-      {plan.isPending ? (
+      {demo ? (
+        <p className="text-sm text-muted">
+          Your marks and notes are saved in this browser only. The personalised plan needs a private deployment; run the project locally to use it.
+        </p>
+      ) : plan.isPending ? (
         <Skeleton className="h-20" />
       ) : plan.isError ? (
         <ErrorNotice>{errorMessage(plan.error)}</ErrorNotice>
