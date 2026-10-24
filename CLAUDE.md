@@ -33,7 +33,7 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 
 ## Local dev
 
-`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 339 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (39) and `-c playwright.demo.config.ts` (demo mode, 2). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
+`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 341 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (39) and `-c playwright.demo.config.ts` (demo mode, 2). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
 
 ## Known state / limits (be honest about these)
 

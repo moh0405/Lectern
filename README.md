@@ -93,7 +93,7 @@ How the pieces fit:
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (340), Vitest (84), Playwright + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (341), Vitest (94), Playwright (39 + 2 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
