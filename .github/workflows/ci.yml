@@ -80,6 +80,11 @@ jobs:
         working-directory: apps/web
         env:
           CI: "true"
+      - name: Public-demo mode (browser-stored flashcards and LeetCode progress)
+        run: npx playwright test -c playwright.demo.config.ts
+        working-directory: apps/web
+        env:
+          E2E_PYTHON: python
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

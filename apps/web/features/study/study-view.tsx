@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorNotice, Notice, Skeleton, Spinner } from "@/components/ui/feedback";
 import { Input, Label, Textarea } from "@/components/ui/field";
-import { useDemo, demoDisabled } from "@/lib/demo";
+import { useDemo } from "@/lib/demo";
+import { addLocalCard, deleteLocalCard, listLocalCards, reviewLocalCard } from "@/lib/local-cards";
+import { toCsvRows } from "@/lib/csv";
 import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { plural } from "@/lib/format";
@@ -30,11 +32,12 @@ function Review({ onReviewed }: { onReviewed: () => void }) {
   const demo = useDemo();
   const due = useQuery({
     queryKey: ["cards", "due"],
-    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { due: true, limit: 100 } } }))),
+    // In the public demo the deck lives in this browser.
+    queryFn: async () => (demo ? listLocalCards({ dueOnly: true }) : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { due: true, limit: 100 } } }))),
   });
   const review = useMutation({
     mutationFn: async ({ id, grade }: { id: number; grade: number }) =>
-      unwrap(await api.http.POST("/api/v1/cards/{card_id}/review", { params: { path: { card_id: id } }, body: { grade } })),
+      demo ? reviewLocalCard(id, grade) : unwrap(await api.http.POST("/api/v1/cards/{card_id}/review", { params: { path: { card_id: id } }, body: { grade } })),
     onSuccess: (card) => {
       setShown(false);
       setLast(`Next review ${describeInterval(card.interval_days)}.`);
@@ -94,14 +97,14 @@ export function StudyView() {
   const demo = useDemo();
   const deck = useQuery({
     queryKey: ["cards", "all"],
-    queryFn: async () => (demo ? demoDisabled() : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { limit: 1000 } } }))),
+    queryFn: async () => (demo ? listLocalCards() : unwrap(await api.http.GET("/api/v1/cards", { params: { query: { limit: 1000 } } }))),
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["cards"] });
 
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const add = useMutation({
-    mutationFn: async () => unwrap(await api.http.POST("/api/v1/cards", { body: { front, back } })),
+    mutationFn: async () => (demo ? addLocalCard(front, back) : unwrap(await api.http.POST("/api/v1/cards", { body: { front, back } }))),
     onSuccess: () => {
       setFront("");
       setBack("");
@@ -118,6 +121,7 @@ export function StudyView() {
 
   const remove = useMutation({
     mutationFn: async (id: number) => {
+      if (demo) return deleteLocalCard(id);
       const res = await api.http.DELETE("/api/v1/cards/{card_id}", { params: { path: { card_id: id } } });
       if (res.error !== undefined) throw new Error("Could not delete the card");
     },
@@ -126,6 +130,11 @@ export function StudyView() {
 
   const exportAs = useMutation({
     mutationFn: async (format: "csv" | "apkg") => {
+      if (demo) {
+        const rows = listLocalCards().cards.map((c) => [c.front, c.back]);
+        downloadBlob(new Blob([toCsvRows(rows)], { type: "text/csv" }), "flashcards.csv");
+        return;
+      }
       const res = await api.http.GET("/api/v1/cards/export", { params: { query: { format } }, parseAs: "blob" });
       if (res.error !== undefined || !res.data) {
         const body = res.error as { error?: { message?: string } } | undefined;
@@ -147,9 +156,11 @@ export function StudyView() {
               <Button variant="ghost" size="sm" onClick={() => exportAs.mutate("csv")} disabled={exportAs.isPending}>
                 <Download className="h-4 w-4" /> CSV
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => exportAs.mutate("apkg")} disabled={exportAs.isPending}>
-                <Download className="h-4 w-4" /> Anki
-              </Button>
+              {demo ? null : (
+                <Button variant="ghost" size="sm" onClick={() => exportAs.mutate("apkg")} disabled={exportAs.isPending}>
+                  <Download className="h-4 w-4" /> Anki
+                </Button>
+              )}
             </div>
           ) : undefined
         }
@@ -201,7 +212,8 @@ export function StudyView() {
             <Label htmlFor="gen-topic">Topic (optional)</Label>
             <Input id="gen-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. hash tables" maxLength={200} />
           </div>
-          <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
+          {demo ? <Notice>Writing cards needs the model and your own sources, so it is off in the public demo. Your hand-made cards are saved in this browser only.</Notice> : null}
+          <Button onClick={() => generate.mutate()} disabled={generate.isPending || demo}>
             {generate.isPending ? <Spinner /> : <Sparkles className="h-4 w-4" />} Generate cards
           </Button>
           {generateCode === "llm_unavailable" ? (
