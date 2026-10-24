@@ -8,6 +8,8 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
+**Demo video (51 s):** [docs/demo/ai-study-mentor-demo.mp4](docs/demo/ai-study-mentor-demo.mp4). Recorded with Playwright against the local demo server (scripted model, as below); regenerate with `cd apps/web && npx playwright test -c playwright.video.config.ts`.
+
 > **About the screenshots.** They are captured from `scripts/demo_server.py`, which runs the real API, real chunking, real MiniLM embeddings and real hybrid retrieval over a small committed corpus, but uses a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
 
 ---

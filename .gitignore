@@ -208,3 +208,4 @@ infra/.terraform/
 *.tfstate.*
 infra/*.tfvars
 .vercel
+apps/web/video-out/
