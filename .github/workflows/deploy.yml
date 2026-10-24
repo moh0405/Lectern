@@ -1,0 +1,47 @@
+name: Deploy API
+
+# Builds the API image and points the Lambda function at it. Needs the repository variable
+# AWS_DEPLOY_ROLE_ARN (terraform output ci_deploy_role_arn); without it the job is skipped.
+# The web app deploys itself through Vercel.
+
+on:
+  push:
+    branches: [main]
+    paths: [backend/**, Dockerfile, pyproject.toml, requirements.txt, data/**]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: deploy-api
+
+jobs:
+  deploy:
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      FUNCTION: ai-study-mentor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push (amd64, as Lambda runs it)
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/ai-study-mentor
+        run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+            -t "${IMAGE}:latest" -t "${IMAGE}:${GITHUB_SHA}" --push .
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+      - name: Update the function
+        run: |
+          aws lambda update-function-code --function-name "$FUNCTION" --image-uri "${IMAGE}:${GITHUB_SHA}" >/dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION"
+      - name: Health check (first request after a new image can take a couple of minutes)
+        run: echo "Deployed ${GITHUB_SHA}. Check the live site; the API needs a key, so no anonymous probe."
