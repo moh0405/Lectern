@@ -65,14 +65,38 @@ def store_version(engine: RAGEngine) -> str:
     return f"{engine.store.embedder_name}:{engine.store.revision}:{engine.retrieval_mode}:{bool(engine._reranker)}"
 
 
+VISITOR_HEADER = "x-visitor-ip"
+_MAX_TRACKED_CLIENTS = 10_000
+
+
+def _key_matches(request: Request) -> bool:
+    expected = settings.api_key
+    given = request.headers.get("x-api-key", "")
+    return bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
+
+
+def _rate_key(request: Request) -> str:
+    """Who is being counted. Behind the hosted web app every call arrives from the proxy's address, so one
+    shared bucket would throttle all visitors together. The proxy passes the visitor's address in
+    `X-Visitor-IP`; it is believed only when the call also carries the right API key, so a direct caller
+    cannot pick its own bucket."""
+    visitor = request.headers.get(VISITOR_HEADER, "").strip()
+    if visitor and _key_matches(request):
+        return "visitor:" + visitor[:64]
+    return (request.client.host if request.client else "unknown") or "unknown"
+
+
 def rate_limit(request: Request) -> None:
-    ip = (request.client.host if request.client else "unknown") or "unknown"
+    key = _rate_key(request)
     now = time.time()
-    times = [t for t in _rate_state.get(ip, []) if now - t < 60.0]
+    if len(_rate_state) > _MAX_TRACKED_CLIENTS:  # forget clients with nothing recent, so memory stays bounded
+        for k in [k for k, v in _rate_state.items() if not v or now - v[-1] >= 60.0]:
+            del _rate_state[k]
+    times = [t for t in _rate_state.get(key, []) if now - t < 60.0]
     if len(times) >= settings.rate_limit_per_min:
         raise ApiError(429, "Rate limit exceeded", headers=None)
     times.append(now)
-    _rate_state[ip] = times
+    _rate_state[key] = times
 
 
 def require_api_key(request: Request) -> None:

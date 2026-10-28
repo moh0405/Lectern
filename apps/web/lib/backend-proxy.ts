@@ -46,6 +46,12 @@ function errorResponse(status: number, code: string, message: string): Response 
 const REQUEST_HEADERS = ["content-type", "accept", "accept-language"];
 const RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control", "retry-after"];
 
+/** The visitor's address as the hosting platform saw it (Vercel sets these and overwrites client-supplied values). */
+export function visitorIp(req: Request): string | null {
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || req.headers.get("x-real-ip")?.trim() || null;
+}
+
 /** `segments` is the URL after /api/backend, as the API client builds it: ["api", "v1", "ask", "stream"]. */
 export async function forward(req: Request, segments: string[], config: ProxyConfig): Promise<Response> {
   const isHealth = segments.length === 1 && segments[0] === "health" && req.method === "GET"; // the status light in the sidebar
@@ -66,6 +72,9 @@ export async function forward(req: Request, segments: string[], config: ProxyCon
     if (value) headers.set(name, value);
   }
   if (config.apiKey) headers.set("x-api-key", config.apiKey);
+  // Every call reaches the API from this server, so tell it which visitor it is for (its rate limit is per visitor).
+  const visitor = visitorIp(req);
+  if (visitor) headers.set("x-visitor-ip", visitor);
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   let upstream: Response;

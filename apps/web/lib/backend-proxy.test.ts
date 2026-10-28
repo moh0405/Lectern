@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { configFromEnv, forward, isAllowed } from "./backend-proxy";
+import { configFromEnv, forward, isAllowed, visitorIp } from "./backend-proxy";
 
 const cfg = { backendUrl: "https://api.example.com", apiKey: "k" };
 
@@ -96,5 +96,20 @@ describe("forward", () => {
     const res = await forward(new Request("https://app.example/x", { method: "POST", body: "{}" }), ["api", "v1", "ask"], cfg);
     expect(res.status).toBe(429);
     expect((await res.json()).error.code).toBe("daily_limit");
+  });
+});
+
+describe("visitor address", () => {
+  it("takes the first forwarded address, else x-real-ip, else none", () => {
+    expect(visitorIp(new Request("https://a/", { headers: { "x-forwarded-for": "9.9.9.9, 10.0.0.1" } }))).toBe("9.9.9.9");
+    expect(visitorIp(new Request("https://a/", { headers: { "x-real-ip": "8.8.8.8" } }))).toBe("8.8.8.8");
+    expect(visitorIp(new Request("https://a/"))).toBeNull();
+  });
+  it("passes it to the API, and a client-supplied x-visitor-ip is not trusted", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await forward(new Request("https://app.example/api/backend/stats", { headers: { "x-forwarded-for": "9.9.9.9", "x-visitor-ip": "6.6.6.6" } }), ["api", "v1", "stats"], cfg);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
+    expect((init.headers as Headers).get("x-visitor-ip")).toBe("9.9.9.9");
   });
 });

@@ -50,6 +50,25 @@ def test_rate_limit(api, monkeypatch):
     assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
 
 
+def test_rate_limit_counts_each_visitor_behind_the_proxy(api, monkeypatch):
+    from backend.api.settings import settings
+
+    monkeypatch.setattr(settings, "api_key", "s3cret")
+    monkeypatch.setattr(settings, "rate_limit_per_min", 2)
+
+    def get(ip=None, key="s3cret"):
+        headers = {"X-API-Key": key}
+        if ip:
+            headers["X-Visitor-IP"] = ip
+        return api.get("/api/v1/stats", headers=headers).status_code
+
+    assert [get("1.1.1.1"), get("1.1.1.1"), get("1.1.1.1")] == [200, 200, 429]
+    assert get("2.2.2.2") == 200  # another visitor has their own budget
+    # Without the right key the header is ignored: claiming a fresh address does not give a fresh budget.
+    assert [get("3.3.3.3", key="wrong"), get("4.4.4.4", key="wrong")] == [401, 401]
+    assert get("5.5.5.5", key="wrong") == 429
+
+
 def test_api_key_required_when_configured(api, monkeypatch):
     from backend.api.settings import settings
 
