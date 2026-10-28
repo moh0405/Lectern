@@ -14,6 +14,7 @@
   "dependencies": {
     "@ai-study-mentor/api-client": "^0.1.0",
     "@dagrejs/dagre": "^3.1.1",
+    "@huggingface/transformers": "^4.3.2",
     "@tanstack/react-query": "^5.104.2",
     "@xyflow/react": "^12.12.0",
     "class-variance-authority": "^0.7.1",
@@ -23,6 +24,7 @@
     "katex": "^0.19.0",
     "lucide-react": "^1.55.0",
     "next": "^16.4.0",
+    "pdfjs-dist": "^6.4.299",
     "plotly.js-gl3d-dist-min": "^4.1.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -47,6 +49,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
+    "fake-indexeddb": "^6.2.6",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.23",
     "tailwindcss": "^4.3.3",

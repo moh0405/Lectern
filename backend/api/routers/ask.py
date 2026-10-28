@@ -51,6 +51,13 @@ def _record(analytics: AnalyticsStore, req: AskRequest, chunks: List[Dict[str, A
         pass
 
 
+def _supplied(req: AskRequest) -> List[Dict[str, Any]] | None:
+    """Passages the caller brought. Such questions are about private material: skip the cache and analytics."""
+    if not req.context:
+        return None
+    return [c.model_dump() for c in req.context]
+
+
 def _cache_key(req: AskRequest, engine: RAGEngine):
     return make_key(req.question, req.mode, req.k, req.model, req.temperature, store_version(engine))
 
@@ -63,23 +70,25 @@ def ask(
     cache: AnswerCache = Depends(get_answer_cache),
 ):
     t0 = time.time()
+    supplied = _supplied(req)
     key = _cache_key(req, engine)
-    hit = None if req.no_cache else cache.get(key)
+    hit = None if (req.no_cache or supplied) else cache.get(key)
     if hit is not None:
         _record(analytics, req, hit["chunks"], t0, hit["prompt"], hit["answer"], True)
         return _response(req, hit, cached=True)
 
-    chunks = engine.retrieve_context(req.question, k=req.k)
+    chunks = supplied if supplied is not None else engine.retrieve_context(req.question, k=req.k)
     prompt = engine.generate_prompt(req.question, chunks, mode=req.mode)
     result = engine.answer_with_gemini(
         req.question, k=req.k, model=req.model, temperature=req.temperature, mode=req.mode, chunks=chunks
     )
     ok = bool(result.get("ok", False))
-    _record(analytics, req, chunks, t0, prompt, result.get("answer") or "", ok)
+    if supplied is None:
+        _record(analytics, req, chunks, t0, prompt, result.get("answer") or "", ok)
     raise_if_failed(result)
     answer = result.get("answer") or ""
     entry = {"answer": answer, "chunks": chunks, "model": result.get("model"), "prompt": prompt, "check": check_answer(answer, chunks)}
-    if answer.strip():
+    if answer.strip() and supplied is None:
         cache.put(key, entry)
     return _response(req, entry, cached=False)
 
@@ -127,8 +136,9 @@ def ask_stream(
 
     def events() -> Iterator[str]:
         t0 = time.time()
+        supplied = _supplied(req)
         key = _cache_key(req, engine)
-        hit = None if req.no_cache else cache.get(key)
+        hit = None if (req.no_cache or supplied) else cache.get(key)
         if hit is not None:
             chunks, prompt = hit["chunks"], hit["prompt"]
             meta: Dict[str, Any] = {"chunks": [Chunk(**c).model_dump() for c in chunks]}
@@ -142,7 +152,7 @@ def ask_stream(
             yield done_event(hit.get("model"), hit["check"], True)
             return
         try:
-            chunks = engine.retrieve_context(req.question, k=req.k)
+            chunks = supplied if supplied is not None else engine.retrieve_context(req.question, k=req.k)
             prompt = engine.generate_prompt(req.question, chunks, mode=req.mode)
         except Exception:
             logger.exception("Retrieval failed for streamed question")
@@ -167,13 +177,15 @@ def ask_stream(
                 code = "daily_limit"
             elif is_quota_error(msg):
                 code, msg = "quota_exhausted", QUOTA_MESSAGE
-            _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
+            if supplied is None:
+                _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
             return
         text = "".join(parts)
         check = check_answer(text, chunks)
-        _record(analytics, req, chunks, t0, prompt, text, True)
-        cache.put(key, {"answer": text, "chunks": chunks, "model": client.model, "prompt": prompt, "check": check})
+        if supplied is None:
+            _record(analytics, req, chunks, t0, prompt, text, True)
+            cache.put(key, {"answer": text, "chunks": chunks, "model": client.model, "prompt": prompt, "check": check})
         yield done_event(client.model, check, False)
 
     return StreamingResponse(

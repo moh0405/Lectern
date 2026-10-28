@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
+import { retrieveLocal } from "@/lib/browser-rag/retrieve";
 import { useDemo } from "@/lib/demo";
 import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Mode, type Turn } from "./session";
 
@@ -16,6 +17,8 @@ export interface AskParams {
   noCache?: boolean;
   /** Skip the model: just list the passages that match. */
   retrievalOnly?: boolean;
+  /** Search the visitor's own documents (kept in this browser) instead of the server's index. */
+  local?: boolean;
 }
 
 /** Run a server call whose failure must never disturb the UI (a sync or throw is swallowed too). */
@@ -95,6 +98,21 @@ export function useAskSession() {
     controllers.current.set(id, controller);
     dispatch({ type: "start", id, question: p.question, mode: p.mode });
     try {
+      let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
+      if (p.local) {
+        context = await retrieveLocal(p.question, p.k);
+        if (context.length === 0) {
+          // Never fall through to the shared index: the question was about the visitor's own documents.
+          dispatch({ type: "meta", id, chunks: [] });
+          dispatch({ type: "error", id, code: "no_local_match", message: "Nothing in your documents matches that question. Try other words, or add more material on the Sources page." });
+          return;
+        }
+        if (p.retrievalOnly) {
+          dispatch({ type: "meta", id, chunks: context });
+          dispatch({ type: "done", id });
+          return;
+        }
+      }
       if (p.retrievalOnly) {
         const res = unwrap(await api.http.GET("/api/v1/search", { params: { query: { query: p.question, k: p.k } }, signal: controller.signal }));
         dispatch({ type: "meta", id, chunks: res.chunks });
@@ -109,6 +127,7 @@ export function useAskSession() {
         model: p.model || undefined,
         include_prompt: p.showPrompt || undefined,
         no_cache: p.noCache || undefined,
+        context,
       };
       for await (const ev of api.askStream(body, controller.signal)) {
         if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks, prompt: ev.data.prompt ?? undefined });

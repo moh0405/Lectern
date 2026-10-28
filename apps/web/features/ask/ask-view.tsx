@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/feedback";
+import { useLocalDocs } from "@/lib/browser-rag/use-local-docs";
+import { useDemo } from "@/lib/demo";
 import { api, unwrap } from "@/lib/api";
 import { NotesPanel } from "./notes-panel";
 import type { Mode } from "./session";
@@ -36,6 +38,12 @@ export function AskView() {
   const [retrievalOnly, setRetrievalOnly] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // In the public demo a visitor can ask about documents kept in their own browser. Once they have added some, default to them.
+  const demo = useDemo();
+  const myDocs = useLocalDocs();
+  const hasMine = demo && (myDocs.data?.length ?? 0) > 0;
+  const [pickedSource, setPickedSource] = useState<"shared" | "mine" | null>(null);
+  const local = hasMine && (pickedSource ?? "mine") === "mine";
 
   const stats = useQuery({
     queryKey: ["stats"],
@@ -58,7 +66,7 @@ export function AskView() {
   const submit = (text: string) => {
     const q = text.trim();
     if (q.length < 3 || busy) return;
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly });
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly, local });
     setQuestion("");
   };
   const onSubmit = (e: FormEvent) => {
@@ -128,6 +136,15 @@ export function AskView() {
               </button>
             ))}
           </div>
+          {hasMine ? (
+            <div>
+              <Label htmlFor="source">Search in</Label>
+              <Select id="source" value={local ? "mine" : "shared"} onChange={(e) => setPickedSource(e.target.value as "shared" | "mine")}>
+                <option value="mine">My documents (in this browser)</option>
+                <option value="shared">The shared textbooks</option>
+              </Select>
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-[1fr_8rem_auto]">
             <div>
               <Label htmlFor="mode">Style</Label>
@@ -207,7 +224,7 @@ export function AskView() {
             turn={t}
             onStop={() => stop(t.id)}
             onRemove={() => remove(t.id)}
-            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true })}
+            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true, local })}
           />
         ))}
         <NotesPanel turns={turns} />

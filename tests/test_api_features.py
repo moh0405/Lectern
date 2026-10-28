@@ -317,3 +317,34 @@ def test_streaming_replays_a_cached_answer_and_a_stream_fills_the_cache(indexed,
     assert len(fake_gemini.calls) == 1
     # and a non-streaming request reuses what the stream produced
     assert indexed.post("/api/v1/ask", json=q).json()["cached"] is True
+
+
+# ----------------------------------------------------------------- answering from the caller's own passages
+MINE = [{"text": "A treap combines a binary search tree with a heap on random priorities.", "doc": "my-notes.pdf", "page": 3, "score": 0.8}]
+
+
+def test_ask_from_supplied_passages_skips_the_index_cache_and_analytics(indexed, fake_gemini):
+    body = {"question": "what is a treap", "context": MINE, "include_prompt": True}
+    r = indexed.post("/api/v1/ask", json=body)
+    assert r.status_code == 200
+    data = r.json()
+    assert [c["doc"] for c in data["chunks"]] == ["my-notes.pdf"]  # the server's own heaps.pdf is not consulted
+    assert "treap" in data["prompt"] and "[my-notes.pdf" in data["prompt"]
+    assert data["cached"] is False
+    assert indexed.post("/api/v1/ask", json=body).json()["cached"] is False  # never cached
+    assert indexed.get("/api/v1/analytics").json()["queries"] == 0  # private material is not recorded
+
+
+def test_ask_stream_from_supplied_passages(indexed, fake_gemini):
+    events = parse_sse(indexed.post("/api/v1/ask/stream", json={"question": "what is a treap", "context": MINE}).text)
+    names = [e for e, _ in events]
+    assert names[0] == "meta" and names[-1] == "done"
+    assert [c["doc"] for c in events[0][1]["chunks"]] == ["my-notes.pdf"]
+    assert indexed.get("/api/v1/analytics").json()["queries"] == 0
+
+
+def test_supplied_passages_are_bounded(indexed):
+    too_many = [dict(MINE[0]) for _ in range(21)]
+    assert indexed.post("/api/v1/ask", json={"question": "what is a treap", "context": too_many}).status_code == 422
+    too_long = [{"text": "x" * 4001, "doc": "d"}]
+    assert indexed.post("/api/v1/ask", json={"question": "what is a treap", "context": too_long}).status_code == 422

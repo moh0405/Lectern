@@ -698,6 +698,11 @@ export interface components {
         /** AskRequest */
         AskRequest: {
             /**
+             * Context
+             * @description Answer from these passages instead of the server's index. Nothing is stored, cached or recorded in analytics.
+             */
+            context?: components["schemas"]["ContextPassage"][] | null;
+            /**
              * Include Prompt
              * @default false
              */
@@ -925,6 +930,25 @@ export interface components {
             id: string;
             /** Label */
             label: string;
+        };
+        /**
+         * ContextPassage
+         * @description A passage the caller already retrieved (for example from documents that live only in the visitor's browser).
+         */
+        ContextPassage: {
+            /** Doc */
+            doc: string;
+            /** End Page */
+            end_page?: number | null;
+            /** Page */
+            page?: number | null;
+            /**
+             * Score
+             * @default 0
+             */
+            score?: number;
+            /** Text */
+            text: string;
         };
         /** DeleteResult */
         DeleteResult: {

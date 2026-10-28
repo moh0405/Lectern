@@ -4,7 +4,7 @@
 
 Full stack: Python/FastAPI backend with a hand-built vector store and hybrid search, a TypeScript/Next.js frontend, and an evaluation harness that measures every retrieval decision.
 
-**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
+**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only, and you can add your own PDFs and ask about them: they are read, embedded and searched inside your browser and never uploaded. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
 
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
@@ -16,7 +16,7 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 ## What it does
 
-- **Ingests** PDFs, YouTube transcripts, web pages, GitHub repos and audio, as background jobs with progress.
+- **Ingests** PDFs, YouTube transcripts, web pages, GitHub repos and audio, as background jobs with progress. In the public demo, visitors can instead add their own PDF, TXT or Markdown files that stay in the browser (text extraction with pdf.js, MiniLM embeddings with transformers.js, hybrid search in TypeScript); only the few matching passages are sent with a question.
 - **Answers only from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **verified** against the retrieved passages and flagged if the document or page was never retrieved.
 - **Retrieves with hybrid search**: embeddings (meaning) + BM25 (exact terms), merged by reciprocal rank fusion. Measured, not assumed.
 - **Tutors**: concept maps, a Socratic tutor that gives hints not answers, cross-source synthesis, level-adaptive explanations, symbolic math.
@@ -93,7 +93,7 @@ How the pieces fit:
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (341), Vitest (94), Playwright (39 + 2 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (345), Vitest (116), Playwright (39 + 3 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
