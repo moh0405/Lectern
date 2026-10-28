@@ -33,12 +33,12 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 
 ## Local dev
 
-`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 341 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (39) and `-c playwright.demo.config.ts` (demo mode, 2). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
+`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 345 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (39) and `-c playwright.demo.config.ts` (demo mode, 3; `E2E_REAL_EMBEDDINGS=1` also runs the real-model test, which downloads MiniLM). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
 
 ## Known state / limits (be honest about these)
 
 - Tutor tools (socratic, adaptive, synthesis, concept-map) call Gemini. On 2026-10-13 the free-tier daily quota (20 calls/day on `gemini-3.8-flash`) was used up, so they returned 429 until it reset. That is a quota, not a code bug. Request fields: socratic and adaptive take `question`; synthesis and concept-map take `topic`; math takes `input`.
-- Public demo disables sources, history, analytics and the LeetCode study plan (shared database). Flashcards and LeetCode progress still work, stored in the visitor's browser (`apps/web/lib/local-cards.ts`, `local-progress.ts`). `BACKEND_ALLOW_WRITES=1` on a private deployment lifts all of it.
+- Public demo disables sources, history, analytics and the LeetCode study plan (shared database). Flashcards and LeetCode progress still work, stored in the visitor's browser (`apps/web/lib/local-cards.ts`, `local-progress.ts`), and visitors can add their own PDFs processed fully in the browser (`apps/web/lib/browser-rag/`, `/ask` accepts `context` passages; the tutor tools do not use them yet). `BACKEND_ALLOW_WRITES=1` on a private deployment lifts all of it.
 - Reserved concurrency of 1 is impossible (account limit 10), so several Lambda copies could race on the SQLite file; documented in `docs/AWS.md`.
 - Cost figures (about $1/month) are estimates, not checked against a real bill.
 

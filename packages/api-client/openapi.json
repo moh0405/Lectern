@@ -213,6 +213,22 @@
       },
       "AskRequest": {
         "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContextPassage"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Answer from these passages instead of the server's index. Nothing is stored, cached or recorded in analytics.",
+            "title": "Context"
+          },
           "include_prompt": {
             "default": false,
             "title": "Include Prompt",
@@ -771,6 +787,60 @@
           "label"
         ],
         "title": "ConceptNode",
+        "type": "object"
+      },
+      "ContextPassage": {
+        "description": "A passage the caller already retrieved (for example from documents that live only in the visitor's browser).",
+        "properties": {
+          "doc": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Doc",
+            "type": "string"
+          },
+          "end_page": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Page"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "score": {
+            "default": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "doc"
+        ],
+        "title": "ContextPassage",
         "type": "object"
       },
       "DeleteResult": {

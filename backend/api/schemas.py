@@ -95,6 +95,16 @@ class CitationCheck(BaseModel):
     )
 
 
+class ContextPassage(BaseModel):
+    """A passage the caller already retrieved (for example from documents that live only in the visitor's browser)."""
+
+    text: str = Field(..., min_length=1, max_length=4000)
+    doc: str = Field(..., min_length=1, max_length=300)
+    page: Optional[int] = Field(None, ge=1, le=100000)
+    end_page: Optional[int] = Field(None, ge=1, le=100000)
+    score: float = 0.0
+
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
     k: int = Field(3, ge=1, le=20, description="Number of chunks to retrieve")
@@ -103,6 +113,11 @@ class AskRequest(BaseModel):
     temperature: float = Field(0.2, ge=0.0, le=1.0)
     include_prompt: bool = False
     no_cache: bool = Field(False, description="Skip the answer cache and ask the model again")
+    context: Optional[List[ContextPassage]] = Field(
+        None,
+        max_length=20,
+        description="Answer from these passages instead of the server's index. Nothing is stored, cached or recorded in analytics.",
+    )
 
 
 class AskResponse(BaseModel):

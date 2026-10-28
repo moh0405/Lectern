@@ -29,7 +29,7 @@ export default defineConfig({
       url: `http://localhost:${WEB_PORT}`,
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { BACKEND_URL: `http://127.0.0.1:${API_PORT}`, NEXT_PUBLIC_API_URL: `http://localhost:${WEB_PORT}/api/backend` },
+      env: { NEXT_PUBLIC_BROWSER_EMBEDDINGS: process.env.E2E_REAL_EMBEDDINGS ? "on" : "off", BACKEND_URL: `http://127.0.0.1:${API_PORT}`, NEXT_PUBLIC_API_URL: `http://localhost:${WEB_PORT}/api/backend` },
     },
   ],
 });

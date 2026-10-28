@@ -5,6 +5,8 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { api, unwrap } from "@/lib/api";
+import { useDemo } from "@/lib/demo";
+import { MyDocumentsCard } from "./my-documents-card";
 import { DocumentsTable } from "./documents-table";
 import { JobCard } from "./job-card";
 import { UploadCard } from "./upload-card";
@@ -13,6 +15,7 @@ import { UrlCard } from "./url-card";
 export function SourcesView() {
   const [jobs, setJobs] = useState<{ id: string; label: string }[]>([]);
   const addJob = (id: string, label: string) => setJobs((j) => [{ id, label }, ...j].slice(0, 5));
+  const demo = useDemo();
   const stats = useQuery({ queryKey: ["stats"], queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")) });
 
   return (
@@ -35,10 +38,14 @@ export function SourcesView() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <UploadCard onJob={addJob} />
-        <UrlCard onJob={addJob} />
-      </div>
+      {demo ? (
+        <MyDocumentsCard />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <UploadCard onJob={addJob} />
+          <UrlCard onJob={addJob} />
+        </div>
+      )}
 
       {jobs.length ? (
         <section aria-label="Indexing jobs" className="mt-4 grid gap-2 md:grid-cols-2">
