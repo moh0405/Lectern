@@ -21,3 +21,20 @@ test("meaning search runs in the browser with the real model", async ({ page }) 
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByText(/graphs\.pdf · pp?\.\d/).first()).toBeVisible({ timeout: 60_000 });
 });
+
+test("when the model cannot be downloaded, the document still works with keyword search and says so", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.route(/huggingface\.co|hf\.co|jsdelivr/, (route) => route.abort());
+  await page.goto("/sources");
+  await page.getByLabel("Add my documents").setInputFiles(PDF);
+  const list = page.getByRole("list", { name: "Your documents" });
+  await expect(list).toContainText("graphs.pdf", { timeout: 100_000 });
+  await expect(list).toContainText("keyword search");
+  await expect(list).not.toContainText("meaning + keyword search");
+  await expect(page.getByText(/could not be downloaded/)).toBeVisible();
+
+  await page.goto("/ask");
+  await page.getByLabel("Your question").fill("How are graphs represented?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await expect(page.getByText(/graphs\.pdf · pp?\.\d/).first()).toBeVisible({ timeout: 30_000 }); // keyword search still finds it
+});

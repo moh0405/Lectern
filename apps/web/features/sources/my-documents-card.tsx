@@ -2,13 +2,13 @@
 
 import { FileText, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Badge, ErrorNotice, Spinner } from "@/components/ui/feedback";
+import { Badge, ErrorNotice, Notice, Spinner } from "@/components/ui/feedback";
 import { chunkPages } from "@/lib/browser-rag/chunk";
-import { EMBEDDING_DIM, embedTexts, loadEmbedder } from "@/lib/browser-rag/embed";
+import { EMBEDDING_DIM, embedTexts, embeddingsEnabled, loadEmbedder } from "@/lib/browser-rag/embed";
 import { ACCEPT, extractPages } from "@/lib/browser-rag/extract";
 import { deleteDoc, newDocId, saveDoc } from "@/lib/browser-rag/store";
 import { LOCAL_DOCS_KEY, useLocalDocs } from "@/lib/browser-rag/use-local-docs";
@@ -26,6 +26,10 @@ export function MyDocumentsCard() {
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [keywordOnly, setKeywordOnly] = useState(false);
+  // The page's HTML shows before its scripts run; a file chosen in that gap would be silently ignored. Offer the picker only once it can act.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   async function addFile(file: File) {
     setBusy(`Reading ${file.name}…`);
@@ -37,6 +41,7 @@ export function MyDocumentsCard() {
       passages.map((p) => p.text),
       (done, total) => setBusy(`Indexing ${file.name}: ${done} of ${total} passages`),
     );
+    if (!vectors && embeddingsEnabled()) setKeywordOnly(true);
     const flat = vectors ? new Float32Array(vectors.length * EMBEDDING_DIM) : null;
     vectors?.forEach((v, i) => flat!.set(v, i * EMBEDDING_DIM));
     await saveDoc({ id: newDocId(), name: file.name, addedAt: Date.now(), pages: pages.length, passages, vectors: flat, dim: EMBEDDING_DIM });
@@ -47,6 +52,7 @@ export function MyDocumentsCard() {
     const files = Array.from(list ?? []);
     if (!files.length) return;
     setErrors([]);
+    setKeywordOnly(false);
     for (const f of files) {
       try {
         await addFile(f);
@@ -80,23 +86,28 @@ export function MyDocumentsCard() {
       >
         {busy ? <Spinner className="h-6 w-6" /> : <Upload className="h-6 w-6 text-muted" />}
         <p className="text-sm" role="status">{busy ?? "Drop PDFs, .txt or .md files here, or"}</p>
-        <Button type="button" onClick={() => input.current?.click()} disabled={busy !== null}>
+        <Button type="button" onClick={() => input.current?.click()} disabled={busy !== null || !ready}>
           Choose files
         </Button>
-        <input
-          ref={input}
-          type="file"
-          multiple
-          accept={ACCEPT}
-          aria-label="Add my documents"
-          className="sr-only"
-          onChange={(e) => {
-            void addFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
+        {ready ? (
+          <input
+            ref={input}
+            type="file"
+            multiple
+            accept={ACCEPT}
+            aria-label="Add my documents"
+            className="sr-only"
+            onChange={(e) => {
+              void addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        ) : null}
         <p className="text-xs text-muted">The first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.</p>
       </div>
+      {keywordOnly ? (
+        <Notice className="mt-3">The search model could not be downloaded, so this document uses keyword search only. Adding it again later may enable meaning search.</Notice>
+      ) : null}
       {errors.map((m) => (
         <ErrorNotice key={m} className="mt-3">{m}</ErrorNotice>
       ))}
