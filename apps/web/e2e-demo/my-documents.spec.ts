@@ -42,10 +42,13 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
   expect(uploads).toEqual([]);
   expect(refused).toEqual([]);
 
-  // 5) a question that matches nothing says so instead of silently searching the shared textbooks
-  await page.getByLabel("Your question").fill("zzzzqqqq xxyyzz");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.getByText(/Nothing in your documents matches/)).toBeVisible();
+  // 5) with keyword search a question that matches nothing says so, instead of silently searching the shared textbooks
+  //    (with meaning search on, the nearest passages are always returned, as on the server)
+  if (!process.env.E2E_REAL_EMBEDDINGS) {
+    await page.getByLabel("Your question").fill("zzzzqqqq xxyyzz");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page.getByText(/Nothing in your documents matches/)).toBeVisible();
+  }
 
   // 6) removing the document returns the page to the shared textbooks
   await page.goto("/sources");
