@@ -275,3 +275,10 @@ def test_argument_types_are_validated(args):
     out = run_tool(default_tools(), ToolContext(engine=None), "search_documents", args)
     assert "error" in out and "Bad arguments" in out["error"]
     json.dumps(out)  # always serialisable
+
+
+def test_tool_results_leave_out_the_page_key_for_sources_without_pages():
+    from backend.tools import _passage
+
+    assert "page" not in _passage({"doc": "hashing.md", "page": None, "text": "t"})
+    assert _passage({"doc": "a.pdf", "page": 3, "text": "t"})["page"] == 3

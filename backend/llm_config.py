@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -62,7 +63,31 @@ def _timeout_s() -> float:
         return DEFAULT_TIMEOUT_S
 
 
+# Gemini says how long to wait when it rate-limits a call ("Please retry in 14.6s", or retryDelay: '14s').
+_RETRY_HINTS = (re.compile(r"retry in (\d+(?:\.\d+)?)\s*s", re.I), re.compile(r"retryDelay['\"]?\s*:\s*['\"](\d+(?:\.\d+)?)s", re.I))
+MAX_RETRY_WAIT_S = 30.0  # a longer wait (a daily quota) will not clear inside one request, so it is not worth retrying
+
+
+def retry_delay_seconds(exc: Any) -> Optional[float]:
+    """How long the provider asked us to wait, if its error says so."""
+    text = str(exc)
+    for rx in _RETRY_HINTS:
+        m = rx.search(text)
+        if m:
+            return float(m.group(1))
+    return None
+
+
+def _backoff_seconds(exc: Exception, attempt: int) -> float:
+    """Pause before retrying: the provider's own hint when it gave one (a per-minute limit clears in seconds), else a short step."""
+    delay = retry_delay_seconds(exc)
+    return min(delay + 0.5, MAX_RETRY_WAIT_S) if delay is not None else 0.8 * (attempt + 1)
+
+
 def _is_transient(exc: Exception) -> bool:
+    delay = retry_delay_seconds(exc)
+    if delay is not None and delay > MAX_RETRY_WAIT_S:
+        return False
     code = getattr(exc, "code", None)
     if isinstance(code, int) and code in _TRANSIENT_CODES:
         return True
@@ -197,7 +222,7 @@ class GeminiClient:
                 except Exception as e:
                     last_err = str(e)
                     if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
-                        time.sleep(0.8 * (attempt + 1))
+                        time.sleep(_backoff_seconds(e, attempt))
                         continue
                     if _is_model_missing(e):
                         break  # try the next candidate model
@@ -232,7 +257,7 @@ class GeminiClient:
                     if started:
                         raise
                     if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
-                        time.sleep(0.8 * (attempt + 1))
+                        time.sleep(_backoff_seconds(e, attempt))
                         continue
                     if _is_model_missing(e):
                         break

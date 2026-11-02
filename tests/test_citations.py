@@ -84,3 +84,84 @@ def test_works_with_no_chunks():
 def test_a_source_without_pages_may_be_cited_as_page_none(text):
     # an older prompt labelled such sources "(page None)", and models copy labels; that must not look invented
     assert [c.status for c in extract_citations(text, CHUNKS)] == ["ok"]
+
+
+# ----------------------------------------------------------------- document + section citations (sources without pages)
+MD_CHUNKS = [
+    {"doc": "hashing.md", "page": None, "text": "Hash Tables > Collisions: ..."},
+    {"doc": "dsa.pdf", "page": 12, "text": "..."},
+    {"doc": "src/utils.py", "page": None, "text": "..."},
+]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "hashing.md > Hash Tables > Open addressing",
+        "hashing.md › Hash Tables",
+        "hashing.md / Collisions",
+        "hashing.md - Collisions",
+        "hashing.md: Collisions",
+        "hashing > Collisions",  # the extension may be dropped, as it already may for a plain citation
+    ],
+)
+def test_a_document_followed_by_a_section_path_cites_the_retrieved_document(label):
+    found = extract_citations(f"Use chaining [{label}].", MD_CHUNKS)
+    assert [(c.doc, c.status) for c in found] == [("hashing.md" if "." in label else "hashing", "ok")]
+    assert found[0].label == label  # the label is shown as the model wrote it
+
+
+def test_a_section_path_does_not_launder_an_invented_document():
+    found = extract_citations("See [Invented.md > Hash Tables > Collisions] and [made-up.pdf > Chapter 3].", MD_CHUNKS)
+    assert [c.status for c in found] == ["unknown_source", "unknown_source"]
+
+
+def test_a_real_document_name_that_contains_a_separator_still_matches_exactly():
+    assert [c.status for c in extract_citations("See [src/utils.py].", MD_CHUNKS)] == ["ok"]
+
+
+def test_a_section_path_with_a_page_still_checks_the_page():
+    ok = extract_citations("See [dsa.pdf > Heaps (page 12)].", MD_CHUNKS)
+    bad = extract_citations("See [dsa.pdf > Heaps (page 99)].", MD_CHUNKS)
+    assert [c.status for c in ok] == ["ok"] and [c.status for c in bad] == ["page_not_retrieved"]
+
+
+def test_the_summary_no_longer_accuses_a_section_style_citation():
+    answer = "Hash tables resolve collisions by chaining or open addressing. " * 5 + "[hashing.md > Hash Tables > Collisions]"
+    summary = check_answer(answer, MD_CHUNKS)
+    assert summary["unverified"] == 0 and summary["uncited"] is False
+
+
+# ----------------------------------------------------------------- several citations in one bracket, and "(null)" pages
+def test_several_citations_in_one_bracket_are_checked_one_by_one():
+    found = extract_citations("See [Dsa.pdf (page 12), Dsa.pdf (page 50)].", CHUNKS)
+    assert [(c.label, c.status) for c in found] == [("Dsa.pdf (page 12)", "ok"), ("Dsa.pdf (page 50)", "ok")]
+
+
+def test_a_bad_one_among_several_is_reported_alone():
+    found = extract_citations("See [Dsa.pdf (page 12); Ghost.pdf (page 3)] and [Dsa.pdf (page 99), Dsa.pdf (page 12)].", CHUNKS)
+    assert {c.label: c.status for c in found} == {
+        "Dsa.pdf (page 12)": "ok",
+        "Ghost.pdf (page 3)": "unknown_source",
+        "Dsa.pdf (page 99)": "page_not_retrieved",
+    }
+
+
+def test_documents_listed_with_commas_split_only_when_each_is_a_retrieved_document():
+    found = extract_citations("See [Dsa.pdf, Intro to Heaps].", CHUNKS)
+    assert [(c.doc, c.status) for c in found] == [("Dsa.pdf", "ok"), ("Intro to Heaps", "ok")]
+    # a title that merely contains a comma is left whole
+    whole = extract_citations("See [Intro to Heaps, second edition.pdf].", CHUNKS)
+    assert len(whole) == 1 and whole[0].status == "unknown_source"
+
+
+@pytest.mark.parametrize("label", ["hashing.md (null)", "hashing.md (None)", "hashing.md (page null)", "hashing.md (n/a)", "hashing.md (unknown)"])
+def test_a_null_page_marker_means_the_document_has_no_pages(label):
+    found = extract_citations(f"Chaining [{label}].", MD_CHUNKS)
+    assert [(c.doc, c.page, c.status) for c in found] == [("hashing.md", None, "ok")]
+
+
+def test_the_exact_reply_a_real_model_gave_is_no_longer_accused():
+    chunks = [{"doc": "graphs.md", "page": None, "text": "..."}, {"doc": "arrays-lists.md", "page": None, "text": "..."}]
+    answer = "BFS uses a queue [graphs.md (null), arrays-lists.md (null)]. It runs in O(V+E) time [graphs.md (null)]."
+    assert check_answer(answer, chunks)["unverified"] == 0

@@ -33,7 +33,7 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 
 ## Local dev
 
-`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 396 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (46) and `-c playwright.demo.config.ts` (demo mode, 3; `E2E_REAL_EMBEDDINGS=1` also runs 2 more that use the real MiniLM download and a blocked-download fallback). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
+`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 422 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (46) and `-c playwright.demo.config.ts` (demo mode, 3; `E2E_REAL_EMBEDDINGS=1` also runs 2 more that use the real MiniLM download and a blocked-download fallback). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
 
 ## Known state / limits (be honest about these)
 
@@ -44,6 +44,7 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 
 - Agentic mode: `POST /ask/agent/stream` (LangGraph, `backend/agent.py`, optional `agent` extra, in the Docker image and CI). Up to 6 model calls per question, counted against the daily cap; always uses the server index (not the browser documents); not evaluated, only behaviour-tested. The proxy allow-list includes it, so it works in the public demo and burns the Gemini quota faster.
 
+- Real-model checks: `tests/real_server.py` + `apps/web/playwright.real.config.ts` + `e2e-real/` (12 tests, opt-in, `GEMINI_API_KEY` needed; passed 12/12 on `gemini-flash-lite-latest` on 2026-11-02 after fixes). Free-tier Gemini keys allow 5 requests a minute and (for `gemini-3.6-flash`) 20 a day per model; the quota is per model, so switch `GEMINI_MODEL` when one is spent. A second key pasted in chat on 2026-11-02 lives in `~/.ai-study-mentor-gemini-key-2` (outside the repo).
 - Tool-using agent: `POST /agent/run/stream` (ReAct, Gemini function calling, `backend/react_agent.py`, `tools.py`, `tool_chat.py`; Agent page in the web app) and an MCP server (`python -m backend.mcp_server`, `docs/MCP.md`, optional `mcp` extra, not in the Docker image). Tested with a scripted model and the SDK's MCP client over stdio; run against real Gemini only by hand. A key pasted in chat on 2026-11-02 lives in `~/.ai-study-mentor-gemini-key` (outside the repo); its quota was exhausted quickly, so it is not a billed key.
 
 ## Remaining work (only with the user's go-ahead)

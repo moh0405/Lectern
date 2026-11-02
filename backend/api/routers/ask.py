@@ -17,7 +17,7 @@ from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
 from ..answer_cache import AnswerCache, make_key
 from ..deps import (
-    QUOTA_MESSAGE,
+    quota_message,
     common_dependencies,
     get_analytics,
     get_answer_cache,
@@ -176,7 +176,7 @@ def ask_stream(
             if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
                 code = "daily_limit"
             elif is_quota_error(msg):
-                code, msg = "quota_exhausted", QUOTA_MESSAGE
+                code, msg = "quota_exhausted", quota_message(msg)
             if supplied is None:
                 _record(analytics, req, chunks, t0, prompt, "".join(parts), False)
             yield sse("error", {"code": code, "message": msg})
@@ -201,7 +201,7 @@ def _llm_failure(msg: str) -> tuple[str, str]:
     if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
         code = "daily_limit"
     elif is_quota_error(msg):
-        code, msg = "quota_exhausted", QUOTA_MESSAGE
+        code, msg = "quota_exhausted", quota_message(msg)
     return code, msg
 
 

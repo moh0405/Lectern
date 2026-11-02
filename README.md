@@ -97,7 +97,7 @@ How the pieces fit:
 | Agents | LangGraph (`langgraph`, `langchain-core`), Gemini function calling, MCP (`mcp`) | A fixed workflow (rewrite, grade, verify) and a tool-using ReAct agent; the tools also served over MCP |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (396), Vitest (140), Playwright (46 + 3 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (422), Vitest (142), Playwright (46 + 3 in demo mode, plus an opt-in 12-test suite against a real Gemini model) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -221,6 +221,7 @@ docs/            architecture, concepts, phases, API, plan
 
 Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Phase 6 (deployment) is done except automatic deploys: the API runs on AWS and the web app on Vercel, and a GitHub-OIDC deploy workflow is written but opt-in (see `infra/README.md`). Phase 7 is release polish: docs are filled in and screenshots refreshed; a demo video and the v1.0 tag are what remain. See [`docs/PLAN.md`](docs/PLAN.md). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+- **Free Gemini keys are tight.** One tested free key allowed 5 requests a minute and 20 a day per model. A plain question uses 1 call, but agentic mode uses up to 6 and the tool-using agent up to 9, so on a free key they can hit the per-minute limit (the server waits out short limits, up to 30 s) or the daily one (it stops and says so). A billed key avoids this.
 - The AWS deployment is a single-user demo design: study data is a SQLite file synced through S3, not a database that several users can write to at once.
 - Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).
 - Exact search is right up to roughly 100k passages; beyond that you would want an approximate index.
