@@ -18,7 +18,7 @@ const ALLOWED: Array<[method: string, pattern: RegExp]> = [
   ["GET", /^leetcode\/(search|stats)$/],
   ["GET", /^leetcode\/problems\/[^/]+$/],
   ["POST", /^leetcode\/problems\/[^/]+\/explain$/],
-  ["POST", /^(ask|ask\/stream|adaptive|concept-map|math|socratic|synthesis)$/],
+  ["POST", /^(ask|ask\/stream|ask\/agent\/stream|adaptive|concept-map|math|socratic|synthesis)$/],
 ];
 
 export interface ProxyConfig {

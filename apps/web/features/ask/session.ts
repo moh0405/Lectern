@@ -4,6 +4,10 @@ export type CitationCheck = components["schemas"]["CitationCheck"];
 
 export type Mode = "eli5" | "technical" | "interview" | "summary";
 export type TurnStatus = "streaming" | "done" | "error" | "stopped";
+export interface AgentStep {
+  name: string;
+  detail: string;
+}
 
 export interface Turn {
   id: string;
@@ -18,15 +22,24 @@ export interface Turn {
   citations?: CitationCheck[];
   uncited?: boolean;
   cached?: boolean;
+  /** Set for answers from the agentic (LangGraph) workflow: what it did, in order. */
+  agent?: boolean;
+  steps?: AgentStep[];
+  /** True when the first answer cited unknown sources and the workflow rewrote it. */
+  rewritten?: boolean;
+  llmCalls?: number;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
 
 export type Action =
-  | { type: "start"; id: string; question: string; mode?: Mode }
+  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean }
+  | { type: "step"; id: string; step: AgentStep }
+  /** The agentic workflow discards the answer streamed so far; a corrected one follows. */
+  | { type: "replace"; id: string }
   | { type: "meta"; id: string; chunks: Chunk[]; prompt?: string }
   | { type: "token"; id: string; text: string }
-  | { type: "done"; id: string; model?: string; citations?: CitationCheck[]; uncited?: boolean; cached?: boolean }
+  | { type: "done"; id: string; model?: string; citations?: CitationCheck[]; uncited?: boolean; cached?: boolean; llmCalls?: number; rewritten?: boolean }
   | { type: "error"; id: string; code: string; message: string }
   | { type: "stop"; id: string }
   | { type: "remove"; id: string }
@@ -42,9 +55,13 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
   switch (action.type) {
     case "start":
       return [
-        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming" },
+        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", ...(action.agent ? { agent: true, steps: [] } : {}) },
         ...turns,
       ];
+    case "step":
+      return update(turns, action.id, (t) => ({ ...t, steps: [...(t.steps ?? []), action.step] }));
+    case "replace":
+      return update(turns, action.id, (t) => ({ ...t, answer: "", rewritten: true }));
     case "meta":
       return update(turns, action.id, (t) => ({ ...t, chunks: action.chunks, prompt: action.prompt ?? t.prompt }));
     case "token":
@@ -57,6 +74,8 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
         citations: action.citations ?? t.citations,
         uncited: action.uncited ?? t.uncited,
         cached: action.cached ?? t.cached,
+        llmCalls: action.llmCalls ?? t.llmCalls,
+        rewritten: action.rewritten ?? t.rewritten,
       }));
     case "error":
       return update(turns, action.id, (t) => ({ ...t, status: "error", error: { code: action.code, message: action.message } }));

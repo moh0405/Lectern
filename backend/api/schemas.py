@@ -120,6 +120,14 @@ class AskRequest(BaseModel):
     )
 
 
+class AgentAskRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=2000)
+    k: int = Field(3, ge=1, le=10, description="Number of passages to answer from")
+    mode: Optional[StudyMode] = None
+    model: Optional[str] = Field(None, max_length=100)
+    temperature: float = Field(0.2, ge=0.0, le=1.0)
+
+
 class AskResponse(BaseModel):
     answer: str
     chunks: List[Chunk]
@@ -470,6 +478,20 @@ class SseDone(BaseModel):
     unverified_citations: int
     uncited: bool
     cached: bool
+
+
+class SseStep(BaseModel):
+    name: Literal["rewrite", "retrieve", "grade", "answer", "verify", "regenerate"]
+    detail: str
+
+
+class SseReplace(BaseModel):
+    reason: str
+
+
+class SseAgentDone(SseDone):
+    llm_calls: int = Field(description="Model calls this question used (at most 6)")
+    regenerated: bool = Field(description="True when the first answer cited unknown sources and was rewritten")
 
 
 class SseError(BaseModel):

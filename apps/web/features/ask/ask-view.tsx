@@ -36,6 +36,7 @@ export function AskView() {
   const [model, setModel] = useState("");
   const [showPrompt, setShowPrompt] = useState(false);
   const [retrievalOnly, setRetrievalOnly] = useState(false);
+  const [agentic, setAgentic] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // In the public demo a visitor can ask about documents kept in their own browser. Once they have added some, default to them.
@@ -66,7 +67,7 @@ export function AskView() {
   const submit = (text: string) => {
     const q = text.trim();
     if (q.length < 3 || busy) return;
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly, local });
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly, local, agent: agentic });
     setQuestion("");
   };
   const onSubmit = (e: FormEvent) => {
@@ -172,6 +173,22 @@ export function AskView() {
               </Button>
             </div>
           </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={agentic && !local && !retrievalOnly}
+              onChange={(e) => setAgentic(e.target.checked)}
+              disabled={local || retrievalOnly}
+              className="mt-1 accent-[var(--color-accent)]"
+            />
+            <span>
+              <span className="font-medium">Agentic mode</span>{" "}
+              <span className="text-muted">
+                rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)
+                {local ? ". Not available for your own documents." : ""}
+              </span>
+            </span>
+          </label>
           <details className="text-sm" onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
             <summary className="cursor-pointer text-muted hover:text-fg">Advanced</summary>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -224,7 +241,7 @@ export function AskView() {
             turn={t}
             onStop={() => stop(t.id)}
             onRemove={() => remove(t.id)}
-            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true, local })}
+            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true, local, agent: t.agent })}
           />
         ))}
         <NotesPanel turns={turns} />

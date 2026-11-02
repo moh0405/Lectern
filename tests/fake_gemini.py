@@ -26,6 +26,10 @@ class FakeGemini:
 
     @staticmethod
     def default_reply(prompt: str, json_mode: bool) -> str:
+        if "TASK: REWRITE_QUERY" in prompt:  # the agentic workflow's planning calls
+            return json.dumps({"query": "binary heap priority queue data structure"})
+        if "TASK: GRADE_PASSAGES" in prompt:
+            return json.dumps({"sufficient": True, "reason": "The passages define the concept.", "better_query": ""})
         if json_mode and "study map" in prompt.lower():
             return json.dumps({
                 "nodes": [{"id": "list", "label": "Linked list"}, {"id": "node", "label": "Node"},
@@ -50,6 +54,8 @@ class FakeGemini:
             # Answer from the first retrieved passage so end-to-end tests can see real retrieval.
             m = re.search(r"^- \[(.+?)\] (.+)$", prompt, re.MULTILINE)
             if m:
+                if "previous answer cited sources" in prompt:  # the agentic workflow's corrective retry: behave this time
+                    return f"From your material: {m.group(2)[:140]} [{m.group(1)}]"
                 if "hallucinate" in prompt.lower():  # e2e: a model that invents a source
                     return f"From your material: {m.group(2)[:100]} [{m.group(1)}] and also [Invented Notes.pdf (page 9)]"
                 return f"From your material: {m.group(2)[:140]} [{m.group(1)}]"

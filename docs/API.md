@@ -8,7 +8,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 {"error": {"code": "not_found", "message": "No such job", "details": null}}
 ```
 
-## All 40 operations
+## All 41 operations
 
 ### Health and corpus
 
@@ -33,6 +33,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 |---|---|---|
 | POST | `/api/v1/ask` | answer with retrieved passages and checked citations |
 | POST | `/api/v1/ask/stream` | same, streamed as Server-Sent Events |
+| POST | `/api/v1/ask/agent/stream` | agentic workflow (LangGraph): rewrite, retrieve, grade, answer, verify; streamed with `step` events |
 | GET | `/api/v1/search?query=&k=` | retrieval only, no model call |
 | GET | `/api/v1/suggestions?n=` | study questions generated from your material |
 | GET | `/api/v1/models` | models your key can use, and the default |
@@ -155,6 +156,28 @@ curl -N -X POST http://127.0.0.1:8000/api/v1/ask/stream \
   -H 'Content-Type: application/json' \
   -d '{"question":"What is the heap property?"}'
 ```
+
+## `POST /api/v1/ask/agent/stream`
+
+A slower, more careful path. Body: `{question, k (1-10), mode?, model?, temperature?}`. It always searches the server's index and is never cached. The workflow:
+
+1. **rewrite** the question into a search query (it also searches the original wording, so a poor rewrite cannot hurt);
+2. **retrieve**, then **grade**: the model says whether the passages are enough; if not, it searches once more with a query it suggests;
+3. **answer** from the passages, streamed;
+4. **verify** the citations; if the answer cited sources it was not given, it is **regenerated** once with the valid labels.
+
+It uses at most 6 model calls per question (each counted against the daily cap). Planning failures (rewrite, grade) fall back to the plain behaviour; running out of quota stops the run with an `error` event.
+
+| Event | Data |
+|---|---|
+| `step` | `{name: rewrite | retrieve | grade | answer | verify | regenerate, detail}` (one per stage, as it finishes) |
+| `meta` | `{chunks}` (when answering starts) |
+| `token` | `{text}` |
+| `replace` | `{reason}`: discard the answer streamed so far; a corrected one follows |
+| `done` | `{model, citations, unverified_citations, uncited, cached: false, llm_calls, regenerated}` |
+| `error` | `{code: llm_unavailable | llm_error | retrieval_error | quota_exhausted | daily_limit, message}` |
+
+Needs the optional `agent` extra (`pip install -e ".[agent]"`); without it the endpoint answers `503 agent_unavailable` and the rest of the API is unaffected.
 
 ## Indexing a PDF
 
