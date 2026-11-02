@@ -52,12 +52,12 @@ class GeminiToolChat:
     thought signatures newer models require when a function result is sent back)."""
 
     def __init__(self, client: Any, system: str, tools: List[ToolSpec], temperature: float | None = None):
-        from .llm_config import RETRY_ATTEMPTS, _is_transient, genai_types
+        from .llm_config import RETRY_ATTEMPTS, _backoff_seconds, _is_transient, genai_types
 
         if genai_types is None:
             raise RuntimeError("google-genai is not installed. Please run: pip install google-genai")
         self._types = genai_types
-        self._retry = (RETRY_ATTEMPTS, _is_transient)
+        self._retry = (RETRY_ATTEMPTS, _is_transient, _backoff_seconds)
         declarations = [
             genai_types.FunctionDeclaration(name=t.name, description=t.description, parameters_json_schema=t.parameters) for t in tools
         ]
@@ -74,14 +74,14 @@ class GeminiToolChat:
     def send(self, message: Union[str, List[ToolResult]]) -> TurnResult:
         types = self._types
         payload: Any = message if isinstance(message, str) else [types.Part.from_function_response(name=r.name, response=r.payload) for r in message]
-        attempts, is_transient = self._retry
+        attempts, is_transient, backoff = self._retry
         for attempt in range(attempts):
             try:
                 resp = self._chat.send_message(payload)
                 break
             except Exception as e:
                 if is_transient(e) and attempt < attempts - 1:
-                    time.sleep(0.8 * (attempt + 1))
+                    time.sleep(backoff(e, attempt))
                     continue
                 raise
         parts = resp.candidates[0].content.parts if resp.candidates and resp.candidates[0].content and resp.candidates[0].content.parts else []

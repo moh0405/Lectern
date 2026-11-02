@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorNotice, Skeleton } from "@/components/ui/feedback";
+import { useDemo } from "@/lib/demo";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { plural } from "@/lib/format";
 
@@ -13,6 +14,7 @@ const ICONS: Record<string, LucideIcon> = { pdf: FileText, youtube: Video, githu
 
 export function DocumentsTable() {
   const qc = useQueryClient();
+  const demo = useDemo(); // the public demo shares one index, so visitors cannot delete from it
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const docs = useQuery({
@@ -56,7 +58,7 @@ export function DocumentsTable() {
                     {d.source_key !== d.docs[0] ? ` · ${d.source_key}` : ""}
                   </p>
                 </div>
-                {sure ? (
+                {demo ? null : sure ? (
                   <div className="flex shrink-0 items-center gap-1">
                     <Button variant="danger" size="sm" disabled={remove.isPending} onClick={() => remove.mutate(d.source_key)}>
                       Confirm delete

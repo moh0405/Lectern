@@ -24,7 +24,7 @@ import os
 import time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, runtime_checkable
 
-from .llm_config import RETRY_ATTEMPTS, GeminiClient, _is_transient
+from .llm_config import RETRY_ATTEMPTS, GeminiClient, _backoff_seconds, _is_transient
 
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -84,7 +84,7 @@ class OpenAICompatClient:
             except Exception as e:
                 last_err = str(e)
                 if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
-                    time.sleep(0.8 * (attempt + 1))
+                    time.sleep(_backoff_seconds(e, attempt))
                     continue
                 return {"ok": False, "error": last_err}
             text = ""
@@ -114,7 +114,7 @@ class OpenAICompatClient:
             except Exception as e:
                 if started or not _is_transient(e) or attempt == RETRY_ATTEMPTS - 1:
                     raise
-                time.sleep(0.8 * (attempt + 1))
+                time.sleep(_backoff_seconds(e, attempt))
 
     def start_tool_chat(self, system: str, tools: List[Any], temperature: Optional[float] = None) -> Any:
         from .tool_chat import ToolCallingUnsupported

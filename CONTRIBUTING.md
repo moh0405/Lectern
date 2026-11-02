@@ -27,6 +27,7 @@ CI runs all of this; run it locally first.
 | Web types, lint, unit tests | `npm run web:typecheck && npm run web:lint && npm run web:test` |
 | Browser tests (no key needed) | `cd apps/web && E2E_PYTHON=$(which python) npx playwright test` |
 | Public-demo mode in a browser | `cd apps/web && E2E_PYTHON=$(which python) npx playwright test -c playwright.demo.config.ts` |
+| Whole app against a real Gemini model (opt-in, needs a key with quota) | `cd apps/web && GEMINI_API_KEY=... GEMINI_MODEL=gemini-flash-lite-latest E2E_PYTHON=$(which python) npx playwright test -c playwright.real.config.ts` |
 | Retrieval quality (if you touched retrieval) | `python -m eval.run`, and commit the report |
 
 ## Conventions

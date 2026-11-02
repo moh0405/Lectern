@@ -78,7 +78,9 @@ def _int(args: Dict[str, Any], key: str, default: int, low: int, high: int) -> i
 
 
 def _passage(c: Dict[str, Any], limit: int = PASSAGE_CHARS) -> Dict[str, Any]:
-    out: Dict[str, Any] = {"doc": c.get("doc"), "page": c.get("page"), "text": (c.get("text") or "")[:limit]}
+    out: Dict[str, Any] = {"doc": c.get("doc"), "text": (c.get("text") or "")[:limit]}
+    if c.get("page") is not None:  # leave the key out for sources without pages, so a model does not write "(null)"
+        out["page"] = c["page"]
     if c.get("end_page"):
         out["end_page"] = c["end_page"]
     return out

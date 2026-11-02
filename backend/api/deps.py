@@ -119,6 +119,18 @@ QUOTA_MESSAGE = (
 )
 
 
+def quota_message(msg: str) -> str:
+    """What to tell the user about a quota error. A per-minute limit (the free tier allows only a few requests a
+    minute) clears in seconds, so say that instead of 'a few calls per day'."""
+    from ..llm_config import retry_delay_seconds
+
+    if "per minute" in msg.lower() or "perminute" in msg.lower():
+        wait = retry_delay_seconds(msg)
+        after = f" Wait about {int(wait) + 1} seconds and try again." if wait is not None else " Wait a minute and try again."
+        return "The language model is rate-limited (a free API key allows only a few requests per minute, and a question can use several)." + after
+    return QUOTA_MESSAGE
+
+
 def is_quota_error(msg: str) -> bool:
     return "RESOURCE_EXHAUSTED" in msg or "exceeded your current quota" in msg.lower()
 
@@ -131,7 +143,7 @@ def raise_if_failed(result: Dict[str, Any]) -> Dict[str, Any]:
     if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
         raise ApiError(429, msg, code="daily_limit")
     if is_quota_error(msg):
-        raise ApiError(429, QUOTA_MESSAGE, code="quota_exhausted")
+        raise ApiError(429, quota_message(msg), code="quota_exhausted")
     if "_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg:
         raise ApiError(503, msg, code="llm_unavailable")
     raise ApiError(502, msg, code="llm_error")

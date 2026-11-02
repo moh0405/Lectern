@@ -4,7 +4,8 @@ The prompt asks the model to cite as `[document (page N)]`. A model can invent a
 real one for a page it never saw. Both look authoritative and are worse than no citation, so each citation
 is checked against the retrieved chunks:
 
-    ok                   the document and (if given) the page are among the retrieved passages
+    ok                   the document and (if given) the page are among the retrieved passages; a section
+                         path after the document ("doc > Heading") is accepted, but the section itself is not checked
     page_not_retrieved   the document was retrieved, but not the cited page
     unknown_source       the document was not retrieved at all
 
@@ -47,7 +48,40 @@ def _doc_keys(name: str) -> set:
     return {base, stem}
 
 
-_NO_PAGE = re.compile(r"\s*\(\s*(?:pages?|pp?\.?)\s*(?:none|n/?a|null|-)\s*\)\s*$", re.I)
+_NO_PAGE = re.compile(r"\s*\(\s*(?:(?:pages?|pp?\.?)\s*)?(?:none|n/?a|null|nil|unknown|-)\s*\)\s*$", re.I)
+
+
+def _split_multi(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+    """Models often put several citations in one bracket: [a.pdf (page 3), b.md (page 1)] or [a.md, b.md]. Split them
+    so each is checked on its own. Commas alone only split when every part is a retrieved document, because a comma
+    can also belong to a title."""
+    parts = [p.strip() for p in re.split(r"(?<=\))\s*[,;]\s*|\s*;\s*", inner) if p.strip()]
+    if len(parts) > 1:
+        return parts
+    if "," in inner:
+        pieces = [p.strip() for p in inner.split(",") if p.strip()]
+        if len(pieces) > 1 and all(any(k in docs for k in _doc_keys(p)) for p in pieces):
+            return pieces
+    return [inner.strip()]
+
+
+# Sources without pages (Markdown, web pages, transcripts) are often cited by document and section, for example
+# [hashing.md > Hash Tables > Collisions]. That names a real document the model was given, so it is not an invented source.
+_SECTION_SEP = re.compile(r"\s*(?:>|›|»|→|/|\||::)\s*|\s+[-–—]\s+|:\s+")
+
+
+def _match_doc(doc_text: str, docs: Dict[str, List[Dict[str, Any]]]) -> tuple:
+    """(chunks of the matching retrieved document or None, the document part of the label). The whole text is tried
+    first (document names can contain '/' or ':'), then the part before the first section separator."""
+    for k in _doc_keys(doc_text):
+        if k in docs:
+            return docs[k], doc_text
+    parts = _SECTION_SEP.split(doc_text, maxsplit=1)
+    if len(parts) == 2 and parts[0].strip():
+        for k in _doc_keys(parts[0]):
+            if k in docs:
+                return docs[k], parts[0].strip()
+    return None, doc_text
 
 
 def _parse(inner: str) -> Optional[Dict[str, Any]]:
@@ -69,13 +103,15 @@ def extract_citations(answer: str, chunks: Sequence[Dict[str, Any]]) -> List[Cit
 
     found: List[Citation] = []
     seen = set()
+    cited: List[str] = []
     for m in _BRACKET.finditer(answer or ""):
-        raw = m.group(1).strip()
+        cited.extend(_split_multi(m.group(1).strip(), docs))
+    for raw in cited:
         parsed = _parse(raw)
         if not parsed or not re.search(r"[A-Za-z]", parsed["doc"]):
             continue
-        doc_keys = _doc_keys(parsed["doc"])
-        matches = next((docs[k] for k in doc_keys if k in docs), None)
+        matches, doc_part = _match_doc(parsed["doc"], docs)
+        parsed["doc"] = doc_part
         is_citation = parsed["suffix"] or bool(_EXTENSION.search(parsed["doc"])) or matches is not None
         if not is_citation:
             continue  # ordinary bracketed text such as an index, a note, a placeholder

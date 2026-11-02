@@ -175,3 +175,60 @@ def test_timeout_comes_from_env_and_is_never_unbounded(monkeypatch):
     assert llm_config._timeout_s() == llm_config.DEFAULT_TIMEOUT_S
     monkeypatch.setenv("GEMINI_TIMEOUT_S", "0")
     assert llm_config._timeout_s() == 1.0
+
+
+# ----------------------------------------------------------------- rate limits: honour the provider's retry hint
+PER_MINUTE = (
+    "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota. * Quota exceeded for metric: "
+    "generate_content_free_tier_requests, limit: 5, model: gemini-3.6-flash, description: Generate content requests per minute "
+    "limit exceeded on Free Tier.\\nPlease retry in 14.650727173s.', 'details': [{'retryDelay': '14s'}]}}"
+)
+PER_DAY = "429 RESOURCE_EXHAUSTED. You exceeded your current quota. Please retry in 20h3m1.5s. retryDelay': '72000s'"
+
+
+def test_the_retry_hint_is_parsed_from_either_form():
+    assert llm_config.retry_delay_seconds(PER_MINUTE) == pytest.approx(14.65, abs=0.01)
+    assert llm_config.retry_delay_seconds("... 'retryDelay': '14s' ...") == 14.0
+    assert llm_config.retry_delay_seconds("503 UNAVAILABLE high demand") is None
+
+
+def test_a_short_rate_limit_is_retried_after_the_providers_own_delay(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_config.time, "sleep", sleeps.append)
+    client = GeminiClient(model="gemini-3.8-flash", client=FakeClient(models=[FakeModel("gemini-3.8-flash")], script=[FakeAPIError(429, PER_MINUTE), "pong"]))
+    assert client.generate("hi") == {"ok": True, "model": "gemini-3.8-flash", "answer": "pong"}
+    assert sleeps == [pytest.approx(15.15, abs=0.05)]  # waited what Gemini asked (plus half a second), not under a second
+
+
+def test_the_wait_is_capped(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_config.time, "sleep", sleeps.append)
+    hint = "429 RESOURCE_EXHAUSTED. Please retry in 29.9s."
+    client = GeminiClient(model="gemini-3.8-flash", client=FakeClient(models=[FakeModel("gemini-3.8-flash")], script=[FakeAPIError(429, hint), "ok"]))
+    client.generate("hi")
+    assert sleeps and sleeps[0] <= llm_config.MAX_RETRY_WAIT_S
+
+
+def test_a_long_wait_such_as_a_daily_quota_is_not_retried(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_config.time, "sleep", sleeps.append)
+    fake = FakeClient(models=[FakeModel("gemini-3.8-flash")], script=[FakeAPIError(429, PER_DAY)])
+    result = GeminiClient(model="gemini-3.8-flash", client=fake).generate("hi")
+    assert result["ok"] is False and "quota" in result["error"].lower()
+    assert sleeps == [] and fake.models.calls == ["gemini-3.8-flash"]  # failed fast: one call, no waiting
+
+
+def test_other_transient_errors_still_use_the_short_backoff(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_config.time, "sleep", sleeps.append)
+    client = GeminiClient(model="gemini-3.8-flash", client=FakeClient(models=[FakeModel("gemini-3.8-flash")], script=[FakeAPIError(503, "503 UNAVAILABLE"), "ok"]))
+    client.generate("hi")
+    assert sleeps == [0.8]
+
+
+def test_the_user_message_says_which_kind_of_limit_was_hit():
+    from backend.api.deps import QUOTA_MESSAGE, quota_message
+
+    minute = quota_message(PER_MINUTE)
+    assert "per minute" in minute and "15 seconds" in minute and "per day" not in minute
+    assert quota_message(PER_DAY) == QUOTA_MESSAGE
