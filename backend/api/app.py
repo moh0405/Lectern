@@ -20,8 +20,8 @@ from .. import __version__
 from .deps import make_engine
 from .errors import ERROR_RESPONSES, ErrorResponse, install_error_handlers
 from .jobs import JobManager
-from .routers import ask, leetcode, sources, study, tracking, tutor, viz
-from .schemas import Health, SseAgentDone, SseDone, SseError, SseMeta, SseReplace, SseStep, SseToken
+from .routers import agent, ask, leetcode, sources, study, tracking, tutor, viz
+from .schemas import Health, SseAgentDone, SseAgentRunDone, SseDone, SseError, SseMeta, SseReplace, SseStep, SseThought, SseToken, SseToolCall, SseToolResult
 from .settings import settings
 
 logger = logging.getLogger("ai-study-mentor.api")
@@ -102,7 +102,7 @@ def create_app() -> FastAPI:
         engine = getattr(app.state, "engine", None) or get_engine_lazy(app)
         return Health(status="ok", version=__version__, semantic_search=engine.semantic_ready, chunks=len(engine.store))
 
-    for r in (sources.router, ask.router, tutor.router, leetcode.router, study.router, viz.router, tracking.router):
+    for r in (sources.router, ask.router, agent.router, tutor.router, leetcode.router, study.router, viz.router, tracking.router):
         app.include_router(r)
 
     base_openapi = app.openapi
@@ -113,7 +113,7 @@ def create_app() -> FastAPI:
         schema = base_openapi()
         components = schema.setdefault("components", {}).setdefault("schemas", {})
         # Not referenced by any route response, but the client needs them to type the SSE stream.
-        for model in (SseMeta, SseToken, SseDone, SseError, SseStep, SseReplace, SseAgentDone, ErrorResponse):
+        for model in (SseMeta, SseToken, SseDone, SseError, SseStep, SseReplace, SseAgentDone, SseThought, SseToolCall, SseToolResult, SseAgentRunDone, ErrorResponse):
             components.update(model.model_json_schema(ref_template="#/components/schemas/{model}").pop("$defs", {}))
             components[model.__name__] = {
                 k: v for k, v in model.model_json_schema(ref_template="#/components/schemas/{model}").items() if k != "$defs"

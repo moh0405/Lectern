@@ -22,10 +22,11 @@ def _never_load_torch(monkeypatch):
 
 @pytest.fixture
 def fake_gemini(monkeypatch):
-    FakeGemini.handler, FakeGemini.fail_with, FakeGemini.calls = None, None, []
+    FakeGemini.handler, FakeGemini.fail_with, FakeGemini.calls, FakeGemini.tool_script = None, None, [], None
     for target in (
         "backend.llm_providers.create_llm",
         "backend.api.routers.ask.create_llm",
+        "backend.api.routers.agent.create_llm",
         "backend.api.routers.tracking.create_llm",
         "backend.advanced_ai.create_llm",
         "backend.leetcode_handler.create_llm",

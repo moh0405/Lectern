@@ -37,12 +37,13 @@ from tests.fake_gemini import FakeGemini  # noqa: E402
 FakeGemini.echo_context = True
 
 import backend.advanced_ai  # noqa: E402
+import backend.api.routers.agent  # noqa: E402
 import backend.api.routers.ask  # noqa: E402
 import backend.leetcode_handler  # noqa: E402
 import backend.api.routers.tracking  # noqa: E402
 import backend.llm_providers  # noqa: E402
 
-for module in (backend.llm_providers, backend.api.routers.ask, backend.api.routers.tracking, backend.advanced_ai, backend.leetcode_handler):
+for module in (backend.llm_providers, backend.api.routers.ask, backend.api.routers.agent, backend.api.routers.tracking, backend.advanced_ai, backend.leetcode_handler):
     module.create_llm = FakeGemini
 
 import uvicorn  # noqa: E402

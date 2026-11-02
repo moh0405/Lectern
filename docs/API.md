@@ -8,7 +8,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 {"error": {"code": "not_found", "message": "No such job", "details": null}}
 ```
 
-## All 41 operations
+## All 42 operations
 
 ### Health and corpus
 
@@ -34,6 +34,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 | POST | `/api/v1/ask` | answer with retrieved passages and checked citations |
 | POST | `/api/v1/ask/stream` | same, streamed as Server-Sent Events |
 | POST | `/api/v1/ask/agent/stream` | agentic workflow (LangGraph): rewrite, retrieve, grade, answer, verify; streamed with `step` events |
+| POST | `/api/v1/agent/run/stream` | tool-using agent (ReAct, Gemini function calling): the model chooses the tools; streamed as `tool_call` / `tool_result` events |
 | GET | `/api/v1/search?query=&k=` | retrieval only, no model call |
 | GET | `/api/v1/suggestions?n=` | study questions generated from your material |
 | GET | `/api/v1/models` | models your key can use, and the default |
@@ -178,6 +179,22 @@ It uses at most 6 model calls per question (each counted against the daily cap).
 | `error` | `{code: llm_unavailable | llm_error | retrieval_error | quota_exhausted | daily_limit, message}` |
 
 Needs the optional `agent` extra (`pip install -e ".[agent]"`); without it the endpoint answers `503 agent_unavailable` and the rest of the API is unaffected.
+
+## `POST /api/v1/agent/run/stream`
+
+The model decides what to do. Body: `{task, max_steps (1-8, default 6), model?, temperature?}`. It is given the task and these tools: `search_documents`, `list_documents`, `read_page`, `solve_math`, `find_leetcode_problem` (and `save_flashcard` only when the deployment sets `AGENT_ALLOW_WRITES=1`; a request cannot enable it). Each turn it either answers or asks for tools; the server runs them and returns the results, until it answers or `max_steps` model turns are used, after which one forced wrap-up turn writes the answer.
+
+| Event | Data |
+|---|---|
+| `thought` | `{text}` (the model's note alongside a tool call, when it writes one) |
+| `tool_call` | `{name, arguments}` |
+| `tool_result` | `{name, summary, error}` (a one-line summary, not the full result) |
+| `meta` | `{chunks}` (the passages the tools returned) |
+| `token` | `{text}` (the whole final answer; the last turn arrives complete) |
+| `done` | `{model, citations, unverified_citations, uncited, steps, tool_calls, llm_calls, wrapped_up}` |
+| `error` | `{code: tools_unsupported | llm_unavailable | llm_error | quota_exhausted | daily_limit, message}` |
+
+Bounds: at most 4 tool calls per turn; an identical repeated call is refused; each tool result is cut at 6,000 characters; every model turn counts against the daily cap. A tool failure is returned to the model as `{"error": ...}` so it can recover. Needs the Gemini provider (other providers answer `tools_unsupported`) and the `agent` extra (`503 agent_unavailable` without it).
 
 ## Indexing a PDF
 

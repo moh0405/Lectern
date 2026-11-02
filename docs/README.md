@@ -21,7 +21,8 @@ Start with the [project README](../README.md) for the overview, then read in thi
 3. **[AWS deployment](AWS.md)**: Lambda, S3, ECR, Secrets Manager, Terraform; what was built, measured, and what it costs.
 4. **[Phase by phase](phases/README.md)**: how the project was built, in order, with the bugs and decisions of each phase.
 5. **[API reference](API.md)**: all 41 operations with examples.
-6. **[Contributing](../CONTRIBUTING.md)**: set up, checks to run, conventions.
+6. **[MCP server](MCP.md)**: the study tools for Claude Desktop, Cursor and other MCP clients.
+7. **[Contributing](../CONTRIBUTING.md)**: set up, checks to run, conventions.
 
 ## Reference
 

@@ -29,3 +29,21 @@ test("askAgentStream throws an ApiError for an HTTP failure before streaming", a
   });
   await assert.rejects(client.askAgentStream({ question: "what is a heap" }).next(), (e: { status?: number; code?: string }) => e.status === 503 && e.code === "agent_unavailable");
 });
+
+test("agentRunStream posts the task to the tool-agent endpoint and yields tool events", async () => {
+  let url = "";
+  const client = createApiClient({
+    baseUrl: "http://api.test",
+    fetch: (async (u: string) => {
+      url = u;
+      return new Response(
+        sse(["tool_call", { name: "search_documents", arguments: { query: "heap" } }], ["tool_result", { name: "search_documents", summary: "3 passages", error: false }], ["token", { text: "A heap is a tree." }], ["done", { steps: 2 }]),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch,
+  });
+  const seen: string[] = [];
+  for await (const ev of client.agentRunStream({ task: "what is a heap" })) seen.push(ev.event);
+  assert.equal(url, "http://api.test/api/v1/agent/run/stream");
+  assert.deepEqual(seen, ["tool_call", "tool_result", "token", "done"]);
+});

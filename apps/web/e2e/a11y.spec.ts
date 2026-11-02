@@ -27,6 +27,7 @@ const PAGES: [string, string, (page: Page) => Promise<void>][] = [
   ["Sources", "/sources", async (p) => void (await p.getByText("Indexed sources").waitFor())],
   ["Flashcards", "/study", async (p) => void (await p.getByRole("button", { name: "Show answer" }).waitFor())],
   ["LeetCode", "/leetcode?q=two+sum&p=1", async (p) => void (await p.getByLabel("Problem detail").getByRole("heading").first().waitFor())],
+  ["Agent", "/agent", async () => {}],
   ["Tutor tools", "/tutor", async () => {}],
   ["Math", "/math", async () => {}],
   ["Embedding map", "/visualize", async (p) => void (await p.getByText(/Showing \d+/).waitFor())],

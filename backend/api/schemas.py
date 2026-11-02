@@ -480,6 +480,39 @@ class SseDone(BaseModel):
     cached: bool
 
 
+class AgentRunRequest(BaseModel):
+    task: str = Field(..., min_length=3, max_length=2000, description="What the student wants done, in their own words")
+    max_steps: int = Field(6, ge=1, le=8, description="Most model turns before the agent must wrap up")
+    model: Optional[str] = Field(None, max_length=100)
+    temperature: float = Field(0.2, ge=0.0, le=1.0)
+
+
+class SseToolCall(BaseModel):
+    name: str
+    arguments: Dict[str, Any]
+
+
+class SseToolResult(BaseModel):
+    name: str
+    summary: str = Field(description="One line describing what the tool returned (or why it failed)")
+    error: bool
+
+
+class SseThought(BaseModel):
+    text: str
+
+
+class SseAgentRunDone(BaseModel):
+    model: Optional[str] = None
+    citations: List[CitationCheck]
+    unverified_citations: int
+    uncited: bool
+    steps: int = Field(description="Model turns used")
+    tool_calls: int
+    llm_calls: int = Field(description="Model calls used, each counted against the daily cap")
+    wrapped_up: bool = Field(description="True when the step limit was reached and the answer was forced")
+
+
 class SseStep(BaseModel):
     name: Literal["rewrite", "retrieve", "grade", "answer", "verify", "regenerate"]
     detail: str

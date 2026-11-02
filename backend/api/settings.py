@@ -34,6 +34,9 @@ class Settings:
     rate_limit_per_min: int = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))
     # If set, every /api/v1 request must send this value in the X-API-Key header.
     api_key: Optional[str] = field(default_factory=lambda: os.getenv("API_KEY") or None)
+    # Lets the tool-using agent call tools that change data (saving flashcards). Off by default, and never settable
+    # per request: a public deployment must not let a model write to a shared database.
+    agent_allow_writes: bool = field(default_factory=lambda: os.getenv("AGENT_ALLOW_WRITES") == "1")
 
     @property
     def max_upload_bytes(self) -> int:

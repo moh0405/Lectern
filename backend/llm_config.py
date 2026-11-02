@@ -119,6 +119,12 @@ class GeminiClient:
                 out.append(_base_name(getattr(m, "name", "")))
         return out
 
+    def start_tool_chat(self, system: str, tools: List[Any], temperature: Optional[float] = None) -> Any:
+        """A conversation in which the model can ask for tools to be run (see backend/tool_chat.py)."""
+        from .tool_chat import GeminiToolChat
+
+        return GeminiToolChat(self, system, tools, temperature)
+
     def _resolve_model(self, requested: str) -> str:
         """Use `requested` if it can generate content; otherwise the best available alternative."""
         cache_key = (self._key_id, requested)
