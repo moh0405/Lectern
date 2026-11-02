@@ -96,6 +96,24 @@ class CappedLLM:
         self._cap.reserve()  # raises DailyLimitReached, which the caller turns into an error event
         return self._inner.stream(*args, **kwargs)
 
+    def start_tool_chat(self, *args: Any, **kwargs: Any):
+        return CappedToolChat(self._inner.start_tool_chat(*args, **kwargs), self._cap)
+
+
+class CappedToolChat:
+    """Counts every turn of a tool chat (each `send` is one model call)."""
+
+    def __init__(self, inner: Any, cap: DailyCap):
+        self._inner = inner
+        self._cap = cap
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def send(self, message: Any):
+        self._cap.reserve()
+        return self._inner.send(message)
+
 
 _cap: Optional[DailyCap] = None
 

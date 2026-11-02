@@ -9,6 +9,7 @@ export type { SseFrame } from "./sse";
 type Schemas = components["schemas"];
 export type AskRequest = Schemas["AskRequest"];
 export type AgentAskRequest = Schemas["AgentAskRequest"];
+export type AgentRunRequest = Schemas["AgentRunRequest"];
 export type Chunk = Schemas["Chunk"];
 export type ErrorResponse = Schemas["ErrorResponse"];
 
@@ -27,6 +28,16 @@ export type AgentStreamEvent =
   /** Discard the answer streamed so far; a corrected one follows. */
   | { event: "replace"; data: Schemas["SseReplace"] }
   | { event: "done"; data: Schemas["SseAgentDone"] }
+  | { event: "error"; data: Schemas["SseError"] };
+
+/** Events from POST /api/v1/agent/run/stream: thought/tool_call/tool_result as the model works, then meta, token (the whole answer), done or error. */
+export type AgentRunEvent =
+  | { event: "thought"; data: Schemas["SseThought"] }
+  | { event: "tool_call"; data: Schemas["SseToolCall"] }
+  | { event: "tool_result"; data: Schemas["SseToolResult"] }
+  | { event: "meta"; data: Schemas["SseMeta"] }
+  | { event: "token"; data: Schemas["SseToken"] }
+  | { event: "done"; data: Schemas["SseAgentRunDone"] }
   | { event: "error"; data: Schemas["SseError"] };
 
 export interface ApiClientOptions {
@@ -56,6 +67,8 @@ export interface AiStudyMentorClient {
   askStream(body: AskRequest, signal?: AbortSignal): AsyncGenerator<AskStreamEvent>;
   /** Stream an answer from the agentic (LangGraph) workflow: the same transport, plus `step` and `replace` events. */
   askAgentStream(body: AgentAskRequest, signal?: AbortSignal): AsyncGenerator<AgentStreamEvent>;
+  /** Run the tool-using agent: the model chooses which tools to call. Yields each tool call and result as it happens. */
+  agentRunStream(body: AgentRunRequest, signal?: AbortSignal): AsyncGenerator<AgentRunEvent>;
 }
 
 export function createApiClient(options: ApiClientOptions): AiStudyMentorClient {
@@ -80,7 +93,9 @@ export function createApiClient(options: ApiClientOptions): AiStudyMentorClient 
   const askStream = (body: AskRequest, signal?: AbortSignal) => postSse<AskStreamEvent>("/api/v1/ask/stream", body, signal);
   const askAgentStream = (body: AgentAskRequest, signal?: AbortSignal) => postSse<AgentStreamEvent>("/api/v1/ask/agent/stream", body, signal);
 
-  return { http, askStream, askAgentStream };
+  const agentRunStream = (body: AgentRunRequest, signal?: AbortSignal) => postSse<AgentRunEvent>("/api/v1/agent/run/stream", body, signal);
+
+  return { http, askStream, askAgentStream, agentRunStream };
 }
 
 async function toApiError(res: Response): Promise<ApiError> {

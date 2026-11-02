@@ -145,6 +145,28 @@ flowchart LR
 - **Optional dependency:** `langgraph` and `langchain-core` (about 27 MB installed, 0.4 s to import) live in the `agent` extra and are imported only when the endpoint is called. Why LangGraph and not LangChain throughout: the workflow needs a graph with loops; the project's retrieval, store and citation checker are deliberately hand-built, so there is nothing for LangChain's abstractions to replace.
 - **Not measured:** the retrieval evaluation (`eval/`) does not cover this path. It is tested for behaviour (steps, retries, bounds, error cases) with a scripted model, not shown to give better answers.
 
+### Tool-using agent (ReAct)
+
+`POST /agent/run/stream` is a different kind of agent from the workflow above: here the *model* decides the steps. Gemini's function calling lets it ask for a tool; the server runs the tool and sends back the result; the model asks again or answers (`backend/react_agent.py`, a LangGraph graph with a model node, a tools node and a wrap-up node).
+
+```mermaid
+flowchart LR
+  T([task]) --> M[model turn<br/>text or tool calls]
+  M -- asked for tools, steps left --> X[run tools<br/>search, read, math, LeetCode]
+  X --> M
+  M -- asked for tools, no steps left --> W[wrap-up turn: answer now]
+  M -- answered --> E([answer + citation check])
+  W --> E
+```
+
+- **One tool registry** (`backend/tools.py`): name, description the model reads, JSON Schema, handler. Handlers never raise: bad arguments or failures return `{"error": ...}` for the model to read. The same registry feeds the MCP server (`backend/mcp_server.py`, see [MCP.md](MCP.md)), so the agent and external MCP clients get identical tools.
+- **Provider-neutral tool chat** (`backend/tool_chat.py`): `send(user text | tool results) -> text + tool calls`. Gemini implements it with the SDK's chat object (which keeps the history and the thought signatures newer models require); the OpenAI-compatible provider raises `ToolCallingUnsupported` until it is added.
+- **Bounds:** `max_steps` model turns (default 6, at most 8) then one forced wrap-up; at most 4 tools per turn; a repeated identical call is refused; each result cut at 6,000 characters; every turn counted against the daily cap (`CappedToolChat`).
+- **Safety:** tool results are text from the user's documents, so the system prompt calls them data, and the default tools are read-only (`save_flashcard` needs `AGENT_ALLOW_WRITES=1` and cannot be requested). That reduces prompt-injection risk; it does not remove it.
+- **Citations:** every passage a tool hands out is recorded, and the final answer's `[document (page N)]` citations are checked against that set, as for normal answers.
+- **Streaming:** tool calls and results stream as they happen; the final answer arrives whole (the last model turn is not streamed token by token).
+- **Observed on real Gemini** (by hand, a few tasks): the model chose its own tool sequence, including re-searching with different words and, once, trying `read_page` on a Markdown file that has no pages (the tool now handles that case and the prompt discourages repeating a failed call). It sometimes uses more calls than a human would. No benchmark exists.
+
 ## 5. Where the data lives
 
 ```

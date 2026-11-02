@@ -116,6 +116,11 @@ class OpenAICompatClient:
                     raise
                 time.sleep(0.8 * (attempt + 1))
 
+    def start_tool_chat(self, system: str, tools: List[Any], temperature: Optional[float] = None) -> Any:
+        from .tool_chat import ToolCallingUnsupported
+
+        raise ToolCallingUnsupported("Tool calling is implemented for the Gemini provider only (LLM_PROVIDER=gemini).")
+
     def list_supported_models(self) -> List[str]:
         try:
             return sorted(m.id for m in self._client.models.list())

@@ -287,6 +287,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `CORS_ORIGINS` | No | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed by CORS |
 | `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
 | `MAX_UPLOAD_MB` | No | `50` | Per-file upload limit |
+| `AGENT_ALLOW_WRITES` | No | off | Set to `1` to let the tool-using agent save flashcards. Never set it on a public deployment. |
+| `GEMINI_TIMEOUT_S` | No | `30` | Per-attempt time limit for model calls |
 | `RATE_LIMIT_PER_MIN` | No | `60` | Per-IP request limit for `/api/v1` |
 | `UPLOAD_DIR`, `STORE_DIR`, `ANALYTICS_DB`, `STUDY_DB` | No | `data/uploaded_files`, `data/vector_store`, `data/analytics.db`, `data/study.db` | Where the API keeps files, the index, analytics, and your flashcards / LeetCode progress / saved history |
 | `OPENAI_API_KEY` | With `LLM_PROVIDER=openai`; also for audio | none | OpenAI key, also used for Whisper transcription of `.mp3/.mp4/.wav/.m4a` |

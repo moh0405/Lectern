@@ -16,6 +16,7 @@ class FakeGemini:
     handler = None  # callable(prompt, json_mode) -> str
     fail_with = None  # set to an Exception to make every call fail
     calls: list = []
+    tool_script = None  # callable(turn, message) -> TurnResult, for tool-calling tests
     echo_context = False  # e2e server: answer from the retrieved context instead of a fixed string
 
     def __init__(self, model=None, temperature=0.2, **kw):
@@ -68,6 +69,11 @@ class FakeGemini:
             raise FakeGemini.fail_with
         return (FakeGemini.handler or FakeGemini.default_reply)(prompt, json_mode)
 
+    def start_tool_chat(self, system, tools, temperature=None):
+        if FakeGemini.fail_with is not None and isinstance(FakeGemini.fail_with, RuntimeError):
+            raise FakeGemini.fail_with
+        return FakeToolChat(self.model, system, tools)
+
     def list_supported_models(self):
         return ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
 
@@ -82,3 +88,37 @@ class FakeGemini:
         words = text.split(" ")
         for i, w in enumerate(words):
             yield w + ("" if i == len(words) - 1 else " ")
+
+
+class FakeToolChat:
+    """Stand-in for a Gemini tool chat. Script it with `FakeGemini.tool_script = fn(turn, message) -> TurnResult`.
+
+    Without a script it behaves like a sensible model: the first turn searches the study material for the task, and
+    once it has results it answers from the first passage (so browser tests can see real tool results)."""
+
+    def __init__(self, model, system, tools):
+        self.model = model
+        self.system = system
+        self.tool_names = [t.name for t in tools]
+        self.turn = 0
+
+    def send(self, message):
+        from backend.tool_chat import ToolCall, TurnResult
+
+        FakeGemini.calls.append(f"TOOLCHAT turn {self.turn}: {message if isinstance(message, str) else [(r.name, r.payload) for r in message]}")
+        if FakeGemini.fail_with is not None:
+            raise FakeGemini.fail_with
+        turn, self.turn = self.turn, self.turn + 1
+        script = getattr(FakeGemini, "tool_script", None)
+        if script is not None:
+            return script(turn, message)
+        if turn == 0:
+            return TurnResult(calls=[ToolCall("search_documents", {"query": str(message)[:120]})])
+        passages = []
+        for r in message if isinstance(message, list) else []:
+            passages += r.payload.get("passages", [])
+        if passages:
+            p = passages[0]
+            ref = f"{p['doc']} (page {p['page']})" if p.get("page") else p["doc"]
+            return TurnResult(text=f"From your material: {p['text'][:140]} [{ref}]")
+        return TurnResult(text="I could not find that in your sources.")

@@ -149,6 +149,49 @@
         "title": "AgentAskRequest",
         "type": "object"
       },
+      "AgentRunRequest": {
+        "properties": {
+          "max_steps": {
+            "default": 6,
+            "description": "Most model turns before the agent must wrap up",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "task": {
+            "description": "What the student wants done, in their own words",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Task",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.2,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "AgentRunRequest",
+        "type": "object"
+      },
       "AnalyticsEvent": {
         "properties": {
           "avg_score": {
@@ -2298,6 +2341,67 @@
         "title": "SseAgentDone",
         "type": "object"
       },
+      "SseAgentRunDone": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "llm_calls": {
+            "description": "Model calls used, each counted against the daily cap",
+            "title": "Llm Calls",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model"
+          },
+          "steps": {
+            "description": "Model turns used",
+            "title": "Steps",
+            "type": "integer"
+          },
+          "tool_calls": {
+            "title": "Tool Calls",
+            "type": "integer"
+          },
+          "uncited": {
+            "title": "Uncited",
+            "type": "boolean"
+          },
+          "unverified_citations": {
+            "title": "Unverified Citations",
+            "type": "integer"
+          },
+          "wrapped_up": {
+            "description": "True when the step limit was reached and the answer was forced",
+            "title": "Wrapped Up",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "citations",
+          "unverified_citations",
+          "uncited",
+          "steps",
+          "tool_calls",
+          "llm_calls",
+          "wrapped_up"
+        ],
+        "title": "SseAgentRunDone",
+        "type": "object"
+      },
       "SseDone": {
         "properties": {
           "cached": {
@@ -2431,6 +2535,19 @@
         "title": "SseStep",
         "type": "object"
       },
+      "SseThought": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "SseThought",
+        "type": "object"
+      },
       "SseToken": {
         "properties": {
           "text": {
@@ -2442,6 +2559,49 @@
           "text"
         ],
         "title": "SseToken",
+        "type": "object"
+      },
+      "SseToolCall": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "title": "SseToolCall",
+        "type": "object"
+      },
+      "SseToolResult": {
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "summary": {
+            "description": "One line describing what the tool returned (or why it failed)",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "summary",
+          "error"
+        ],
+        "title": "SseToolResult",
         "type": "object"
       },
       "Stats": {
@@ -2841,6 +3001,121 @@
         "summary": "Explain at a chosen level (ELI5 to Expert) with a mini quiz",
         "tags": [
           "tutor"
+        ]
+      }
+    },
+    "/api/v1/agent/run/stream": {
+      "post": {
+        "description": "The model is given the task and a set of tools (search the study material, list documents, read a page, solve math, find a LeetCode problem) and decides which to call, in a loop: it asks for a tool, the server runs it and returns the result, and the model asks again or answers. The loop is bounded (`max_steps` model turns, then a forced wrap-up) and every model turn counts against the daily cap. Tools that change data are available only when the deployment sets `AGENT_ALLOW_WRITES=1`; a request cannot enable them.\\n\\nEvents: `thought` (`{text}`), `tool_call` (`{name, arguments}`), `tool_result` (`{name, summary, error}`), then `meta` (`{chunks}`, the passages the tools returned), `token` (the whole final answer), and `done` or `error`. Needs the Gemini provider; other providers answer with `tools_unsupported`.",
+        "operationId": "agent_run_stream_api_v1_agent_run_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Run the tool-using agent, streamed as Server-Sent Events",
+        "tags": [
+          "agent"
         ]
       }
     },

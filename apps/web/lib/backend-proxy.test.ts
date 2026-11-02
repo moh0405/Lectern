@@ -7,7 +7,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("isAllowed", () => {
   it("lets reading and asking through", () => {
-    for (const [m, p] of [["GET", "search"], ["GET", "documents"], ["POST", "ask"], ["POST", "ask/stream"], ["POST", "ask/agent/stream"], ["GET", "leetcode/problems/12"], ["POST", "leetcode/problems/12/explain"]]) {
+    for (const [m, p] of [["GET", "search"], ["GET", "documents"], ["POST", "ask"], ["POST", "ask/stream"], ["POST", "ask/agent/stream"], ["POST", "agent/run/stream"], ["GET", "leetcode/problems/12"], ["POST", "leetcode/problems/12/explain"]]) {
       expect(isAllowed(m!, p!)).toBe(true);
     }
   });

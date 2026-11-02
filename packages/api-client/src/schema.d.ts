@@ -21,6 +21,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/run/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the tool-using agent, streamed as Server-Sent Events
+         * @description The model is given the task and a set of tools (search the study material, list documents, read a page, solve math, find a LeetCode problem) and decides which to call, in a loop: it asks for a tool, the server runs it and returns the result, and the model asks again or answers. The loop is bounded (`max_steps` model turns, then a forced wrap-up) and every model turn counts against the daily cap. Tools that change data are available only when the deployment sets `AGENT_ALLOW_WRITES=1`; a request cannot enable them.\n\nEvents: `thought` (`{text}`), `tool_call` (`{name, arguments}`), `tool_result` (`{name, summary, error}`), then `meta` (`{chunks}`, the passages the tools returned), `token` (the whole final answer), and `done` or `error`. Needs the Gemini provider; other providers answer with `tools_unsupported`.
+         */
+        post: operations["agent_run_stream_api_v1_agent_run_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics": {
         parameters: {
             query?: never;
@@ -687,6 +707,27 @@ export interface components {
             model?: string | null;
             /** Question */
             question: string;
+            /**
+             * Temperature
+             * @default 0.2
+             */
+            temperature?: number;
+        };
+        /** AgentRunRequest */
+        AgentRunRequest: {
+            /**
+             * Max Steps
+             * @description Most model turns before the agent must wrap up
+             * @default 6
+             */
+            max_steps?: number;
+            /** Model */
+            model?: string | null;
+            /**
+             * Task
+             * @description What the student wants done, in their own words
+             */
+            task: string;
             /**
              * Temperature
              * @default 0.2
@@ -1540,6 +1581,37 @@ export interface components {
             /** Unverified Citations */
             unverified_citations: number;
         };
+        /** SseAgentRunDone */
+        SseAgentRunDone: {
+            /** Citations */
+            citations: components["schemas"]["CitationCheck"][];
+            /**
+             * Llm Calls
+             * @description Model calls used, each counted against the daily cap
+             */
+            llm_calls: number;
+            /**
+             * Model
+             * @default null
+             */
+            model?: string | null;
+            /**
+             * Steps
+             * @description Model turns used
+             */
+            steps: number;
+            /** Tool Calls */
+            tool_calls: number;
+            /** Uncited */
+            uncited: boolean;
+            /** Unverified Citations */
+            unverified_citations: number;
+            /**
+             * Wrapped Up
+             * @description True when the step limit was reached and the answer was forced
+             */
+            wrapped_up: boolean;
+        };
         /** SseDone */
         SseDone: {
             /** Cached */
@@ -1591,10 +1663,36 @@ export interface components {
              */
             name: "rewrite" | "retrieve" | "grade" | "answer" | "verify" | "regenerate";
         };
+        /** SseThought */
+        SseThought: {
+            /** Text */
+            text: string;
+        };
         /** SseToken */
         SseToken: {
             /** Text */
             text: string;
+        };
+        /** SseToolCall */
+        SseToolCall: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+        };
+        /** SseToolResult */
+        SseToolResult: {
+            /** Error */
+            error: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Summary
+             * @description One line describing what the tool returned (or why it failed)
+             */
+            summary: string;
         };
         /** Stats */
         Stats: {
@@ -1723,6 +1821,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Adaptive"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    agent_run_stream_api_v1_agent_run_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Bad Request */

@@ -17,6 +17,8 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 ## What it does
 
 - **Ingests** PDFs, YouTube transcripts, web pages, GitHub repos and audio, as background jobs with progress. In the public demo, visitors can instead add their own PDF, TXT or Markdown files that stay in the browser (text extraction with pdf.js, MiniLM embeddings with transformers.js, hybrid search in TypeScript); only the few matching passages are sent with a question.
+- **Tool-using agent (the Agent page):** give it a task and the *model* decides which tools to call, in a ReAct loop (reason, act, observe, repeat) using Gemini function calling: search your documents, list them, read a page, solve math in the sandboxed solver, find a LeetCode problem. Each call and result streams to the page, the final answer's citations are checked against what the tools returned, and the loop is bounded (a step limit, then a forced wrap-up; every model turn counts against the daily cap). Tools that change data (saving flashcards) exist only when a deployment turns them on.
+- **MCP server:** the same tools are available to Claude Desktop, Claude Code, Cursor or any MCP client (`python -m backend.mcp_server`, see [docs/MCP.md](docs/MCP.md)).
 - **Agentic mode (optional, LangGraph):** for harder questions the Ask page can run a small workflow that rewrites the search query, asks the model whether the retrieved passages are enough (searching once more if not), writes the answer, and re-checks its citations (rewriting once if it cited sources it was never given). The steps are shown with the answer. It is slower and uses up to 6 model calls per question; its benefit has not been measured (see Status and limits).
 - **Answers only from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **verified** against the retrieved passages and flagged if the document or page was never retrieved.
 - **Retrieves with hybrid search**: embeddings (meaning) + BM25 (exact terms), merged by reciprocal rank fusion. Measured, not assumed.
@@ -88,14 +90,14 @@ How the pieces fit:
 |---|---|---|
 | Web app | Next.js 16, React 19, TypeScript (strict), Tailwind v4, TanStack Query | UI, streaming, state |
 | Typed client | OpenAPI → `openapi-typescript` + `openapi-fetch`, custom SSE reader | Frontend types generated from the backend |
-| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 41 operations under `/api/v1` |
+| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 42 operations under `/api/v1` |
 | Retrieval | NumPy exact search (FAISS opt-in), BM25, RRF, optional cross-encoder | Hybrid search |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-d), hashing fallback | Meaning as vectors |
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
-| Agentic mode | LangGraph (`langgraph`, `langchain-core`) | Optional workflow: rewrite the search, grade the passages, verify the citations |
+| Agents | LangGraph (`langgraph`, `langchain-core`), Gemini function calling, MCP (`mcp`) | A fixed workflow (rewrite, grade, verify) and a tool-using ReAct agent; the tools also served over MCP |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (361), Vitest (132), Playwright (42 + 3 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (396), Vitest (140), Playwright (46 + 3 in demo mode) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -118,7 +120,7 @@ All under `/api/v1` except `/health`. Interactive docs at `/docs`. Full detail a
 |---|---|
 | Health and corpus | `GET /health` · `GET /stats` · `GET /documents` · `DELETE /sources?key=` |
 | Ingestion | `POST /sources/files` · `POST /sources/urls` · `GET /jobs/{job_id}` |
-| Ask and search | `POST /ask` · `POST /ask/stream` (SSE) · `POST /ask/agent/stream` (SSE, agentic) · `GET /search` · `GET /suggestions` · `GET /models` |
+| Ask and search | `POST /ask` · `POST /ask/stream` (SSE) · `POST /ask/agent/stream` (SSE, agentic) · `POST /agent/run/stream` (SSE, tool-using agent) · `GET /search` · `GET /suggestions` · `GET /models` |
 | Tutor tools | `POST /concept-map` · `/socratic` · `/synthesis` · `/adaptive` · `/math` |
 | LeetCode | `GET /leetcode/stats` · `/leetcode/search` · `/leetcode/problems/{pid}` · `POST /leetcode/problems/{pid}/explain` |
 | Flashcards | `GET` / `POST /cards` · `POST /cards/generate` · `GET /cards/export` · `POST /cards/{id}/review` · `DELETE /cards/{id}` |
@@ -222,7 +224,7 @@ Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, 
 - The AWS deployment is a single-user demo design: study data is a SQLite file synced through S3, not a database that several users can write to at once.
 - Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).
 - Exact search is right up to roughly 100k passages; beyond that you would want an approximate index.
-- Evaluation measures retrieval, not whether a generated claim is faithful to its source; citation checks catch invented sources only. The agentic mode has no evaluation of its own: it is tested for behaviour (steps, retries, bounded model calls) but not shown to improve answers.
+- Evaluation measures retrieval, not whether a generated claim is faithful to its source; citation checks catch invented sources only. The agentic workflow and the tool-using agent have no evaluation of their own: they are tested for behaviour (steps, retries, tool use, bounded model calls) with a scripted model, and the tool-using agent was run against real Gemini by hand on a handful of tasks, but neither is shown to improve answers. The agent can be prompt-injected by text inside a document; the default tools are read-only to limit the damage.
 - The demo screenshots use a scripted model, as noted above.
 
 ## License
