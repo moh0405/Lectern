@@ -81,3 +81,31 @@ describe("citation checks", () => {
     expect(s[0]).toMatchObject({ status: "done", citations, uncited: false, cached: true });
   });
 });
+
+describe("agentic turns", () => {
+  const agentStart = { type: "start", id: "a", question: "what is x", agent: true } as const;
+
+  it("collects the workflow's steps in order and records the cost", () => {
+    let s = reducer([], agentStart);
+    expect(s[0]).toMatchObject({ agent: true, steps: [] });
+    s = reducer(s, { type: "step", id: "a", step: { name: "rewrite", detail: "Searching for: x" } });
+    s = reducer(s, { type: "step", id: "a", step: { name: "retrieve", detail: "found 3 passages in 1 source" } });
+    s = reducer(s, { type: "done", id: "a", llmCalls: 3 });
+    expect(s[0]!.steps!.map((x) => x.name)).toEqual(["rewrite", "retrieve"]);
+    expect(s[0]).toMatchObject({ status: "done", llmCalls: 3 });
+  });
+
+  it("replace discards the answer so far and remembers that it happened", () => {
+    let s = reducer([], agentStart);
+    s = reducer(s, { type: "token", id: "a", text: "First draft [Fake.pdf]" });
+    s = reducer(s, { type: "replace", id: "a" });
+    expect(s[0]).toMatchObject({ answer: "", rewritten: true });
+    s = reducer(s, { type: "token", id: "a", text: "Better." });
+    s = reducer(s, { type: "done", id: "a", rewritten: true });
+    expect(s[0]).toMatchObject({ answer: "Better.", rewritten: true });
+  });
+
+  it("plain turns have no steps", () => {
+    expect(reducer([], start("p"))[0]).not.toHaveProperty("steps");
+  });
+});

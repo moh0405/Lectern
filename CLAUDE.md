@@ -33,7 +33,7 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 
 ## Local dev
 
-`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 345 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (39) and `-c playwright.demo.config.ts` (demo mode, 3; `E2E_REAL_EMBEDDINGS=1` also runs 2 more that use the real MiniLM download and a blocked-download fallback). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
+`.venv` (Python 3.13, gitignored): `python3.13 -m venv .venv && .venv/bin/pip install -e ".[api,math,export,anki,dev]"`. The system `python3` is 3.14 and has no deps. `ruff check .` passes. `.venv/bin/python -m pytest` gives 361 passed, 3 skipped. Browser tests: `cd apps/web && E2E_PYTHON=$PWD/../../.venv/bin/python npx playwright test` (42) and `-c playwright.demo.config.ts` (demo mode, 3; `E2E_REAL_EMBEDDINGS=1` also runs 2 more that use the real MiniLM download and a blocked-download fallback). (Python 3.13 renamed the HTTPStatus phrases for 413/422; `scripts/export_openapi.py` pins the old wording so `openapi.json` is identical on every Python version.)
 
 ## Known state / limits (be honest about these)
 
@@ -41,6 +41,8 @@ zsh note: always write `"${REPO}:latest"` (a bare `$REPO:latest` becomes `...ate
 - Public demo disables sources, history, analytics and the LeetCode study plan (shared database). Flashcards and LeetCode progress still work, stored in the visitor's browser (`apps/web/lib/local-cards.ts`, `local-progress.ts`), and visitors can add their own PDFs processed fully in the browser (`apps/web/lib/browser-rag/`, `/ask` accepts `context` passages; the tutor tools do not use them yet). `BACKEND_ALLOW_WRITES=1` on a private deployment lifts all of it.
 - Reserved concurrency of 1 is impossible (account limit 10), so several Lambda copies could race on the SQLite file; documented in `docs/AWS.md`.
 - Cost figures (about $1/month) are estimates, not checked against a real bill.
+
+- Agentic mode: `POST /ask/agent/stream` (LangGraph, `backend/agent.py`, optional `agent` extra, in the Docker image and CI). Up to 6 model calls per question, counted against the daily cap; always uses the server index (not the browser documents); not evaluated, only behaviour-tested. The proxy allow-list includes it, so it works in the public demo and burns the Gemini quota faster.
 
 ## Remaining work (only with the user's go-ahead)
 

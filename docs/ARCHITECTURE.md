@@ -123,6 +123,28 @@ sequenceDiagram
 - Errors are **events**, not HTTP failures, once streaming has started (`error` with a code such as `llm_unavailable`).
 - The **cache key includes the index version**, so adding or removing a source invalidates cached answers. Failures and empty answers are never cached.
 
+### Agentic answers (LangGraph)
+
+`POST /ask/agent/stream` runs the same pieces as a small LangGraph state graph (`backend/agent.py`) instead of one straight line:
+
+```mermaid
+flowchart LR
+  S([question]) --> RW[rewrite query]
+  RW --> RT[retrieve<br/>question + rewrite, merged]
+  RT --> G{grade passages}
+  G -- weak, one retry left --> RT
+  G -- sufficient --> A[answer, streamed]
+  A --> V{verify citations}
+  V -- cites unknown sources, once --> RG[regenerate] --> V
+  V -- ok --> E([done])
+```
+
+- **Reuses the pipeline:** retrieval is `RAGEngine.retrieve_context`, the prompt is `generate_prompt`, the check is `check_answer`. The graph only adds the three decisions (rewrite, grade, verify) and the loops.
+- **Safe by construction:** the original question is always searched too (a bad rewrite cannot beat the plain path's passages); each loop runs at most once; one question makes at most 6 model calls, each counted against the daily cap; rewrite and grade failures degrade to the plain behaviour, while running out of quota stops the run.
+- **Streaming:** nodes write `step`, `meta`, `token` and `replace` events through LangGraph's stream writer; the API turns them into Server-Sent Events. `replace` tells the client to drop the draft streamed so far when verification forces a rewrite.
+- **Optional dependency:** `langgraph` and `langchain-core` (about 27 MB installed, 0.4 s to import) live in the `agent` extra and are imported only when the endpoint is called. Why LangGraph and not LangChain throughout: the workflow needs a graph with loops; the project's retrieval, store and citation checker are deliberately hand-built, so there is nothing for LangChain's abstractions to replace.
+- **Not measured:** the retrieval evaluation (`eval/`) does not cover this path. It is tested for behaviour (steps, retries, bounds, error cases) with a scripted model, not shown to give better answers.
+
 ## 5. Where the data lives
 
 ```

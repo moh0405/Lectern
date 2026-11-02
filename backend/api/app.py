@@ -21,7 +21,7 @@ from .deps import make_engine
 from .errors import ERROR_RESPONSES, ErrorResponse, install_error_handlers
 from .jobs import JobManager
 from .routers import ask, leetcode, sources, study, tracking, tutor, viz
-from .schemas import Health, SseDone, SseError, SseMeta, SseToken
+from .schemas import Health, SseAgentDone, SseDone, SseError, SseMeta, SseReplace, SseStep, SseToken
 from .settings import settings
 
 logger = logging.getLogger("ai-study-mentor.api")
@@ -113,7 +113,7 @@ def create_app() -> FastAPI:
         schema = base_openapi()
         components = schema.setdefault("components", {}).setdefault("schemas", {})
         # Not referenced by any route response, but the client needs them to type the SSE stream.
-        for model in (SseMeta, SseToken, SseDone, SseError, ErrorResponse):
+        for model in (SseMeta, SseToken, SseDone, SseError, SseStep, SseReplace, SseAgentDone, ErrorResponse):
             components.update(model.model_json_schema(ref_template="#/components/schemas/{model}").pop("$defs", {}))
             components[model.__name__] = {
                 k: v for k, v in model.model_json_schema(ref_template="#/components/schemas/{model}").items() if k != "$defs"

@@ -90,6 +90,65 @@
         "title": "AdaptiveRequest",
         "type": "object"
       },
+      "AgentAskRequest": {
+        "properties": {
+          "k": {
+            "default": 3,
+            "description": "Number of passages to answer from",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "eli5",
+                  "technical",
+                  "interview",
+                  "summary"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "question": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Question",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.2,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AgentAskRequest",
+        "type": "object"
+      },
       "AnalyticsEvent": {
         "properties": {
           "avg_score": {
@@ -2184,6 +2243,61 @@
         "title": "SourcesAccepted",
         "type": "object"
       },
+      "SseAgentDone": {
+        "properties": {
+          "cached": {
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "llm_calls": {
+            "description": "Model calls this question used (at most 6)",
+            "title": "Llm Calls",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model"
+          },
+          "regenerated": {
+            "description": "True when the first answer cited unknown sources and was rewritten",
+            "title": "Regenerated",
+            "type": "boolean"
+          },
+          "uncited": {
+            "title": "Uncited",
+            "type": "boolean"
+          },
+          "unverified_citations": {
+            "title": "Unverified Citations",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "citations",
+          "unverified_citations",
+          "uncited",
+          "cached",
+          "llm_calls",
+          "regenerated"
+        ],
+        "title": "SseAgentDone",
+        "type": "object"
+      },
       "SseDone": {
         "properties": {
           "cached": {
@@ -2276,6 +2390,45 @@
           "chunks"
         ],
         "title": "SseMeta",
+        "type": "object"
+      },
+      "SseReplace": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "SseReplace",
+        "type": "object"
+      },
+      "SseStep": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "rewrite",
+              "retrieve",
+              "grade",
+              "answer",
+              "verify",
+              "regenerate"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "detail"
+        ],
+        "title": "SseStep",
         "type": "object"
       },
       "SseToken": {
@@ -3011,6 +3164,121 @@
           }
         },
         "summary": "Answer a question from the indexed material",
+        "tags": [
+          "ask"
+        ]
+      }
+    },
+    "/api/v1/ask/agent/stream": {
+      "post": {
+        "description": "A slower, more careful path for harder questions. The workflow rewrites the question into a better search query, retrieves, asks the model whether the passages are sufficient (searching once more if not), writes the answer, and verifies its citations (rewriting once if it cited sources it was not given). It uses up to 6 model calls per question. Always searches the server's index; nothing is cached.\n\nEvents: `step` (`{name, detail}`, as each stage finishes), `meta` (`{chunks}`, when answering starts), `token`, `replace` (`{reason}`: discard the answer streamed so far, a corrected one follows), then `done` or `error`.",
+        "operationId": "ask_agent_stream_api_v1_ask_agent_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Answer with an agentic workflow (LangGraph), streamed as Server-Sent Events",
         "tags": [
           "ask"
         ]

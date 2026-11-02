@@ -19,6 +19,8 @@ export interface AskParams {
   retrievalOnly?: boolean;
   /** Search the visitor's own documents (kept in this browser) instead of the server's index. */
   local?: boolean;
+  /** Use the agentic (LangGraph) workflow: rewrite the search, grade the passages, verify the citations. */
+  agent?: boolean;
 }
 
 /** Run a server call whose failure must never disturb the UI (a sync or throw is swallowed too). */
@@ -96,7 +98,8 @@ export function useAskSession() {
     const id = newId();
     const controller = new AbortController();
     controllers.current.set(id, controller);
-    dispatch({ type: "start", id, question: p.question, mode: p.mode });
+    const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly;
+    dispatch({ type: "start", id, question: p.question, mode: p.mode, agent });
     try {
       let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
       if (p.local) {
@@ -129,6 +132,19 @@ export function useAskSession() {
         no_cache: p.noCache || undefined,
         context,
       };
+      if (agent) {
+        const agentBody = { question: p.question, k: Math.min(p.k, 10), mode: p.mode, temperature: p.temperature, model: p.model || undefined };
+        for await (const ev of api.askAgentStream(agentBody, controller.signal)) {
+          if (ev.event === "step") dispatch({ type: "step", id, step: ev.data });
+          else if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks });
+          else if (ev.event === "token") dispatch({ type: "token", id, text: ev.data.text });
+          else if (ev.event === "replace") dispatch({ type: "replace", id });
+          else if (ev.event === "done")
+            dispatch({ type: "done", id, model: ev.data.model ?? undefined, citations: ev.data.citations, uncited: ev.data.uncited, cached: false, llmCalls: ev.data.llm_calls, rewritten: ev.data.regenerated });
+          else dispatch({ type: "error", id, code: ev.data.code, message: ev.data.message });
+        }
+        return;
+      }
       for await (const ev of api.askStream(body, controller.signal)) {
         if (ev.event === "meta") dispatch({ type: "meta", id, chunks: ev.data.chunks, prompt: ev.data.prompt ?? undefined });
         else if (ev.event === "token") dispatch({ type: "token", id, text: ev.data.text });

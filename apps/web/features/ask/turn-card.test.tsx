@@ -145,3 +145,28 @@ describe("TurnCard citation checks", () => {
     expect(screen.queryByRole("button", { name: /flashcard/i })).toBeNull();
   });
 });
+
+describe("TurnCard for agentic answers", () => {
+  const steps = [
+    { name: "rewrite", detail: "Searching for: binary heap priority queue" },
+    { name: "grade", detail: "Passages look sufficient" },
+  ];
+
+  it("lists what the workflow did and what it cost", () => {
+    render(<TurnCard turn={turn({ agent: true, steps, llmCalls: 3, answer: "A heap is a tree.", chunks })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.getByText("agentic")).toBeInTheDocument();
+    expect(screen.getByText(/How it answered \(2 steps, 3 model calls\)/)).toBeInTheDocument();
+    expect(screen.getByText("Searching for: binary heap priority queue")).toBeInTheDocument();
+  });
+
+  it("says when the first answer was rewritten", () => {
+    render(<TurnCard turn={turn({ agent: true, steps, rewritten: true, answer: "ok", chunks })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.getByText(/cited sources it was not given, so it was rewritten/)).toBeInTheDocument();
+  });
+
+  it("shows nothing extra for a plain answer", () => {
+    render(<TurnCard turn={turn({ answer: "ok", chunks })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.queryByText(/How it answered/)).toBeNull();
+    expect(screen.queryByText("agentic")).toBeNull();
+  });
+});

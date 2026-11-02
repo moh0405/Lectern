@@ -15,9 +15,9 @@ COPY backend ./backend
 # CPU-only torch: the default wheel pulls ~2 GB of CUDA libraries that a CPU container never uses.
 RUN if [ "$EMBEDDINGS" = "1" ]; then \
       pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-      pip install ".[api,sources,math,export,anki,aws,embeddings]"; \
+      pip install ".[api,sources,math,export,anki,aws,agent,embeddings]"; \
     else \
-      pip install ".[api,sources,math,export,anki,aws]"; \
+      pip install ".[api,sources,math,export,anki,aws,agent]"; \
     fi
 # Bake the model into the image so the first request does not download it.
 ENV HF_HOME=/opt/hf

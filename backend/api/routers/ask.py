@@ -27,7 +27,7 @@ from ..deps import (
     store_version,
 )
 from ..errors import ERROR_RESPONSES, ApiError
-from ..schemas import AskRequest, AskResponse, Chunk, Models, SearchResponse, Suggestions
+from ..schemas import AgentAskRequest, AskRequest, AskResponse, Chunk, Models, SearchResponse, SseAgentDone, SseMeta, SseReplace, SseStep, SseToken, Suggestions
 
 logger = logging.getLogger("ai-study-mentor.api")
 
@@ -187,6 +187,82 @@ def ask_stream(
             _record(analytics, req, chunks, t0, prompt, text, True)
             cache.put(key, {"answer": text, "chunks": chunks, "model": client.model, "prompt": prompt, "check": check})
         yield done_event(client.model, check, False)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+def _llm_failure(msg: str) -> tuple[str, str]:
+    """The (code, message) the stream reports for a model failure."""
+    code = "llm_unavailable" if ("_API_KEY" in msg or "not installed" in msg or "LLM_PROVIDER" in msg) else "llm_error"
+    if "daily limit" in msg.lower() or "calls are paused" in msg.lower():
+        code = "daily_limit"
+    elif is_quota_error(msg):
+        code, msg = "quota_exhausted", QUOTA_MESSAGE
+    return code, msg
+
+
+@router.post(
+    "/ask/agent/stream",
+    summary="Answer with an agentic workflow (LangGraph), streamed as Server-Sent Events",
+    description=(
+        "A slower, more careful path for harder questions. The workflow rewrites the question into a better search "
+        "query, retrieves, asks the model whether the passages are sufficient (searching once more if not), writes the "
+        "answer, and verifies its citations (rewriting once if it cited sources it was not given). It uses up to 6 model "
+        "calls per question. Always searches the server's index; nothing is cached.\n\n"
+        "Events: `step` (`{name, detail}`, as each stage finishes), `meta` (`{chunks}`, when answering starts), `token`, "
+        "`replace` (`{reason}`: discard the answer streamed so far, a corrected one follows), then `done` or `error`."
+    ),
+    responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
+)
+def ask_agent_stream(
+    req: AgentAskRequest,
+    engine: RAGEngine = Depends(get_engine),
+    analytics: AnalyticsStore = Depends(get_analytics),
+):
+    try:
+        from ...agent import run_agent
+    except ImportError:  # langgraph is an optional extra
+        raise ApiError(503, "The agentic mode needs the 'agent' extra (langgraph) on the server", code="agent_unavailable")
+
+    def events() -> Iterator[str]:
+        t0 = time.time()
+        text, prompt, chunks = "", "", []
+        try:
+            llm = create_llm(model=req.model, temperature=req.temperature)
+        except Exception as e:
+            code, msg = _llm_failure(str(e))
+            yield sse("error", {"code": code, "message": msg})
+            return
+        try:
+            for ev in run_agent(engine, llm, req.question, k=req.k, mode=req.mode, temperature=req.temperature):
+                name, data = ev["event"], ev["data"]
+                if name == "meta":
+                    chunks = data["chunks"]
+                    data = SseMeta(chunks=[Chunk(**c) for c in chunks]).model_dump()
+                elif name == "token":
+                    data = SseToken(**data).model_dump()
+                elif name == "step":
+                    data = SseStep(**data).model_dump()
+                elif name == "replace":
+                    data = SseReplace(**data).model_dump()
+                elif name == "done":
+                    text, prompt = data.pop("_answer"), data.pop("_prompt")
+                    data.pop("_chunks", None)
+                    data = SseAgentDone(**data).model_dump()
+                yield sse(name, data)
+        except Exception as e:
+            logger.exception("Agent run failed")
+            code, msg = _llm_failure(str(e))
+            if not chunks and code == "llm_error":
+                code, msg = "retrieval_error", "Retrieval failed"
+            _record(analytics, req, chunks, t0, prompt, text, False)  # type: ignore[arg-type]
+            yield sse("error", {"code": code, "message": msg})
+            return
+        _record(analytics, req, chunks, t0, prompt, text, True)  # type: ignore[arg-type]
 
     return StreamingResponse(
         events(),

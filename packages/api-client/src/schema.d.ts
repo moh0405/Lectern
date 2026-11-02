@@ -56,6 +56,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ask/agent/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer with an agentic workflow (LangGraph), streamed as Server-Sent Events
+         * @description A slower, more careful path for harder questions. The workflow rewrites the question into a better search query, retrieves, asks the model whether the passages are sufficient (searching once more if not), writes the answer, and verifies its citations (rewriting once if it cited sources it was not given). It uses up to 6 model calls per question. Always searches the server's index; nothing is cached.
+         *
+         *     Events: `step` (`{name, detail}`, as each stage finishes), `meta` (`{chunks}`, when answering starts), `token`, `replace` (`{reason}`: discard the answer streamed so far, a corrected one follows), then `done` or `error`.
+         */
+        post: operations["ask_agent_stream_api_v1_ask_agent_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ask/stream": {
         parameters: {
             query?: never;
@@ -643,6 +665,26 @@ export interface components {
              * @enum {string}
              */
             level?: "ELI5" | "ELI10" | "Undergrad" | "Grad" | "Expert";
+            /** Question */
+            question: string;
+            /**
+             * Temperature
+             * @default 0.2
+             */
+            temperature?: number;
+        };
+        /** AgentAskRequest */
+        AgentAskRequest: {
+            /**
+             * K
+             * @description Number of passages to answer from
+             * @default 3
+             */
+            k?: number;
+            /** Mode */
+            mode?: ("eli5" | "technical" | "interview" | "summary") | null;
+            /** Model */
+            model?: string | null;
             /** Question */
             question: string;
             /**
@@ -1472,6 +1514,32 @@ export interface components {
             /** Urls */
             urls: string[];
         };
+        /** SseAgentDone */
+        SseAgentDone: {
+            /** Cached */
+            cached: boolean;
+            /** Citations */
+            citations: components["schemas"]["CitationCheck"][];
+            /**
+             * Llm Calls
+             * @description Model calls this question used (at most 6)
+             */
+            llm_calls: number;
+            /**
+             * Model
+             * @default null
+             */
+            model?: string | null;
+            /**
+             * Regenerated
+             * @description True when the first answer cited unknown sources and was rewritten
+             */
+            regenerated: boolean;
+            /** Uncited */
+            uncited: boolean;
+            /** Unverified Citations */
+            unverified_citations: number;
+        };
         /** SseDone */
         SseDone: {
             /** Cached */
@@ -1507,6 +1575,21 @@ export interface components {
              * @default null
              */
             prompt?: string | null;
+        };
+        /** SseReplace */
+        SseReplace: {
+            /** Reason */
+            reason: string;
+        };
+        /** SseStep */
+        SseStep: {
+            /** Detail */
+            detail: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "rewrite" | "retrieve" | "grade" | "answer" | "verify" | "regenerate";
         };
         /** SseToken */
         SseToken: {
@@ -1922,6 +2005,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AskResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ask_agent_stream_api_v1_ask_agent_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Bad Request */

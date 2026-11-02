@@ -13,6 +13,29 @@ import { pageLabel } from "@/lib/format";
 import { plainText } from "./flashcards";
 import type { Turn } from "./session";
 
+/** What the agentic workflow did, stage by stage. Open while it runs; collapsed once it is done. */
+function AgentSteps({ turn }: { turn: Turn }) {
+  const steps = turn.steps ?? [];
+  if (!turn.agent) return null;
+  return (
+    <details open={turn.status === "streaming"} className="rounded-lg border border-border bg-bg/40 px-3 py-2 text-sm" aria-label="How it answered">
+      <summary className="cursor-pointer select-none text-muted hover:text-fg">
+        How it answered ({steps.length} {steps.length === 1 ? "step" : "steps"}
+        {turn.llmCalls ? `, ${turn.llmCalls} model calls` : ""})
+      </summary>
+      <ol className="mt-2 space-y-1">
+        {steps.map((s, i) => (
+          <li key={i} className="flex gap-2">
+            <Badge className="shrink-0 font-mono">{s.name}</Badge>
+            <span>{s.detail}</span>
+          </li>
+        ))}
+      </ol>
+      {turn.rewritten ? <p className="mt-2 text-xs text-muted">The first answer cited sources it was not given, so it was rewritten.</p> : null}
+    </details>
+  );
+}
+
 const MODE_LABEL = { eli5: "ELI5", technical: "Technical", interview: "Interview", summary: "Summary" } as const;
 
 function CopyButton({ text }: { text: string }) {
@@ -116,6 +139,7 @@ export function TurnCard({
             {turn.mode ? <Badge>{MODE_LABEL[turn.mode]}</Badge> : null}
             {turn.model ? <Badge>{turn.model}</Badge> : null}
             {turn.cached ? <Badge title="Served from the cache; nothing new was sent to the model">cached</Badge> : null}
+            {turn.agent ? <Badge title="Answered by the agentic workflow (LangGraph)">agentic</Badge> : null}
             {turn.status === "stopped" ? <Badge>stopped</Badge> : null}
           </div>
         </div>
@@ -149,6 +173,8 @@ export function TurnCard({
       ) : turn.error ? (
         <ErrorNotice>{turn.error.message}</ErrorNotice>
       ) : null}
+
+      <AgentSteps turn={turn} />
 
       {turn.answer || streaming ? (
         <div aria-live="polite">
