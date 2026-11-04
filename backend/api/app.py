@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="AI Study Mentor API",
+        title="Lectern API",
         version=__version__,
         description=(
             "RAG tutor for Computer Science learning. Add sources (PDFs, audio, YouTube, GitHub, web), "

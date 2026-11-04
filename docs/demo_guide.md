@@ -1,9 +1,9 @@
-# Presenting AI Study Mentor (about 3 minutes)
+# Presenting Lectern (about 3 minutes)
 
 Run the API and the web app first (see the README), with some real study material indexed and a `GEMINI_API_KEY` set.
 
 ## Opening (20 s)
-"AI Study Mentor is a tutor that answers from *your own* material and shows its evidence. It turns PDFs, lectures, repos and articles into a searchable index, then explains, quizzes and cites."
+"Lectern is a tutor that answers from *your own* material and shows its evidence. It turns PDFs, lectures, repos and articles into a searchable index, then explains, quizzes and cites."
 
 ## Flow
 1. **Sources** (30 s): drop a PDF and paste a YouTube link. Point out the live indexing job and that re-adding the same file is skipped (incremental).

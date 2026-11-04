@@ -33,7 +33,7 @@ test("walkthrough", async ({ page }) => {
   test.setTimeout(240_000);
 
   await page.goto("/ask");
-  await caption(page, "AI Study Mentor: ask your own CS material, get answers with checked citations");
+  await caption(page, "Lectern: ask your own CS material, get answers with checked citations");
   await pause(page, 3000);
 
   await caption(page, "Hybrid search (embeddings + BM25) finds the passages; the answer streams in");

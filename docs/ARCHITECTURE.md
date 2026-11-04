@@ -1,6 +1,6 @@
 # Architecture
 
-This document explains how AI Study Mentor is put together: what each part does, how data moves through it, why it was built that way, and what happens when something is missing or breaks. Read it after the README and before the code.
+This document explains how Lectern is put together: what each part does, how data moves through it, why it was built that way, and what happens when something is missing or breaks. Read it after the README and before the code.
 
 ![Architecture](images/architecture.png)
 

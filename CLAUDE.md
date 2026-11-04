@@ -1,10 +1,10 @@
-# AI Study Mentor: session notes for Claude
+# Lectern (formerly AI Study Mentor): session notes for Claude
 
 Portfolio RAG tutor: FastAPI backend (`backend/`) + Next.js/TypeScript web app (`apps/web`). Plan in `docs/PLAN.md`; phase issues #2-#9. AWS details in `docs/AWS.md`.
 
 ## Where things stand (2026-10-24)
 
-- Phases 0-6 done except automatic deploys (written, opt-in). Phase 7 (docs, v1.0) is issue #9: docs, screenshots and demo video are done (`docs/demo/ai-study-mentor-demo.mp4`); the `v1.0` tag is still to do, only when the user says so.
+- Phases 0-6 done except automatic deploys (written, opt-in). Phase 7 (docs, v1.0) is issue #9: docs, screenshots and demo video are done (`docs/demo/lectern-demo.mp4`); the `v1.0` tag is still to do, only when the user says so.
 - Merged: AWS Lambda/S3/Terraform (#17), README AWS section (#18), API key + daily cap (#19), Vercel app (#20), openapi/CLAUDE.md (#21), LeetCode on Lambda (#22), demo 403/mobile fix (#23), npm audit fix with Next.js 16.4.3 (#24), browser-stored LeetCode progress (#25) and flashcards (#27) in the public demo, OIDC deploy workflow (#26, off until `terraform apply -var enable_ci_deploy=true` and the repo variable `AWS_DEPLOY_ROLE_ARN`), Phase 7 docs (#28), demo video (#29).
 - Live API (Lambda `ai-study-mentor`, us-east-1): `https://abkrinzbvtuem5ihomtm42pnba0brazm.lambda-url.us-east-1.on.aws/`
 - Live web app (Vercel project `ai-study-mentor`, root `apps/web`): `https://ai-study-mentor-two.vercel.app`. It calls `/api/backend/*`, which proxies to AWS and adds the API key. The public demo allow-list is in `apps/web/lib/backend-proxy.ts`.
@@ -20,7 +20,7 @@ The Lambda runs the fixed image: its code SHA matches ECR `latest` (pushed 2026-
 To redeploy later (`docker version` must show a Server section; run `open -a Docker` first):
 
 ```sh
-cd ~/Documents/GitHub/AI-study-mentor-
+cd ~/Documents/GitHub/AI-study-mentor-   # the local folder keeps its old name (renaming it would break .venv); the GitHub repo is moh0405/Lectern
 git checkout main && git pull
 REPO=249946084409.dkr.ecr.us-east-1.amazonaws.com/ai-study-mentor
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 249946084409.dkr.ecr.us-east-1.amazonaws.com

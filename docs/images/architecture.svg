@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1060" viewBox="0 0 1600 1060" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif">
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9fb0e6"/></marker><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a1f3d"/><stop offset="1" stop-color="#0a0e1a"/></linearGradient></defs>
 <rect width="1600" height="1060" fill="url(#g)"/>
-<text x="44" y="52" font-size="30" font-weight="800" fill="#e6e9f2">AI Study Mentor</text>
+<text x="44" y="52" font-size="30" font-weight="800" fill="#e6e9f2">Lectern</text>
 <text x="44" y="80" font-size="16" fill="#95a0bd">Architecture: a RAG tutor with hybrid retrieval, checked citations and a typed full-stack client</text>
 <rect x="20" y="104" width="1560" height="236" rx="16" fill="none" stroke="#2a3558" stroke-width="1" stroke-dasharray="3 6"/>
 <text x="44" y="134" font-size="15" font-weight="700" letter-spacing="1.2" fill="#38bdf8">1 · INDEXING  (when you add material)</text>
@@ -90,7 +90,7 @@
 <text x="44" y="710" font-size="15" font-weight="700" letter-spacing="1.2" fill="#6d5de8">3 · THE PRODUCT</text>
 <rect x="44" y="720" width="330" height="150" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
 <text x="209.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">FastAPI  /api/v1</text>
-<text x="209.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">26 routes: sources · jobs · ask (+stream)</text>
+<text x="209.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">42 routes: sources · jobs · ask (+stream)</text>
 <text x="209.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">search · tutor tools · LeetCode · notes</text>
 <text x="209.0" y="841.0" text-anchor="middle" font-size="13" fill="#95a0bd">export · analytics · embedding map</text>
 <rect x="420" y="740" width="210" height="110" rx="12" fill="#11172a" stroke="#2a3558" stroke-width="1.5"/>
@@ -111,6 +111,6 @@
 <line x1="910" y1="795" x2="960" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
 <rect x="44" y="900" width="1516" height="110" rx="12" fill="#11172a" stroke="#34d399" stroke-width="1.5"/>
 <text x="802.0" y="945.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Quality gates (all in CI)</text>
-<text x="802.0" y="967.0" text-anchor="middle" font-size="13" fill="#95a0bd">350+ automated tests: pytest · Vitest · Playwright browser tests incl. axe accessibility · retrieval evaluation with confidence intervals</text>
+<text x="802.0" y="967.0" text-anchor="middle" font-size="13" fill="#95a0bd">600+ automated tests: pytest · Vitest · Playwright browser tests incl. axe accessibility · retrieval evaluation with confidence intervals</text>
 <text x="802.0" y="984.0" text-anchor="middle" font-size="13" fill="#95a0bd">ruff · tsc --strict · eslint · generated-types check · Python 3.10 and 3.12 · scripted-model e2e (no API key needed)</text>
 </svg>

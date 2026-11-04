@@ -2888,7 +2888,7 @@
   },
   "info": {
     "description": "RAG tutor for Computer Science learning. Add sources (PDFs, audio, YouTube, GitHub, web), ask questions with cited answers (JSON or streaming), and use tutoring tools.\n\nAll `/api/v1` routes are rate limited per IP. If the server sets `API_KEY`, send it as `X-API-Key`. Errors always have the shape `{\"error\": {\"code\", \"message\", \"details?\"}}`.",
-    "title": "AI Study Mentor API",
+    "title": "Lectern API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",

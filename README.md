@@ -1,4 +1,6 @@
-# AI Study Mentor
+# Lectern
+
+> Formerly *AI Study Mentor*. The GitHub repository, app and documentation now use the name Lectern.
 
 **A retrieval-augmented tutor for Computer Science study material: ask questions of your own textbooks, lectures and repos, and get answers with citations that are checked against the passages the model actually saw.**
 
@@ -8,7 +10,7 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
-**Demo video (51 s):** [docs/demo/ai-study-mentor-demo.mp4](docs/demo/ai-study-mentor-demo.mp4). Recorded with Playwright against the local demo server (scripted model, as below); regenerate with `cd apps/web && npx playwright test -c playwright.video.config.ts`.
+**Demo video (51 s):** [docs/demo/lectern-demo.mp4](docs/demo/lectern-demo.mp4). Recorded with Playwright against the local demo server (scripted model, as below); regenerate with `cd apps/web && npx playwright test -c playwright.video.config.ts`.
 
 > **About the screenshots.** They are captured from `scripts/demo_server.py`, which runs the real API, real chunking, real MiniLM embeddings and real hybrid retrieval over a small committed corpus, but uses a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
 
@@ -173,7 +175,7 @@ Honest limits: Lambda can run several copies at once and this account's quota do
 Requires Python 3.10+, Node 20+, and a [Gemini API key](https://aistudio.google.com/) (or an OpenAI-compatible endpoint, see `LLM_PROVIDER`) for generated answers (retrieval, LeetCode, math and the embedding map work without one).
 
 ```bash
-git clone https://github.com/moh0405/AI-study-mentor-.git && cd AI-study-mentor-
+git clone https://github.com/moh0405/Lectern.git && cd Lectern
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[all,dev]"
 cp .env.example .env            # set GEMINI_API_KEY

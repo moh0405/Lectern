@@ -45,7 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="border-b border-border md:sticky md:top-0 md:h-dvh md:w-60 md:shrink-0 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-4 py-4">
           <BookOpen className="h-5 w-5 text-accent-2" />
-          <span className="font-semibold tracking-tight">AI Study Mentor</span>
+          <span className="font-semibold tracking-tight">Lectern</span>
         </div>
         <div className="hidden px-3 pb-3 md:block">
           <CommandPalette />
