@@ -1,4 +1,4 @@
-# AI Study Mentor — RAG Learning Guide
+# Lectern — RAG Learning Guide
 
 This guide teaches you the full Retrieval-Augmented Generation (RAG) pipeline in small, incremental steps, with practical code references to this repository. It focuses on learning-by-doing while keeping the project stable and easy to commit frequently.
 

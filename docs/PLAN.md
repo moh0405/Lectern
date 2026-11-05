@@ -1,6 +1,6 @@
-# AI Study Mentor: Completion Plan
+# Lectern: Completion Plan
 
-Goal: take AI Study Mentor from a hackathon prototype to a polished, deployable **portfolio project**: a reliable RAG backend, a TypeScript (Next.js) frontend, measurable answer quality, and clear documentation.
+Goal: take Lectern (then called AI Study Mentor) from a hackathon prototype to a polished, deployable **portfolio project**: a reliable RAG backend, a TypeScript (Next.js) frontend, measurable answer quality, and clear documentation.
 
 Status of this plan: drafted October 2026. Each phase has a matching GitHub issue.
 

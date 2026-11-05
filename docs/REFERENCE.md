@@ -1,10 +1,10 @@
-# AI Study Mentor: Reference
+# Lectern: Reference
 
 > The project overview is in the [README](../README.md). This page keeps the detailed configuration, CLI, data and internals notes. Some sections predate the later phases; where they disagree with the README or the other docs, those are newer.
 
 > A domain-specific **Retrieval-Augmented Generation (RAG)** tutor for Computer Science learning, built with Python, FastAPI, Next.js (TypeScript), sentence-transformers (with optional FAISS) and Google Gemini.
 
-AI Study Mentor was my first project for learning AI engineering, and it grew into a hackathon-style demo. You feed it study material (textbook PDFs, YouTube lectures, web articles, GitHub repos, audio recordings). It chunks and indexes that material, then answers questions **only from your sources, with citations**. On top of Q&A it adds tutoring tools (concept maps, a Socratic tutor, adaptive explanations, math solving) and a searchable LeetCode problem bank with AI-generated study guides.
+Lectern (originally named AI Study Mentor) was my first project for learning AI engineering, and it grew into a hackathon-style demo. You feed it study material (textbook PDFs, YouTube lectures, web articles, GitHub repos, audio recordings). It chunks and indexes that material, then answers questions **only from your sources, with citations**. On top of Q&A it adds tutoring tools (concept maps, a Socratic tutor, adaptive explanations, math solving) and a searchable LeetCode problem bank with AI-generated study guides.
 
 ---
 
@@ -143,7 +143,7 @@ flowchart LR
 ## Repository layout
 
 ```
-AI-study-mentor-/
+Lectern/
 ├── backend/
 │   ├── api/                    # FastAPI app: app.py, settings, errors, deps, jobs, schemas, routers/
 │   ├── safe_math.py            # Whitelisted SymPy parser + worker process with timeout
@@ -229,8 +229,8 @@ AI-study-mentor-/
 ### Install
 
 ```bash
-git clone https://github.com/moh0405/AI-study-mentor-.git
-cd AI-study-mentor-
+git clone https://github.com/moh0405/Lectern.git
+cd Lectern
 
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -630,7 +630,7 @@ The canned-answer "Demo Mode" from the original Streamlit app was not carried ov
 - **Origin**: the first AI-engineering project, started in October 2025 to learn RAG with LangChain, ChromaDB/FAISS and LLMs on CS material.
 - **Nov 2025**: pipeline working end to end without a UI, caching and preprocessing for fast startup, custom CSS, demo mode, batch-processing optimizations. Built under a hackathon deadline (see the context file).
 - **Jan 2026**: added transient retry logic to the Gemini client and re-applied the Demo Mode refactor.
-- **Open work**: see the phase issues (#2–#9) and `docs/PLAN.md`. [PR #1](https://github.com/moh0405/AI-study-mentor-/pull/1) (an early FAISS pipeline) predates the current code and is superseded by the vector store.
+- **Open work**: see the phase issues (#2–#9) and `docs/PLAN.md`. [PR #1](https://github.com/moh0405/Lectern/pull/1) (an early FAISS pipeline) predates the current code and is superseded by the vector store.
 
 ---
 

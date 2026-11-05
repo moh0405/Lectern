@@ -71,7 +71,7 @@ def to_csv(cards: Iterable[Dict[str, Any]]) -> str:
 _MODEL_ID, _DECK_ID = 1607392319, 2059400110
 
 
-def to_apkg(cards: Sequence[Dict[str, Any]], deck_name: str = "AI Study Mentor") -> bytes | None:
+def to_apkg(cards: Sequence[Dict[str, Any]], deck_name: str = "Lectern") -> bytes | None:
     """An Anki package (.apkg), or None if the optional `genanki` package is not installed."""
     try:
         import genanki
@@ -81,7 +81,7 @@ def to_apkg(cards: Sequence[Dict[str, Any]], deck_name: str = "AI Study Mentor")
     import tempfile
 
     model = genanki.Model(
-        _MODEL_ID, "AI Study Mentor card",
+        _MODEL_ID, "Lectern card",
         fields=[{"name": "Front"}, {"name": "Back"}],
         templates=[{"name": "Card 1", "qfmt": "{{Front}}", "afmt": '{{FrontSide}}<hr id="answer">{{Back}}'}],
     )

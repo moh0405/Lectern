@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: { default: "AI Study Mentor", template: "%s · AI Study Mentor" },
+  title: { default: "Lectern", template: "%s · Lectern" },
   description: "A RAG tutor for Computer Science: ask your own material, get cited answers.",
 };
 

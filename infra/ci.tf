@@ -9,7 +9,7 @@ variable "enable_ci_deploy" {
 
 variable "github_repo" {
   type        = string
-  default     = "moh0405/AI-study-mentor-"
+  default     = "moh0405/Lectern"
   description = "owner/name allowed to assume the deploy role (main branch only)."
 }
 

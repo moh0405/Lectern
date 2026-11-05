@@ -31,10 +31,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (use ab
 ```json
 {
   "mcpServers": {
-    "ai-study-mentor": {
-      "command": "/path/to/AI-study-mentor-/.venv/bin/python",
+    "lectern": {
+      "command": "/path/to/Lectern/.venv/bin/python",
       "args": ["-m", "backend.mcp_server"],
-      "cwd": "/path/to/AI-study-mentor-"
+      "cwd": "/path/to/Lectern"
     }
   }
 }
@@ -43,8 +43,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (use ab
 ### Claude Code
 
 ```bash
-cd /path/to/AI-study-mentor-
-claude mcp add ai-study-mentor -- .venv/bin/python -m backend.mcp_server
+cd /path/to/Lectern
+claude mcp add lectern -- .venv/bin/python -m backend.mcp_server
 ```
 
 ### Cursor

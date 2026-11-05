@@ -38,7 +38,7 @@ def _describe(name: str) -> str:
 
 
 def build_server(ctx: ToolContext, allow_writes: bool = False) -> MCPServer:
-    server = MCPServer(name="ai-study-mentor", instructions=INSTRUCTIONS)
+    server = MCPServer(name="lectern", instructions=INSTRUCTIONS)
     tools = default_tools(allow_writes)
 
     def call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,7 +108,7 @@ def make_context() -> ToolContext:
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(prog="python -m backend.mcp_server", description="MCP server for the AI Study Mentor tools")
+    parser = argparse.ArgumentParser(prog="python -m backend.mcp_server", description="MCP server for the Lectern tools")
     parser.add_argument("--http", action="store_true", help="serve streamable HTTP instead of stdio")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
