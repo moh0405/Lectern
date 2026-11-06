@@ -59,8 +59,13 @@ def fast(monkeypatch):
     monkeypatch.delenv("GEMINI_TEMPERATURE", raising=False)
 
 
-def make(models=("gemini-3.8-flash",), **kw):
-    return GeminiClient(client=FakeClient(models=[FakeModel(m) for m in models], **kw))
+DEFAULT = llm_config.DEFAULT_MODEL
+LITE = "gemini-flash-lite-latest"
+FLASH25 = "gemini-2.5-flash"
+
+
+def make(models=(DEFAULT,), model=None, **kw):
+    return GeminiClient(model=model, client=FakeClient(models=[FakeModel(m) for m in models], **kw))
 
 
 def test_requires_api_key(monkeypatch):
@@ -71,7 +76,7 @@ def test_requires_api_key(monkeypatch):
 
 
 def test_default_model_is_used_when_available():
-    assert make().model == "gemini-3.8-flash"
+    assert make().model == DEFAULT
 
 
 def test_unavailable_model_falls_back_to_best_candidate(monkeypatch):
@@ -85,10 +90,10 @@ def test_non_text_models_are_not_selected():
 
 
 def test_model_resolution_is_cached_per_key_and_request():
-    fake = FakeClient(models=[FakeModel("gemini-3.8-flash")])
+    fake = FakeClient(models=[FakeModel(DEFAULT)])
     GeminiClient(client=fake)
     fake.models._models = []  # a second listing would now find nothing
-    assert GeminiClient(client=fake).model == "gemini-3.8-flash"
+    assert GeminiClient(client=fake).model == DEFAULT
 
 
 def test_listing_failure_uses_requested_model_without_caching():
@@ -98,13 +103,13 @@ def test_listing_failure_uses_requested_model_without_caching():
 
     fake = FakeClient(models=[])
     fake.models.__class__ = Boom
-    assert GeminiClient(client=fake).model == "gemini-3.8-flash"
+    assert GeminiClient(client=fake).model == DEFAULT
     assert not llm_config._resolved_models
 
 
 def test_generate_success():
     c = make(script=["hello"])
-    assert c.generate("hi") == {"ok": True, "model": "gemini-3.8-flash", "answer": "hello"}
+    assert c.generate("hi") == {"ok": True, "model": DEFAULT, "answer": "hello"}
 
 
 def test_generate_retries_transient_errors_then_succeeds():
@@ -114,9 +119,11 @@ def test_generate_retries_transient_errors_then_succeeds():
 
 
 def test_generate_gives_up_after_retries():
-    c = make(script=[FakeAPIError(503, "unavailable")] * 3)
+    # A model named by the caller is never swapped, so an overloaded one is retried and then reported.
+    c = make(model=DEFAULT, script=[FakeAPIError(503, "unavailable")] * 3)
     res = c.generate("hi")
     assert res["ok"] is False and "unavailable" in res["error"]
+    assert c._client.models.calls == [DEFAULT] * 3
 
 
 def test_generate_does_not_retry_auth_errors():
@@ -127,9 +134,9 @@ def test_generate_does_not_retry_auth_errors():
 
 def test_generate_tries_default_model_when_requested_one_is_missing(monkeypatch):
     monkeypatch.setenv("GEMINI_MODEL", "custom-model")
-    c = make(models=("custom-model", "gemini-3.8-flash"), script=[FakeAPIError(404, "model not found"), "recovered"])
+    c = make(models=("custom-model", DEFAULT), script=[FakeAPIError(404, "model not found"), "recovered"])
     res = c.generate("hi")
-    assert res["ok"] and res["model"] == "gemini-3.8-flash"
+    assert res["ok"] and res["model"] == DEFAULT
 
 
 def test_generate_reports_empty_response():
@@ -232,3 +239,109 @@ def test_the_user_message_says_which_kind_of_limit_was_hit():
     minute = quota_message(PER_MINUTE)
     assert "per minute" in minute and "15 seconds" in minute and "per day" not in minute
     assert quota_message(PER_DAY) == QUOTA_MESSAGE
+
+
+# ----------------------------------------------------------------- fail-over between models
+ALL = (DEFAULT, LITE, FLASH25)
+OVERLOADED = "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand.'}}"
+
+
+@pytest.fixture
+def sleeps(monkeypatch):
+    waited = []
+    monkeypatch.setattr(llm_config.time, "sleep", waited.append)
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+    return waited
+
+
+def test_the_default_model_is_one_that_answers():
+    assert DEFAULT == "gemini-3.6-flash" and llm_config.DEFAULT_FALLBACKS[0] == LITE
+
+
+def test_an_overloaded_model_hands_over_to_the_next_immediately(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), "pong"])
+    res = c.generate("hi")
+    assert res == {"ok": True, "model": LITE, "answer": "pong"}
+    assert c._client.models.calls == [DEFAULT, LITE]  # one try on the overloaded model, not three
+    assert sleeps == []  # and no waiting on it
+    assert c.model == LITE  # the client reports the model that really answered
+
+
+def test_a_timeout_also_hands_over(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(504, "504 DEADLINE_EXCEEDED"), "pong"])
+    assert c.generate("hi")["model"] == LITE and sleeps == []
+
+
+def test_a_model_that_is_out_of_quota_hands_over_whether_the_limit_is_per_minute_or_per_day(sleeps):
+    for quota in (PER_MINUTE, PER_DAY):
+        c = make(models=ALL, script=[FakeAPIError(429, quota), "pong"])
+        assert c.generate("hi")["model"] == LITE, quota[:40]
+    assert sleeps == []  # a daily limit is not waited out, and a per-minute one is not waited out when another model can answer
+
+
+def test_it_moves_down_the_whole_chain(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(503, OVERLOADED), "last resort"])
+    res = c.generate("hi")
+    assert res["model"] == FLASH25 and c._client.models.calls == [DEFAULT, LITE, FLASH25]
+
+
+def test_a_model_the_key_cannot_use_is_skipped(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(404, "model not found"), "ok"])
+    assert c.generate("hi")["model"] == FLASH25
+
+
+def test_when_every_model_fails_the_error_is_reported(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED)] * 6)
+    res = c.generate("hi")
+    assert res["ok"] is False and "UNAVAILABLE" in res["error"]
+    assert c._client.models.calls[:3] == [DEFAULT, LITE, FLASH25]  # each model was tried
+
+
+def test_a_bad_key_or_bad_request_is_not_passed_around(sleeps):
+    for code, text in ((401, "API key not valid"), (403, "permission denied"), (400, "invalid argument")):
+        c = make(models=ALL, script=[FakeAPIError(code, text), "never reached"])
+        assert c.generate("hi")["ok"] is False and c._client.models.calls == [DEFAULT], code
+
+
+def test_a_model_named_by_the_caller_is_never_swapped(sleeps):
+    c = make(models=ALL, model=LITE, script=[FakeAPIError(503, OVERLOADED)] * 3)
+    assert c.generate("hi")["ok"] is False
+    assert set(c._client.models.calls) == {LITE}  # retried on the same model, never moved to another
+
+
+def test_fail_over_can_be_turned_off(sleeps, monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "none")
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(503, OVERLOADED), "ok"])
+    assert c.generate("hi")["model"] == DEFAULT and c._client.models.calls == [DEFAULT] * 3
+
+
+def test_the_fallback_list_can_be_chosen(sleeps, monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", f"{FLASH25}, custom-model")
+    assert llm_config.fallback_models() == [FLASH25, "custom-model"]
+    c = make(models=ALL + ("custom-model",), script=[FakeAPIError(503, OVERLOADED), "ok"])
+    assert c.generate("hi")["model"] == FLASH25
+
+
+def test_streaming_hands_over_before_the_first_token(sleeps):
+    c = make(models=ALL, stream_script=[FakeAPIError(503, OVERLOADED), [FakeResp("Hel"), FakeResp("lo")]])
+    assert "".join(c.stream("hi")) == "Hello"
+    assert c._client.models.calls == [DEFAULT, LITE] and c.model == LITE
+
+
+def test_streaming_never_switches_models_in_the_middle_of_an_answer(sleeps):
+    def torn():
+        yield FakeResp("Hel")
+        raise FakeAPIError(503, OVERLOADED)
+
+    c = make(models=ALL, stream_script=[torn(), [FakeResp("other model")]])
+    got = []
+    with pytest.raises(FakeAPIError):
+        for piece in c.stream("hi"):
+            got.append(piece)
+    assert got == ["Hel"] and c._client.models.calls == [DEFAULT]
+
+
+def test_a_streaming_client_reports_the_model_that_answered(sleeps):
+    c = make(models=ALL, stream_script=[[FakeResp("hi")]])
+    list(c.stream("hi"))
+    assert c.model == DEFAULT

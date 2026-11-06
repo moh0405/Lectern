@@ -40,10 +40,10 @@ The first request after a quiet period is slower (a "cold start") because a fres
 | **Secrets Manager** | Stores secrets, hands them to a service at start | Holds `GEMINI_API_KEY`; it never appears in the image, repo or Terraform state | `ai-study-mentor/GEMINI_API_KEY` |
 | **IAM roles** | Permissions for AWS services themselves | One role for the function: write logs, read/write **only** its own bucket prefix, read **only** its own secret | `ai-study-mentor-lambda` |
 | **Secrets Manager** (second secret) | Also holds the API key (`ai-study-mentor/API_KEY`) that callers must send | `ai-study-mentor/API_KEY` |
-| **Budgets** | Spend alerts | Emails `mp2319@scarletmail.rutgers.edu` at 50% of actual and 100% of forecast spend of the monthly limit | `ai-study-mentor-monthly` |
+| **Budgets** | Spend alerts | Emails the address you set (`budget_email`) at 50% of actual and 100% of forecast spend of the monthly limit | `ai-study-mentor-monthly` |
 | **Terraform** | Infrastructure as code | Describes all of the above in one file so it can be reviewed, repeated and deleted | `infra/` |
 
-Region: `us-east-1`. Account: `249946084409`, IAM user `MohammadTest`.
+Region: `us-east-1`. Account: yours (shown here as `<ACCOUNT_ID>`), deployed with an IAM user that has the permissions in `infra/README.md`.
 
 ## How the code uses S3 (`backend/cloud_sync.py`)
 
@@ -57,7 +57,7 @@ Details that matter: the SQLite file is copied with SQLite's own backup API befo
 **Building the index.** Indexing a PDF takes longer than one request, and Lambda would freeze the work after the response. So the index is built on your own computer and uploaded:
 
 ```bash
-export S3_BUCKET=ai-study-mentor-249946084409 S3_PREFIX=ai-study-mentor
+export S3_BUCKET=ai-study-mentor-<ACCOUNT_ID> S3_PREFIX=ai-study-mentor
 python -m backend.cloud_sync push      # upload data/vector_store and the study database
 python -m backend.cloud_sync pull      # download them
 ```
@@ -109,7 +109,7 @@ Rough figures from AWS list prices as I remember them; check the AWS pricing pag
 | S3, ECR, Secrets Manager (about $0.40 per secret), logs | $1 or less |
 | **Total** | **about $1 a month** |
 
-Gemini usage is billed by Google, not AWS. The budget alert is **$15 a month** and emails `mp2319@scarletmail.rutgers.edu`. A budget **alerts**, it does not stop spending; the API key and the daily call cap are what limit it.
+Gemini usage is billed by Google, not AWS. The budget alert is **$15 a month** and emails the address you set in `budget_email`. A budget **alerts**, it does not stop spending; the API key and the daily call cap are what limit it.
 
 ## Operating it
 
@@ -119,7 +119,7 @@ cd infra && terraform output api_url
 curl -H "X-API-Key: $(cat ~/.ai-study-mentor-api-key)" <api_url>api/v1/stats
 
 # deploy a new version of the code
-REPO=249946084409.dkr.ecr.us-east-1.amazonaws.com/ai-study-mentor
+REPO=<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ai-study-mentor
 aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
 docker buildx build --platform linux/amd64 --provenance=false -t "${REPO}:latest" --push .
 aws lambda update-function-code --function-name ai-study-mentor --image-uri "${REPO}:latest"

@@ -209,3 +209,6 @@ infra/.terraform/
 infra/*.tfvars
 .vercel
 apps/web/video-out/
+
+# Private notes for the maintainer's AI assistant (account details, endpoints, personal rules): never commit
+CLAUDE.local.md
