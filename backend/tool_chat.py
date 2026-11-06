@@ -52,13 +52,14 @@ class GeminiToolChat:
     thought signatures newer models require when a function result is sent back)."""
 
     def __init__(self, client: Any, system: str, tools: List[ToolSpec], temperature: float | None = None):
-        from .llm_config import RETRY_ATTEMPTS, _backoff_seconds, _is_model_missing, _is_transient, _should_fail_over, genai_types
+        from .llm_config import RETRY_ATTEMPTS, _backoff_seconds, _is_model_missing, _is_transient, _should_fail_over, _total_budget_s, genai_types
 
         if genai_types is None:
             raise RuntimeError("google-genai is not installed. Please run: pip install google-genai")
         self._types = genai_types
         self._retry = (RETRY_ATTEMPTS, _is_transient, _backoff_seconds)
         self._switchable = lambda e: _is_model_missing(e) or _should_fail_over(e)
+        self._budget = _total_budget_s()
         declarations = [
             genai_types.FunctionDeclaration(name=t.name, description=t.description, parameters_json_schema=t.parameters) for t in tools
         ]
@@ -82,12 +83,13 @@ class GeminiToolChat:
         payload: Any = message if isinstance(message, str) else [types.Part.from_function_response(name=r.name, response=r.payload) for r in message]
         attempts, is_transient, backoff = self._retry
         attempt = 0
+        started_at = time.monotonic()
         while True:
             try:
                 resp = self._chat.send_message(payload)
                 break
             except Exception as e:
-                if not self._started and self._index + 1 < len(self._names) and self._switchable(e):
+                if not self._started and self._index + 1 < len(self._names) and self._switchable(e) and time.monotonic() - started_at <= self._budget:
                     self._index += 1
                     self.model = self._names[self._index]
                     self._chat = self._owner._client.chats.create(model=self.model, config=self._config)

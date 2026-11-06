@@ -60,8 +60,7 @@ def fast(monkeypatch):
 
 
 DEFAULT = llm_config.DEFAULT_MODEL
-LITE = "gemini-flash-lite-latest"
-FLASH25 = "gemini-2.5-flash"
+LITE, SECOND, THIRD = llm_config.DEFAULT_FALLBACKS  # the chain after the default model
 
 
 def make(models=(DEFAULT,), model=None, **kw):
@@ -242,7 +241,7 @@ def test_the_user_message_says_which_kind_of_limit_was_hit():
 
 
 # ----------------------------------------------------------------- fail-over between models
-ALL = (DEFAULT, LITE, FLASH25)
+ALL = (DEFAULT, LITE, SECOND, THIRD)
 OVERLOADED = "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand.'}}"
 
 
@@ -255,7 +254,9 @@ def sleeps(monkeypatch):
 
 
 def test_the_default_model_is_one_that_answers():
-    assert DEFAULT == "gemini-3.6-flash" and llm_config.DEFAULT_FALLBACKS[0] == LITE
+    assert DEFAULT == "gemini-3.6-flash" and LITE == "gemini-3.1-flash-lite"
+    assert "gemini-3.8-flash" not in llm_config.DEFAULT_FALLBACKS  # it times out (~87 s), which would outlast the Lambda
+    assert "gemini-2.5-flash" not in llm_config.DEFAULT_FALLBACKS  # retired for new keys (404)
 
 
 def test_an_overloaded_model_hands_over_to_the_next_immediately(sleeps):
@@ -280,21 +281,21 @@ def test_a_model_that_is_out_of_quota_hands_over_whether_the_limit_is_per_minute
 
 
 def test_it_moves_down_the_whole_chain(sleeps):
-    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(503, OVERLOADED), "last resort"])
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(429, PER_DAY), FakeAPIError(503, OVERLOADED), "last resort"])
     res = c.generate("hi")
-    assert res["model"] == FLASH25 and c._client.models.calls == [DEFAULT, LITE, FLASH25]
+    assert res["model"] == THIRD and c._client.models.calls == [DEFAULT, LITE, SECOND, THIRD]
 
 
 def test_a_model_the_key_cannot_use_is_skipped(sleeps):
     c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED), FakeAPIError(404, "model not found"), "ok"])
-    assert c.generate("hi")["model"] == FLASH25
+    assert c.generate("hi")["model"] == SECOND
 
 
 def test_when_every_model_fails_the_error_is_reported(sleeps):
     c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED)] * 6)
     res = c.generate("hi")
     assert res["ok"] is False and "UNAVAILABLE" in res["error"]
-    assert c._client.models.calls[:3] == [DEFAULT, LITE, FLASH25]  # each model was tried
+    assert c._client.models.calls[:4] == [DEFAULT, LITE, SECOND, THIRD]  # each model was tried
 
 
 def test_a_bad_key_or_bad_request_is_not_passed_around(sleeps):
@@ -316,10 +317,10 @@ def test_fail_over_can_be_turned_off(sleeps, monkeypatch):
 
 
 def test_the_fallback_list_can_be_chosen(sleeps, monkeypatch):
-    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", f"{FLASH25}, custom-model")
-    assert llm_config.fallback_models() == [FLASH25, "custom-model"]
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", f"{SECOND}, custom-model")
+    assert llm_config.fallback_models() == [SECOND, "custom-model"]
     c = make(models=ALL + ("custom-model",), script=[FakeAPIError(503, OVERLOADED), "ok"])
-    assert c.generate("hi")["model"] == FLASH25
+    assert c.generate("hi")["model"] == SECOND
 
 
 def test_streaming_hands_over_before_the_first_token(sleeps):
@@ -345,3 +346,42 @@ def test_a_streaming_client_reports_the_model_that_answered(sleeps):
     c = make(models=ALL, stream_script=[[FakeResp("hi")]])
     list(c.stream("hi"))
     assert c.model == DEFAULT
+
+
+# ----------------------------------------------------------------- the time budget, and honest errors
+def test_a_chain_never_outlasts_the_time_budget(sleeps, monkeypatch):
+    now = [1000.0]
+
+    def fake_monotonic():
+        now[0] += 50  # every call to the clock is "50 s later": the first failure already uses up most of the budget
+        return now[0]
+
+    monkeypatch.setattr(llm_config.time, "monotonic", fake_monotonic)
+    monkeypatch.setenv("GEMINI_TOTAL_BUDGET_S", "60")
+    c = make(models=ALL, script=[FakeAPIError(503, OVERLOADED)] * 10)
+    res = c.generate("hi")
+    assert res["ok"] is False and "UNAVAILABLE" in res["error"]
+    assert len(c._client.models.calls) <= 2  # it stopped starting new calls once out of time
+
+
+def test_the_budget_can_be_set_and_has_a_sane_default(monkeypatch):
+    monkeypatch.delenv("GEMINI_TOTAL_BUDGET_S", raising=False)
+    assert llm_config._total_budget_s() == 90.0
+    monkeypatch.setenv("GEMINI_TOTAL_BUDGET_S", "30")
+    assert llm_config._total_budget_s() == 30.0
+    monkeypatch.setenv("GEMINI_TOTAL_BUDGET_S", "junk")
+    assert llm_config._total_budget_s() == 90.0
+
+
+def test_a_retired_models_404_does_not_hide_the_real_reason(sleeps):
+    quota = "429 RESOURCE_EXHAUSTED. You exceeded your current quota. retryDelay': '40s'"
+    c = make(models=ALL, script=[FakeAPIError(429, quota), FakeAPIError(404, "model is no longer available to new users"), FakeAPIError(404, "not found"), FakeAPIError(404, "not found")])
+    res = c.generate("hi")
+    assert res["ok"] is False and "quota" in res["error"].lower() and "no longer available" not in res["error"]
+
+
+def test_the_stream_also_keeps_the_real_reason(sleeps):
+    c = make(models=ALL, stream_script=[FakeAPIError(503, OVERLOADED), FakeAPIError(404, "gone"), FakeAPIError(404, "gone"), FakeAPIError(404, "gone")])
+    with pytest.raises(FakeAPIError) as caught:
+        list(c.stream("hi"))
+    assert "UNAVAILABLE" in str(caught.value)
