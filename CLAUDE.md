@@ -15,6 +15,6 @@ Private deployment notes (account details, endpoints, key locations, the maintai
 - Tests never call a paid model: the scripted `FakeGemini` (`tests/fake_gemini.py`) stands in, including for tool calling.
 - The public demo refuses anything that touches the shared database (`apps/web/lib/backend-proxy.ts`); flashcards, LeetCode progress and a visitor's own documents live in the browser there.
 - Internal identifiers are deliberately not renamed with the brand (package names, logger names, browser-storage keys, AWS and Terraform names): changing them would erase visitors' saved data or recreate infrastructure.
-- Model calls: the server default (`gemini-3.6-flash`) fails over to `gemini-flash-lite-latest` then `gemini-2.5-flash` when overloaded or out of quota; a model named in the request is never swapped. Every model turn counts against the daily cap (`DAILY_LLM_LIMIT`).
+- Model calls: the server default (`gemini-3.6-flash`) fails over to `gemini-3.1-flash-lite`, `gemini-flash-lite-latest` and `gemini-2.5-flash-lite` when overloaded or out of quota, within a 90 s total budget (`GEMINI_TOTAL_BUDGET_S`); a model named in the request is never swapped. Every model turn counts against the daily cap (`DAILY_LLM_LIMIT`).
 - The tool-using agent's write tools exist only when `AGENT_ALLOW_WRITES=1`; never set it on a public deployment.
 - Do not commit secrets, `.env` files or Terraform state (all gitignored); keep personal or account details out of docs.

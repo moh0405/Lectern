@@ -11,7 +11,8 @@ The public surface is small and unchanged for callers:
 Configuration (environment or `.env`):
     GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.6-flash), GEMINI_TEMPERATURE,
     GEMINI_TIMEOUT_S (per attempt, default 30), GEMINI_FALLBACK_MODELS (models tried in order when the chosen one is
-    overloaded or out of quota; default gemini-flash-lite-latest,gemini-2.5-flash; "none" disables)
+    overloaded or out of quota; default gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-2.5-flash-lite; "none" disables),
+    GEMINI_TOTAL_BUDGET_S (most time one call may spend across all models and retries, default 90)
 """
 
 from __future__ import annotations
@@ -51,7 +52,11 @@ FALLBACK_MODELS = [
 ]
 # Used when the chosen model is overloaded, rate-limited or timing out: tried in this order, immediately. Every model has
 # its own quota, so this also lets a free key serve more questions. Override with GEMINI_FALLBACK_MODELS ("none" turns it off).
-DEFAULT_FALLBACKS = ["gemini-flash-lite-latest", "gemini-2.5-flash"]
+# Chosen from what answered quickly on a real free key (measured 2026-11-06): gemini-3.8-flash and 3.7 timed out after ~87 s each,
+# gemini-2.5-flash returns 404 (retired for new users), so they are not in the chain. Quota errors and 404s fail instantly.
+DEFAULT_FALLBACKS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"]
+# Everything one call may spend across all models and retries, so a chain can never outlast the host (Lambda stops at 120 s).
+DEFAULT_TOTAL_BUDGET_S = 90.0
 RETRY_ATTEMPTS = 3
 # Per-attempt limit. Without one a stalled model call outlives the host (Lambda stops at 120 s) and the user
 # sees a stream that just ends. 3 attempts of 30 s fit inside 120 s and end in a normal `llm_error` event.
@@ -100,6 +105,13 @@ def _is_transient(exc: Exception) -> bool:
         return True
     text = str(exc).lower()
     return any(m in text for m in _TRANSIENT_MARKERS)
+
+
+def _total_budget_s() -> float:
+    try:
+        return max(1.0, float(os.getenv("GEMINI_TOTAL_BUDGET_S", str(DEFAULT_TOTAL_BUDGET_S))))
+    except ValueError:
+        return DEFAULT_TOTAL_BUDGET_S
 
 
 def fallback_models() -> List[str]:
@@ -250,16 +262,21 @@ class GeminiClient:
         config = self._config(temperature, json_mode)
         last_err: Optional[str] = None
         names = self._candidates()
+        started_at, budget = time.monotonic(), _total_budget_s()
         for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
+                if (i or attempt) and time.monotonic() - started_at > budget:
+                    return {"ok": False, "error": last_err or "Unknown generation error"}  # out of time: do not start another call
                 try:
                     resp = self._client.models.generate_content(model=name, contents=prompt, config=config)
                 except Exception as e:
-                    last_err = str(e)
+                    # A retired or unknown model must not hide the real reason an earlier model failed.
+                    if not (_is_model_missing(e) and last_err):
+                        last_err = str(e)
                     if _is_model_missing(e):
                         break  # try the next candidate model
                     if self._next_model_exists(names, i) and _should_fail_over(e):
-                        logger.warning("Model '%s' failed (%s); trying '%s'", name, last_err[:90], names[i + 1])
+                        logger.warning("Model '%s' failed (%s); trying '%s'", name, str(e)[:90], names[i + 1])
                         break  # overloaded or out of quota: do not wait on it, ask the next model
                     if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
                         time.sleep(_backoff_seconds(e, attempt))
@@ -282,8 +299,11 @@ class GeminiClient:
         config = self._config(temperature, json_mode)
         last_exc: Optional[Exception] = None
         names = self._candidates()
+        started_at, budget = time.monotonic(), _total_budget_s()
         for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
+                if (i or attempt) and time.monotonic() - started_at > budget and last_exc is not None:
+                    raise last_exc  # out of time: do not start another call
                 started = False
                 try:
                     for chunk in self._client.models.generate_content_stream(model=name, contents=prompt, config=config):
@@ -295,9 +315,10 @@ class GeminiClient:
                             yield piece
                     return
                 except Exception as e:
-                    last_exc = e
                     if started:
                         raise
+                    if not (_is_model_missing(e) and last_exc is not None):
+                        last_exc = e  # a retired model's 404 must not hide the real reason an earlier model failed
                     if _is_model_missing(e):
                         break
                     if self._next_model_exists(names, i) and _should_fail_over(e):

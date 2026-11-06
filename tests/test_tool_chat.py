@@ -8,7 +8,7 @@ from backend import llm_config, tool_chat
 from backend.llm_config import GeminiClient
 from backend.tool_chat import GeminiToolChat, ToolResult, ToolSpec
 
-from .test_llm_config import ALL, DEFAULT, LITE, FakeAPIError, FakeClient, FakeModel
+from .test_llm_config import ALL, DEFAULT, LITE, SECOND, THIRD, FakeAPIError, FakeClient, FakeModel
 
 
 class Part:
@@ -108,7 +108,7 @@ def test_a_bad_key_is_not_passed_to_another_model():
 
 
 def test_when_every_model_fails_the_last_error_surfaces():
-    chat, chats = make({DEFAULT: [OVERLOADED], LITE: [OVERLOADED], "gemini-2.5-flash": [OVERLOADED] * 3})
+    chat, chats = make({DEFAULT: [OVERLOADED], LITE: [OVERLOADED], SECOND: [OVERLOADED], THIRD: [OVERLOADED] * 3})
     with pytest.raises(FakeAPIError):
         chat.send("hi")
-    assert chats.created == [DEFAULT, LITE, "gemini-2.5-flash"]
+    assert chats.created == [DEFAULT, LITE, SECOND, THIRD]
