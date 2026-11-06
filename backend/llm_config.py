@@ -9,8 +9,9 @@ The public surface is small and unchanged for callers:
     client.list_supported_models()
 
 Configuration (environment or `.env`):
-    GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.8-flash), GEMINI_TEMPERATURE,
-    GEMINI_TIMEOUT_S (per attempt, default 30)
+    GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.6-flash), GEMINI_TEMPERATURE,
+    GEMINI_TIMEOUT_S (per attempt, default 30), GEMINI_FALLBACK_MODELS (models tried in order when the chosen one is
+    overloaded or out of quota; default gemini-flash-lite-latest,gemini-2.5-flash; "none" disables)
 """
 
 from __future__ import annotations
@@ -37,14 +38,20 @@ except Exception:
 
 logger = logging.getLogger("ai-study-mentor.llm")
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+# gemini-3.8-flash was the default until it was found to answer "503 high demand" or time out most of the time
+# (a live Lambda sat on it for weeks while gemini-3.6-flash and the lite model answered in seconds).
+DEFAULT_MODEL = "gemini-3.6-flash"
+# Used to pick a substitute when the requested model does not exist for the key.
 FALLBACK_MODELS = [
     DEFAULT_MODEL,
+    "gemini-3.8-flash",
     "gemini-3.7-flash",
-    "gemini-3.6-flash",
     "gemini-flash-latest",
     "gemini-pro-latest",
 ]
+# Used when the chosen model is overloaded, rate-limited or timing out: tried in this order, immediately. Every model has
+# its own quota, so this also lets a free key serve more questions. Override with GEMINI_FALLBACK_MODELS ("none" turns it off).
+DEFAULT_FALLBACKS = ["gemini-flash-lite-latest", "gemini-2.5-flash"]
 RETRY_ATTEMPTS = 3
 # Per-attempt limit. Without one a stalled model call outlives the host (Lambda stops at 120 s) and the user
 # sees a stream that just ends. 3 attempts of 30 s fit inside 120 s and end in a normal `llm_error` event.
@@ -95,6 +102,26 @@ def _is_transient(exc: Exception) -> bool:
     return any(m in text for m in _TRANSIENT_MARKERS)
 
 
+def fallback_models() -> List[str]:
+    raw = os.getenv("GEMINI_FALLBACK_MODELS")
+    if raw is None:
+        return list(DEFAULT_FALLBACKS)
+    if raw.strip().lower() in ("", "none", "off", "false", "0"):
+        return []
+    return [m.strip() for m in raw.split(",") if m.strip()]
+
+
+def _is_quota(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return getattr(exc, "code", None) == 429 or "resource_exhausted" in text or "quota" in text
+
+
+def _should_fail_over(exc: Exception) -> bool:
+    """Errors that mean "this model, right now": overloaded, timing out, or out of quota. Another model may well answer.
+    Not for bad requests, bad keys or blocked content: those would fail the same way on every model."""
+    return _is_transient(exc) or _is_quota(exc)
+
+
 def _is_model_missing(exc: Exception) -> bool:
     code = getattr(exc, "code", None)
     text = str(exc).lower()
@@ -127,6 +154,9 @@ class GeminiClient:
         self._client = client
         requested = model or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
         self.model = self._resolve_model(requested)
+        # A model the caller asked for by name is respected: no silent swapping. The server's default may fail over.
+        self._fail_over = model is None
+        self._fallbacks = fallback_models() if self._fail_over else []
         try:
             self.temperature = float(os.getenv("GEMINI_TEMPERATURE", str(temperature)))
         except Exception:
@@ -207,28 +237,37 @@ class GeminiClient:
 
     def _candidates(self) -> List[str]:
         names = [self.model]
-        if DEFAULT_MODEL not in names:
-            names.append(DEFAULT_MODEL)
+        for m in [DEFAULT_MODEL, *self._fallbacks]:
+            if m not in names:
+                names.append(m)
         return names
+
+    def _next_model_exists(self, names: List[str], i: int) -> bool:
+        return self._fail_over and i < len(names) - 1
 
     def generate(self, prompt: str, temperature: Optional[float] = None, json_mode: bool = False) -> Dict[str, Any]:
         """One-shot generation. Retries transient errors, then tries the default model once."""
         config = self._config(temperature, json_mode)
         last_err: Optional[str] = None
-        for name in self._candidates():
+        names = self._candidates()
+        for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
                 try:
                     resp = self._client.models.generate_content(model=name, contents=prompt, config=config)
                 except Exception as e:
                     last_err = str(e)
+                    if _is_model_missing(e):
+                        break  # try the next candidate model
+                    if self._next_model_exists(names, i) and _should_fail_over(e):
+                        logger.warning("Model '%s' failed (%s); trying '%s'", name, last_err[:90], names[i + 1])
+                        break  # overloaded or out of quota: do not wait on it, ask the next model
                     if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
                         time.sleep(_backoff_seconds(e, attempt))
                         continue
-                    if _is_model_missing(e):
-                        break  # try the next candidate model
                     return {"ok": False, "error": last_err}
                 text = self._text_of(resp)
                 if text:
+                    self.model = name  # report the model that really answered
                     return {"ok": True, "model": name, "answer": text}
                 last_err = "Model returned an empty response (it may have been blocked by a safety filter)"
                 break
@@ -242,13 +281,16 @@ class GeminiClient:
         """
         config = self._config(temperature, json_mode)
         last_exc: Optional[Exception] = None
-        for name in self._candidates():
+        names = self._candidates()
+        for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
                 started = False
                 try:
                     for chunk in self._client.models.generate_content_stream(model=name, contents=prompt, config=config):
                         piece = self._text_of(chunk)
                         if piece:
+                            if not started:
+                                self.model = name  # report the model that really answered
                             started = True
                             yield piece
                     return
@@ -256,11 +298,14 @@ class GeminiClient:
                     last_exc = e
                     if started:
                         raise
+                    if _is_model_missing(e):
+                        break
+                    if self._next_model_exists(names, i) and _should_fail_over(e):
+                        logger.warning("Model '%s' failed (%s); trying '%s'", name, str(e)[:90], names[i + 1])
+                        break
                     if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
                         time.sleep(_backoff_seconds(e, attempt))
                         continue
-                    if _is_model_missing(e):
-                        break
                     raise
         if last_exc is not None:
             raise last_exc

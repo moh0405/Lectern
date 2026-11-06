@@ -1,3 +1,5 @@
+> **Historical document.** These are planning notes from the original hackathon prototype (October 2025). They describe a different stack (for example LangChain, Streamlit and local models) that the project has since moved away from. The current project is **Lectern**; see the README and `docs/ARCHITECTURE.md` for what it is today.
+
 # 🚨 EMERGENCY HACKATHON CONTEXT - 2.5 HOURS LEFT
 
 **Current Time: 4:20 PM | Deadline: 7:00 PM | Time Remaining: 2h 40min**

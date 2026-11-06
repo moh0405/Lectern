@@ -136,7 +136,7 @@ flowchart LR
 - **Graceful degradation everywhere**: optional imports are wrapped in `try/except`, so a missing library disables a feature rather than crashing the app. This was added after segfaults from PyTorch/Accelerate on macOS.
 - **Lazy loading**: `sentence-transformers` is imported only when embeddings are actually needed.
 - **Pluggable sources**: every source implements the `BaseSource` interface (`validate`, `extract`, `get_metadata`) and returns the same chunk schema.
-- **Cloud inference only**: Gemini is the supported LLM (default `gemini-3.8-flash`).
+- **Cloud inference only**: Gemini is the supported LLM (default `gemini-3.6-flash`, with automatic fail-over to `gemini-flash-lite-latest` and `gemini-2.5-flash`).
 
 ---
 
@@ -207,7 +207,7 @@ Lectern/
 | Language | Python 3.10+ (uses `X \| None` type syntax) |
 | Frontend | Next.js 16, React 19, TypeScript (strict), Tailwind v4, TanStack Query, React Flow, Plotly (3D), KaTeX, cmdk |
 | API | FastAPI, Uvicorn, Pydantic, python-multipart |
-| LLM | Google Gemini via the `google-genai` SDK, default model `gemini-3.8-flash` |
+| LLM | Google Gemini via the `google-genai` SDK, default model `gemini-3.6-flash`, falling over to the lite and 2.5 models when it is overloaded |
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
 | Vector search | Exact cosine similarity: NumPy by default, optional FAISS (`faiss-cpu`) |
 | Ingestion | `pypdf`, `youtube-transcript-api`, `requests`, `beautifulsoup4`, `readability-lxml`, `gitpython`, `openai` (Whisper) |
@@ -278,7 +278,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 |---|---|---|---|
 | `LLM_PROVIDER` | No | `gemini` | Which language-model backend answers: `gemini` or `openai` (any OpenAI-compatible server) |
 | `GEMINI_API_KEY` | Yes, with `gemini` | none | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-3.8-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
+| `GEMINI_MODEL` | No | `gemini-3.6-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
+| `GEMINI_FALLBACK_MODELS` | No | `gemini-flash-lite-latest,gemini-2.5-flash` | Models tried, in order and without waiting, when the chosen model is overloaded, timing out or out of quota (each model has its own quota). A model named in the request is never swapped. `none` turns this off. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
 | `RETRIEVAL_MODE` | No | `auto` | `auto` (hybrid with a semantic index, else BM25), `hybrid`, `dense` or `bm25` |

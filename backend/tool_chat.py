@@ -52,38 +52,52 @@ class GeminiToolChat:
     thought signatures newer models require when a function result is sent back)."""
 
     def __init__(self, client: Any, system: str, tools: List[ToolSpec], temperature: float | None = None):
-        from .llm_config import RETRY_ATTEMPTS, _backoff_seconds, _is_transient, genai_types
+        from .llm_config import RETRY_ATTEMPTS, _backoff_seconds, _is_model_missing, _is_transient, _should_fail_over, genai_types
 
         if genai_types is None:
             raise RuntimeError("google-genai is not installed. Please run: pip install google-genai")
         self._types = genai_types
         self._retry = (RETRY_ATTEMPTS, _is_transient, _backoff_seconds)
+        self._switchable = lambda e: _is_model_missing(e) or _should_fail_over(e)
         declarations = [
             genai_types.FunctionDeclaration(name=t.name, description=t.description, parameters_json_schema=t.parameters) for t in tools
         ]
-        config = genai_types.GenerateContentConfig(
+        self._config = config = genai_types.GenerateContentConfig(
             system_instruction=system,
             tools=[genai_types.Tool(function_declarations=declarations)] if declarations else None,
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),  # we run the tools ourselves
             temperature=client.temperature if temperature is None else float(temperature),
         )
-        self.model = client.model
+        # The first turn may move to another model if the chosen one is overloaded or out of quota (see GeminiClient).
+        # After that the history belongs to one model, so later turns are retried but never moved.
+        self._names = client._candidates() if client._fail_over else [client.model]
+        self._index = 0
+        self._started = False
+        self.model = self._names[0]
         self._owner = client  # keeps the SDK client alive: when it is freed the SDK closes its connection mid-run
-        self._chat = client._client.chats.create(model=client.model, config=config)
+        self._chat = client._client.chats.create(model=self.model, config=config)
 
     def send(self, message: Union[str, List[ToolResult]]) -> TurnResult:
         types = self._types
         payload: Any = message if isinstance(message, str) else [types.Part.from_function_response(name=r.name, response=r.payload) for r in message]
         attempts, is_transient, backoff = self._retry
-        for attempt in range(attempts):
+        attempt = 0
+        while True:
             try:
                 resp = self._chat.send_message(payload)
                 break
             except Exception as e:
-                if is_transient(e) and attempt < attempts - 1:
-                    time.sleep(backoff(e, attempt))
+                if not self._started and self._index + 1 < len(self._names) and self._switchable(e):
+                    self._index += 1
+                    self.model = self._names[self._index]
+                    self._chat = self._owner._client.chats.create(model=self.model, config=self._config)
+                    continue  # a fresh conversation on the next model; the failed model does not use up a retry
+                attempt += 1
+                if is_transient(e) and attempt < attempts:
+                    time.sleep(backoff(e, attempt - 1))
                     continue
                 raise
+        self._started = True
         parts = resp.candidates[0].content.parts if resp.candidates and resp.candidates[0].content and resp.candidates[0].content.parts else []
         text = "".join(p.text for p in parts if getattr(p, "text", None) and not getattr(p, "thought", False))
         calls = [ToolCall(p.function_call.name, dict(p.function_call.args or {})) for p in parts if getattr(p, "function_call", None)]

@@ -32,7 +32,7 @@ Plus `eval/` (retrieval evaluation), `tests/` (Python tests), `scripts/` (CLI to
 | `rerank.py` | Optional re-ordering | A cross-encoder that reads query and passage together |
 | `indexer.py` | Build and update the index | Incremental: content fingerprints, skip unchanged files, re-chunk when the chunker changes |
 | `rag_engine.py` | The orchestrator | `retrieve_context`, prompt building, calls the model, suggestions, notes |
-| `llm_config.py` | Talk to Gemini | Model resolution, retries, streaming, JSON mode |
+| `llm_config.py` | Talk to Gemini | Model resolution, retries that honour the provider's retry hint, fail-over to other models when one is overloaded or out of quota, streaming, JSON mode |
 | `citations.py` | Verify an answer's citations | Checks each `[doc (page N)]` against the retrieved passages |
 | `advanced_ai.py` | Tutor tools | Concept map, Socratic tutor, source synthesis, adaptive explanation |
 | `safe_math.py` | Math without `eval` | Whitelist parser in a sandboxed worker process with a timeout |
