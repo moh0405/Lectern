@@ -167,7 +167,7 @@ def test_the_exact_reply_a_real_model_gave_is_no_longer_accused():
     assert check_answer(answer, chunks)["unverified"] == 0
 
 
-@pytest.mark.parametrize("label", ["a.pdf (page 58, page 170)", "a.pdf (pages 58, 170)", "a.pdf (pp. 58, 170)"])
+@pytest.mark.parametrize("label", ["a.pdf (page 58, page 170)", "a.pdf (pages 58, 170)", "a.pdf (pp. 58, 170)", "a.pdf, pages 58, 170", "a.pdf, p. 58, 170"])
 def test_several_pages_in_one_parenthesis_are_checked_page_by_page(label):
     chunks = [{"doc": "a.pdf", "page": 58, "end_page": 58}, {"doc": "a.pdf", "page": 170, "end_page": 170}]
     assert check_answer(f"x [{label}]", chunks)["unverified"] == 0

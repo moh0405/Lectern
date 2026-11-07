@@ -99,7 +99,7 @@ How the pieces fit:
 | Agents | LangGraph (`langgraph`, `langchain-core`), Gemini function calling, MCP (`mcp`) | A fixed workflow (rewrite, grade, verify) and a tool-using ReAct agent; the tools also served over MCP |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (451), Vitest (142), Playwright (46 + 3 in demo mode, plus an opt-in 12-test suite against a real Gemini model) + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (453), Vitest (142), Playwright (46 + 3 in demo mode, plus an opt-in 12-test suite against a real Gemini model) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
