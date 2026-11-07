@@ -24,6 +24,7 @@ _BRACKET = re.compile(r"(?<![\w\])])\[([^\[\]\n]{3,200})\](?!\()")
 _PAGE = r"(?:pages?|pp?\.?)\s*(\d+)(?:\s*[-–]\s*(\d+))?"
 _WITH_PAGE_PAREN = re.compile(rf"^(?P<doc>.+?)\s*\(\s*{_PAGE}\s*\)\s*$", re.I)
 _WITH_PAGE_COMMA = re.compile(rf"^(?P<doc>.+?)\s*[,;:·–-]\s*{_PAGE}\s*$", re.I)
+_PAGE_LIST = re.compile(r"^(?P<doc>.+?)\s*\(\s*(?P<pages>(?:pages?|pp?\.?)\s*\d+(?:\s*[,;&]\s*(?:(?:pages?|pp?\.?)\s*)?\d+)+)\s*\)\s*$", re.I)
 _EXTENSION = re.compile(r"\.(pdf|md|txt|py|rst|docx?|pptx?|mp3|mp4|wav|m4a|html?)\b", re.I)
 
 
@@ -55,6 +56,9 @@ def _split_multi(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]
     """Models often put several citations in one bracket: [a.pdf (page 3), b.md (page 1)] or [a.md, b.md]. Split them
     so each is checked on its own. Commas alone only split when every part is a retrieved document, because a comma
     can also belong to a title."""
+    listed = _PAGE_LIST.match(inner)
+    if listed:  # "doc (page 58, page 170)" or "doc (pages 58, 59)": one citation per page
+        return [f"{listed.group('doc')} (page {n})" for n in re.findall(r"\d+", listed.group("pages"))]
     parts = [p.strip() for p in re.split(r"(?<=\))\s*[,;]\s*|\s*;\s*", inner) if p.strip()]
     if len(parts) > 1:
         return parts
