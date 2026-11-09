@@ -1,20 +1,21 @@
-.git
-.github
-.env*
-**/.env*
-.venv
-venv
-node_modules
+# Frontend monorepo inputs only; Railway owns the Python backend deployment.
+*
+!package.json
+!package-lock.json
+!apps/
+!apps/web/
+!apps/web/**
+!packages/
+!packages/api-client/
+!packages/api-client/**
+
+# Keep local state and credentials out even inside included source directories.
 **/node_modules
 **/.next
+**/.env*
 **/test-results
 **/playwright-report
 **/coverage
-backend
-data
-eval
-infra
-tests
-docs
-uploads
-store
+**/*.tsbuildinfo
+**/*.log
+**/.DS_Store
