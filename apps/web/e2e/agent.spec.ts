@@ -8,6 +8,7 @@ test.afterEach(async ({ request }) => removeFixture(request));
 
 test("agentic mode shows what the workflow did and answers from the passages it found", async ({ page }) => {
   await page.goto("/ask");
+  await page.locator('summary[aria-label="Advanced"]').click();
   await page.getByRole("checkbox", { name: /Agentic mode/ }).check();
   await page.getByLabel("Your question").fill("What is a binary heap used for?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
@@ -28,6 +29,7 @@ test("agentic mode shows what the workflow did and answers from the passages it 
 
 test("an answer that invents a source is rewritten, and the result is clean", async ({ page }) => {
   await page.goto("/ask");
+  await page.locator('summary[aria-label="Advanced"]').click();
   await page.getByRole("checkbox", { name: /Agentic mode/ }).check();
   await page.getByLabel("Your question").fill("Please hallucinate about binary heaps");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
@@ -45,7 +47,9 @@ test("an answer that invents a source is rewritten, and the result is clean", as
 
 test("plain questions are unaffected, and the toggle is off by default", async ({ page }) => {
   await page.goto("/ask");
+  await page.locator('summary[aria-label="Advanced"]').click();
   await expect(page.getByRole("checkbox", { name: /Agentic mode/ })).not.toBeChecked();
+  await page.locator('summary[aria-label="Advanced"]').click();
   await page.getByLabel("Your question").fill("What is a binary heap used for?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.locator(".md-body").first()).toContainText("From your material", { timeout: 30_000 });

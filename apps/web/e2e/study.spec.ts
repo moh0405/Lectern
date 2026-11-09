@@ -57,7 +57,7 @@ test("the model writes cards from indexed material; they can be exported and del
 test("generating without any material explains what to do", async ({ page }) => {
   await page.goto("/study");
   await page.getByRole("button", { name: "Generate cards" }).click();
-  await expect(page.getByRole("status")).toContainText("Add some sources first");
+  await expect(page.getByRole("status").filter({ hasText: "Add some sources first" })).toBeVisible();
 });
 
 test("an answer from Ask can be saved as a flashcard", async ({ page, request }) => {

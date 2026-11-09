@@ -18,7 +18,8 @@ const isDemo = () => Boolean(process.env.BACKEND_URL) && process.env.BACKEND_ALL
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("lectern-reading-theme")==="light")document.documentElement.dataset.theme="light"}catch{}` }} /></head>
       <body className="font-sans antialiased">
         <Providers demo={isDemo()}>
           <AppShell>{children}</AppShell>

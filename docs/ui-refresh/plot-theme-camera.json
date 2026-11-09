@@ -1,0 +1,82 @@
+{
+  "environment": "Production preview3420, isolated scripted API8420, two test PDFs; no live model/semantic-quality claim",
+  "before": {
+    "camera": {
+      "up": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "center": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "eye": {
+        "x": 1.25,
+        "y": 1.2500000000000002,
+        "z": 1.25
+      },
+      "projection": {
+        "type": "perspective"
+      }
+    },
+    "font": "#edf0f6",
+    "legendFill": "rgb(237, 240, 246)",
+    "rootFG": "#edf0f6"
+  },
+  "dragged": {
+    "up": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    "center": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "eye": {
+      "x": 1.267654880808804,
+      "y": -0.1495887861634823,
+      "z": 1.748763648471615
+    },
+    "projection": {
+      "type": "perspective"
+    }
+  },
+  "after": {
+    "camera": {
+      "up": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "center": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "eye": {
+        "x": 1.267654880808804,
+        "y": -0.1495887861634823,
+        "z": 1.748763648471615
+      },
+      "projection": {
+        "type": "perspective"
+      }
+    },
+    "font": "#202939",
+    "legendFill": "rgb(32, 41, 57)",
+    "legendBackground": "#fff",
+    "rootFG": "#202939",
+    "rootSurface": "#fff",
+    "uirevision": "lectern-embedding-view"
+  },
+  "checks": {
+    "actualDragChangedCamera": true,
+    "lightFontMatchesTheme": true,
+    "lightLegendMatchesSurface": true,
+    "cameraPreservedThroughToggle": true
+  }
+}

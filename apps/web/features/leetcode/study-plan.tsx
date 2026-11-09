@@ -48,9 +48,9 @@ export function StudyPlan({ onOpen }: { onOpen: (pid: string) => void }) {
           ) : (
             <p className="text-sm text-muted">Mark problems as attempted or solved and this plan will focus on the topics you struggle with.</p>
           )}
-          <ol className="grid gap-2 sm:grid-cols-2">
+          <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {plan.data.items.map((i) => (
-              <li key={i.pid}>
+              <li key={i.pid} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => onOpen(i.pid)}

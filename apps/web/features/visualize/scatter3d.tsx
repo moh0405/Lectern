@@ -55,26 +55,30 @@ export function Scatter3D({ points, onSelect }: { points: Point[]; onSelect: (p:
         hovertemplate: `<b>${doc.replace(/[<>&]/g, "")}</b><br>%{text}<extra></extra>`,
         marker: { size: 4, opacity: 0.85 },
       }));
-      const axis = { showgrid: true, gridcolor: "#263050", zeroline: false, showticklabels: false, title: { text: "" }, backgroundcolor: "rgba(0,0,0,0)" };
-      const plot = await Plotly.react(
-        el,
-        traces,
-        {
+      const draw = () => {
+        const style = getComputedStyle(document.documentElement);
+        const color = (name: string) => style.getPropertyValue(name).trim();
+        const axis = { showgrid: true, gridcolor: color("--color-border"), zeroline: false, showticklabels: false, title: { text: "" }, backgroundcolor: "rgba(0,0,0,0)" };
+        return Plotly.react(el, traces, {
+          uirevision: "lectern-embedding-view",
           paper_bgcolor: "rgba(0,0,0,0)",
-          font: { color: "#95a0bd", size: 11 },
+          font: { color: color("--color-fg"), size: 12 },
           margin: { l: 0, r: 0, t: 0, b: 0 },
-          legend: { x: 0, y: 1, xanchor: "left", yanchor: "top", bgcolor: "rgba(11,16,32,0.6)", font: { size: 10 } },
+          legend: { x: 0, y: 1, xanchor: "left", yanchor: "top", bgcolor: color("--color-surface"), font: { size: 11 } },
           scene: { xaxis: axis, yaxis: axis, zaxis: axis, bgcolor: "rgba(0,0,0,0)" },
-        },
-        { responsive: true, displaylogo: false, displayModeBar: false },
-      );
-      if (cancelled) return;
+        }, { responsive: true, displaylogo: false, displayModeBar: false });
+      };
+      const plot = await draw();
+      if (cancelled) { Plotly.purge(el); return; }
+      // Change the palette without rebuilding the canvas or losing the camera position.
+      const themeObserver = new MutationObserver(() => { void draw().catch(() => setError("Could not update the plot palette")); });
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
       plot.on("plotly_click", (ev) => {
         const idx = ev.points[0]?.customdata;
         const hit = points.find((p) => p.index === idx);
         if (hit) onSelectRef.current(hit);
       });
-      purge = () => Plotly.purge(el);
+      purge = () => { themeObserver.disconnect(); Plotly.purge(el); };
     })().catch((e) => setError(e instanceof Error ? e.message : "Could not draw the plot"));
     return () => {
       cancelled = true;

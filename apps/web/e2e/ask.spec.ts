@@ -18,7 +18,7 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
   const job = page.getByTestId("job-card");
   await expect(job).toContainText("heaps.pdf");
   await expect(job).toContainText("done", { timeout: 30_000 });
-  await expect(job).toContainText(/chunks? added/);
+  await expect(job).toContainText(/passages? added/);
   await expect(page.getByRole("list").getByText("heaps.pdf")).toBeVisible();
 
   // 2) ask about it

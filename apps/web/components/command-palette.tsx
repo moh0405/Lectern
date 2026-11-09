@@ -50,11 +50,11 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted hover:border-accent/60 hover:text-fg"
+        className="workspace-jump"
       >
         <Search className="h-3.5 w-3.5" />
         <span className="flex-1 text-left">Jump to…</span>
-        <kbd className="rounded border border-border px-1.5 font-mono">Ctrl K</kbd>
+        <kbd className="rounded border border-border px-1.5 font-mono">⌘ / Ctrl K</kbd>
       </button>
       <Command.Dialog
         open={open}

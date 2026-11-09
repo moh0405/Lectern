@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const button = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+  "lectern-button inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -12,7 +12,7 @@ const button = cva(
         ghost: "text-muted hover:bg-surface-2 hover:text-fg",
         danger: "border border-bad/40 text-bad hover:bg-bad/10",
       },
-      size: { sm: "h-8 px-3", md: "h-10 px-4", icon: "h-9 w-9" },
+      size: { sm: "min-h-10 px-3", md: "min-h-11 px-4", icon: "h-11 w-11" },
     },
     defaultVariants: { variant: "primary", size: "md" },
   },

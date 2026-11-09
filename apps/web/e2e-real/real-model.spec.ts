@@ -85,6 +85,7 @@ test("style and passage options change what is asked", async ({ page }) => {
 
 test("agentic mode shows the rewrite, retrieve, grade, answer and verify steps with a real model", async ({ page }) => {
   await page.goto("/ask");
+  await page.locator('summary[aria-label="Advanced"]').click();
   await page.getByRole("checkbox", { name: /Agentic mode/ }).check();
   await withModelRetries(
     page,

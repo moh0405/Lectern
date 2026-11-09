@@ -1,7 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Send, Trash2 } from "lucide-react";
+import {
+  ArrowUpRight,
+  BookOpen,
+  Send,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -16,6 +22,7 @@ import { NotesPanel } from "./notes-panel";
 import type { Mode } from "./session";
 import { TurnCard } from "./turn-card";
 import { useAskSession } from "./use-ask-session";
+import styles from "./ask.module.css";
 
 const MODES: { value: "" | Mode; label: string }[] = [
   { value: "", label: "Default" },
@@ -25,7 +32,12 @@ const MODES: { value: "" | Mode; label: string }[] = [
   { value: "summary", label: "Quick summary" },
 ];
 
-const STARTERS = ["Explain dynamic programming", "What is a hash table?", "Difference between BFS and DFS", "How does quicksort work?"];
+const STARTERS = [
+  "Explain dynamic programming",
+  "What is a hash table?",
+  "Difference between BFS and DFS",
+  "How does quicksort work?",
+];
 
 export function AskView() {
   const { turns, ask, stop, remove, clear, busy } = useAskSession();
@@ -43,7 +55,9 @@ export function AskView() {
   const demo = useDemo();
   const myDocs = useLocalDocs();
   const hasMine = demo && (myDocs.data?.length ?? 0) > 0;
-  const [pickedSource, setPickedSource] = useState<"shared" | "mine" | null>(null);
+  const [pickedSource, setPickedSource] = useState<"shared" | "mine" | null>(
+    null,
+  );
   const local = hasMine && (pickedSource ?? "mine") === "mine";
 
   const stats = useQuery({
@@ -59,7 +73,12 @@ export function AskView() {
   });
   const suggestions = useQuery({
     queryKey: ["suggestions"],
-    queryFn: async () => unwrap(await api.http.GET("/api/v1/suggestions", { params: { query: { n: 4 } } })),
+    queryFn: async () =>
+      unwrap(
+        await api.http.GET("/api/v1/suggestions", {
+          params: { query: { n: 4 } },
+        }),
+      ),
     enabled: (stats.data?.chunks ?? 0) > 0,
     staleTime: 5 * 60_000,
   });
@@ -67,7 +86,17 @@ export function AskView() {
   const submit = (text: string) => {
     const q = text.trim();
     if (q.length < 3 || busy) return;
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly, local, agent: agentic });
+    void ask({
+      question: q,
+      mode: mode || undefined,
+      k,
+      temperature,
+      model: model.trim() || undefined,
+      showPrompt,
+      retrievalOnly,
+      local,
+      agent: agentic,
+    });
     setQuestion("");
   };
   const onSubmit = (e: FormEvent) => {
@@ -82,21 +111,28 @@ export function AskView() {
   };
 
   const empty = (stats.data?.chunks ?? 0) === 0 && !stats.isPending;
-  const chips = suggestions.data?.questions.length ? suggestions.data.questions : STARTERS;
+  const chips = suggestions.data?.questions.length
+    ? suggestions.data.questions
+    : STARTERS;
 
   return (
-    <>
-      <PageHeader
-        title="Ask"
-        description="Ask a question about your own material. Answers cite the passages they came from."
-        actions={
-          turns.length ? (
-            <Button variant="ghost" size="sm" onClick={clear}>
-              <Trash2 className="h-4 w-4" /> Clear session
-            </Button>
-          ) : undefined
-        }
-      />
+    <div className={styles.workspace}>
+      <div className={styles.masthead}>
+        <p className={styles.eyebrow}>
+          <BookOpen aria-hidden="true" /> YOUR RESEARCH DESK
+        </p>
+        <PageHeader
+          title="Ask"
+          description="Ask a question about your own material. Answers cite the passages they came from."
+          actions={
+            turns.length ? (
+              <Button variant="ghost" size="sm" onClick={clear}>
+                <Trash2 className="h-4 w-4" /> Clear session
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
 
       {empty ? (
         <div className="mb-4">
@@ -109,10 +145,15 @@ export function AskView() {
         </div>
       ) : null}
 
-      <Card className="mb-6">
-        <form onSubmit={onSubmit} className="space-y-3">
-          <div>
-            <Label htmlFor="question">Your question</Label>
+      <Card className={styles.composer}>
+        <form onSubmit={onSubmit} className={styles.composerForm}>
+          <div className={styles.questionField}>
+            <div className={styles.composerHeading}>
+              <Label htmlFor="question">Your question</Label>
+              <span>
+                {local ? "Your browser documents" : "Your study material"}
+              </span>
+            </div>
             <Textarea
               id="question"
               ref={inputRef}
@@ -124,32 +165,44 @@ export function AskView() {
               rows={3}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={styles.starters}>
+            <span className={styles.starterLabel}>A place to start</span>
             {chips.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => submit(c)}
                 disabled={busy}
-                className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-fg disabled:opacity-50"
+                className={styles.starter}
               >
                 {c}
+                <ArrowUpRight aria-hidden="true" />
               </button>
             ))}
           </div>
           {hasMine ? (
             <div>
               <Label htmlFor="source">Search in</Label>
-              <Select id="source" value={local ? "mine" : "shared"} onChange={(e) => setPickedSource(e.target.value as "shared" | "mine")}>
+              <Select
+                id="source"
+                value={local ? "mine" : "shared"}
+                onChange={(e) =>
+                  setPickedSource(e.target.value as "shared" | "mine")
+                }
+              >
                 <option value="mine">My documents (in this browser)</option>
                 <option value="shared">The shared textbooks</option>
               </Select>
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-[1fr_8rem_auto]">
+          <div className={styles.composeControls}>
             <div>
               <Label htmlFor="mode">Style</Label>
-              <Select id="mode" value={mode} onChange={(e) => setMode(e.target.value as "" | Mode)}>
+              <Select
+                id="mode"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "" | Mode)}
+              >
                 {MODES.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
@@ -159,7 +212,11 @@ export function AskView() {
             </div>
             <div>
               <Label htmlFor="k">Passages</Label>
-              <Select id="k" value={k} onChange={(e) => setK(Number(e.target.value))}>
+              <Select
+                id="k"
+                value={k}
+                onChange={(e) => setK(Number(e.target.value))}
+              >
                 {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
                   <option key={n} value={n}>
                     {n}
@@ -168,32 +225,46 @@ export function AskView() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button type="submit" disabled={busy || question.trim().length < 3} className="w-full sm:w-auto">
+              <Button
+                type="submit"
+                disabled={busy || question.trim().length < 3}
+                className="w-full sm:w-auto"
+              >
                 <Send className="h-4 w-4" /> Ask
               </Button>
             </div>
           </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={agentic && !local && !retrievalOnly}
-              onChange={(e) => setAgentic(e.target.checked)}
-              disabled={local || retrievalOnly}
-              className="mt-1 accent-[var(--color-accent)]"
-            />
-            <span>
-              <span className="font-medium">Agentic mode</span>{" "}
-              <span className="text-muted">
-                rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)
-                {local ? ". Not available for your own documents." : ""}
-              </span>
-            </span>
-          </label>
-          <details className="text-sm" onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
-            <summary className="cursor-pointer text-muted hover:text-fg">Advanced</summary>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <details
+            className={styles.advanced}
+            onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+          >
+            <summary aria-label="Advanced">
+              <SlidersHorizontal aria-hidden="true" /> Advanced
+              <span>Adjust the search and answer</span>
+            </summary>
+            <div className={styles.advancedGrid}>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={agentic && !local && !retrievalOnly}
+                  onChange={(e) => setAgentic(e.target.checked)}
+                  disabled={local || retrievalOnly}
+                  className="mt-1 accent-[var(--color-accent)]"
+                />
+                <span>
+                  <span className="font-medium">Agentic mode</span>{" "}
+                  <span className="text-muted">
+                    rewrites the search, checks the passages and re-checks the
+                    citations (slower, up to 6 model calls)
+                    {local ? ". Not available for your own documents." : ""}
+                  </span>
+                </span>
+              </label>
+
               <div>
-                <Label htmlFor="temperature">Temperature: {temperature.toFixed(2)}</Label>
+                <Label htmlFor="temperature">
+                  Temperature: {temperature.toFixed(2)}
+                </Label>
                 <input
                   id="temperature"
                   type="range"
@@ -208,8 +279,14 @@ export function AskView() {
               <div>
                 <Label htmlFor="model">Model</Label>
                 {models.data ? (
-                  <Select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
-                    <option value="">Server default ({models.data.default})</option>
+                  <Select
+                    id="model"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                  >
+                    <option value="">
+                      Server default ({models.data.default})
+                    </option>
                     {models.data.models.map((m) => (
                       <option key={m} value={m}>
                         {m}
@@ -217,35 +294,67 @@ export function AskView() {
                     ))}
                   </Select>
                 ) : (
-                  <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="server default" />
+                  <Input
+                    id="model"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="server default"
+                  />
                 )}
               </div>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={retrievalOnly} onChange={(e) => setRetrievalOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
+                <input
+                  type="checkbox"
+                  checked={retrievalOnly}
+                  onChange={(e) => setRetrievalOnly(e.target.checked)}
+                  className="accent-[var(--color-accent)]"
+                />
                 Only show matching passages (skip the model)
               </label>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} disabled={retrievalOnly} className="accent-[var(--color-accent)]" />
+                <input
+                  type="checkbox"
+                  checked={showPrompt}
+                  onChange={(e) => setShowPrompt(e.target.checked)}
+                  disabled={retrievalOnly}
+                  className="accent-[var(--color-accent)]"
+                />
                 Show the prompt sent to the model
               </label>
             </div>
           </details>
-          <p className="text-xs text-muted">Press Ctrl/⌘ + Enter to send.</p>
+          <div className={styles.composerFootnote}>
+            <p>Follow the answer back to its sources.</p>
+            <p>
+              Press <kbd>Ctrl/⌘ + Enter</kbd> to send.
+            </p>
+          </div>
         </form>
       </Card>
 
-      <div className="space-y-4">
+      <div className={styles.conversation}>
         {turns.map((t) => (
           <TurnCard
             key={t.id}
             turn={t}
             onStop={() => stop(t.id)}
             onRemove={() => remove(t.id)}
-            onFresh={() => void ask({ question: t.question, mode: t.mode, k, temperature, model: model.trim() || undefined, noCache: true, local, agent: t.agent })}
+            onFresh={() =>
+              void ask({
+                question: t.question,
+                mode: t.mode,
+                k,
+                temperature,
+                model: model.trim() || undefined,
+                noCache: true,
+                local,
+                agent: t.agent,
+              })
+            }
           />
         ))}
         <NotesPanel turns={turns} />
       </div>
-    </>
+    </div>
   );
 }

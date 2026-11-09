@@ -1,8 +1,16 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Layers, Square, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  Copy,
+  Layers,
+  Square,
+  Trash2,
+} from "lucide-react";
+import { useId, useState } from "react";
 import { ChunkCard } from "@/components/chunk-card";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
@@ -12,13 +20,18 @@ import { api, errorMessage, unwrap } from "@/lib/api";
 import { pageLabel } from "@/lib/format";
 import { plainText } from "./flashcards";
 import type { Turn } from "./session";
+import styles from "./ask.module.css";
 
 /** What the agentic workflow did, stage by stage. Open while it runs; collapsed once it is done. */
 function AgentSteps({ turn }: { turn: Turn }) {
   const steps = turn.steps ?? [];
   if (!turn.agent) return null;
   return (
-    <details open={turn.status === "streaming"} className="rounded-lg border border-border bg-bg/40 px-3 py-2 text-sm" aria-label="How it answered">
+    <details
+      open={turn.status === "streaming"}
+      className="rounded-lg border border-border bg-bg/40 px-3 py-2 text-sm"
+      aria-label="How it answered"
+    >
       <summary className="cursor-pointer select-none text-muted hover:text-fg">
         How it answered ({steps.length} {steps.length === 1 ? "step" : "steps"}
         {turn.llmCalls ? `, ${turn.llmCalls} model calls` : ""})
@@ -31,32 +44,56 @@ function AgentSteps({ turn }: { turn: Turn }) {
           </li>
         ))}
       </ol>
-      {turn.rewritten ? <p className="mt-2 text-xs text-muted">The first answer cited sources it was not given, so it was rewritten.</p> : null}
+      {turn.rewritten ? (
+        <p className="mt-2 text-xs text-muted">
+          The first answer cited sources it was not given, so it was rewritten.
+        </p>
+      ) : null}
     </details>
   );
 }
 
-const MODE_LABEL = { eli5: "ELI5", technical: "Technical", interview: "Interview", summary: "Summary" } as const;
+const MODE_LABEL = {
+  eli5: "ELI5",
+  technical: "Technical",
+  interview: "Interview",
+  summary: "Summary",
+} as const;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const errorId = useId();
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Copy answer"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          /* clipboard unavailable */
-        }
-      }}
-    >
-      {copied ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
-    </Button>
+    <span className={styles.copyControl}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Copy answer"
+        aria-describedby={copyError ? errorId : undefined}
+        onClick={async () => {
+          setCopyError(false);
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            setCopyError(true);
+          }
+        }}
+      >
+        {copied ? (
+          <Check className="h-4 w-4 text-good" />
+        ) : (
+          <Copy className="h-4 w-4" />
+        )}
+      </Button>
+      {copyError ? (
+        <span id={errorId} role="status" className={styles.copyFeedback}>
+          Copy is unavailable. Select the answer text to copy it manually.
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -67,7 +104,11 @@ function SaveCardButton({ turn }: { turn: Turn }) {
     mutationFn: async () =>
       unwrap(
         await api.http.POST("/api/v1/cards", {
-          body: { front: turn.question.slice(0, 1200), back: plainText(turn.answer).slice(0, 1200), source: turn.chunks[0]?.doc ?? null },
+          body: {
+            front: turn.question.slice(0, 1200),
+            back: plainText(turn.answer).slice(0, 1200),
+            source: turn.chunks[0]?.doc ?? null,
+          },
         }),
       ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["cards"] }),
@@ -76,12 +117,22 @@ function SaveCardButton({ turn }: { turn: Turn }) {
     <Button
       variant="ghost"
       size="icon"
-      aria-label={save.isSuccess ? "Saved as flashcard" : save.isError ? `Could not save: ${errorMessage(save.error)}` : "Save as flashcard"}
+      aria-label={
+        save.isSuccess
+          ? "Saved as flashcard"
+          : save.isError
+            ? `Could not save: ${errorMessage(save.error)}`
+            : "Save as flashcard"
+      }
       title={save.isError ? errorMessage(save.error) : "Save as flashcard"}
       disabled={save.isPending || save.isSuccess}
       onClick={() => save.mutate()}
     >
-      {save.isSuccess ? <Check className="h-4 w-4 text-good" /> : <Layers className="h-4 w-4" />}
+      {save.isSuccess ? (
+        <Check className="h-4 w-4 text-good" />
+      ) : (
+        <Layers className="h-4 w-4" />
+      )}
     </Button>
   );
 }
@@ -99,19 +150,25 @@ function CitationWarnings({ turn }: { turn: Turn }) {
       {bad.length > 0 ? (
         <>
           <p className="font-medium">
-            {bad.length === 1 ? "This answer cites something it was not given." : "This answer cites things it was not given."} Check
-            before relying on it.
+            {bad.length === 1
+              ? "This answer cites something it was not given."
+              : "This answer cites things it was not given."}{" "}
+            Check before relying on it.
           </p>
           <ul className="mt-1 list-disc pl-5">
             {bad.map((c) => (
               <li key={c.label}>
-                <span className="font-mono text-xs">[{c.label}]</span>: {CITE_PROBLEM[c.status]}
+                <span className="font-mono text-xs">[{c.label}]</span>:{" "}
+                {CITE_PROBLEM[c.status]}
               </li>
             ))}
           </ul>
         </>
       ) : (
-        <p>This answer does not cite any of the sources it was given, so you cannot tell where it came from.</p>
+        <p>
+          This answer does not cite any of the sources it was given, so you
+          cannot tell where it came from.
+        </p>
       )}
     </Notice>
   );
@@ -131,19 +188,28 @@ export function TurnCard({
   const streaming = turn.status === "streaming";
   const noKey = turn.error?.code === "llm_unavailable";
   return (
-    <Card className="space-y-4" aria-busy={streaming}>
-      <div className="flex items-start justify-between gap-3">
+    <Card className={`space-y-4 ${styles.turn}`} aria-busy={streaming}>
+      <div className={styles.turnHeading}>
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold leading-snug">{turn.question}</h2>
+          <p className={styles.eyebrow}>YOUR QUESTION</p>
+          <h2 className={styles.turnQuestion}>{turn.question}</h2>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {turn.mode ? <Badge>{MODE_LABEL[turn.mode]}</Badge> : null}
             {turn.model ? <Badge>{turn.model}</Badge> : null}
-            {turn.cached ? <Badge title="Served from the cache; nothing new was sent to the model">cached</Badge> : null}
-            {turn.agent ? <Badge title="Answered by the agentic workflow (LangGraph)">agentic</Badge> : null}
+            {turn.cached ? (
+              <Badge title="Served from the cache; nothing new was sent to the model">
+                cached
+              </Badge>
+            ) : null}
+            {turn.agent ? (
+              <Badge title="Answered by the agentic workflow (LangGraph)">
+                agentic
+              </Badge>
+            ) : null}
             {turn.status === "stopped" ? <Badge>stopped</Badge> : null}
           </div>
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className={styles.turnActions}>
           {streaming ? (
             <Button variant="secondary" size="sm" onClick={onStop}>
               <Square className="h-3.5 w-3.5" /> Stop
@@ -156,8 +222,15 @@ export function TurnCard({
                 </Button>
               ) : null}
               {turn.answer ? <CopyButton text={turn.answer} /> : null}
-              {turn.answer && turn.status === "done" ? <SaveCardButton turn={turn} /> : null}
-              <Button variant="ghost" size="icon" aria-label="Remove" onClick={onRemove}>
+              {turn.answer && turn.status === "done" ? (
+                <SaveCardButton turn={turn} />
+              ) : null}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Remove"
+                onClick={onRemove}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </>
@@ -167,8 +240,9 @@ export function TurnCard({
 
       {noKey ? (
         <Notice>
-          The server has no language-model key configured, so it cannot write an answer. Retrieval still works: the sources
-          below are the passages it found.
+          The server has no language-model key configured, so it cannot write an
+          answer. Retrieval still works: the sources below are the passages it
+          found.
         </Notice>
       ) : turn.error ? (
         <ErrorNotice>{turn.error.message}</ErrorNotice>
@@ -177,8 +251,15 @@ export function TurnCard({
       <AgentSteps turn={turn} />
 
       {turn.answer || streaming ? (
-        <div aria-live="polite">
-          {turn.answer ? <Markdown streaming={streaming}>{turn.answer}</Markdown> : <p className="text-sm text-muted">Thinking…</p>}
+        <div className={styles.answer} aria-live="polite">
+          <p className={styles.answerLabel}>
+            {streaming ? "Building your answer" : "Answer"}
+          </p>
+          {turn.answer ? (
+            <Markdown streaming={streaming}>{turn.answer}</Markdown>
+          ) : (
+            <p className="text-sm text-muted">Thinking…</p>
+          )}
         </div>
       ) : null}
 
@@ -186,32 +267,50 @@ export function TurnCard({
 
       {turn.prompt ? (
         <details>
-          <summary className="cursor-pointer select-none text-sm text-muted hover:text-fg">Prompt sent to the model</summary>
-          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg/60 p-3 font-mono text-xs">{turn.prompt}</pre>
+          <summary className="cursor-pointer select-none text-sm text-muted hover:text-fg">
+            Prompt sent to the model
+          </summary>
+          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg/60 p-3 font-mono text-xs">
+            {turn.prompt}
+          </pre>
         </details>
       ) : null}
 
       {turn.chunks.length > 0 ? (
-        <details open={!turn.answer || turn.status === "error"} className="group">
-          <summary className="cursor-pointer select-none list-none text-sm text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
+        <details
+          open={!turn.answer || turn.status === "error"}
+          className={styles.evidence}
+        >
+          <summary className={styles.evidenceSummary}>
+            <BookOpen aria-hidden="true" />
             <span className="mr-2">Sources ({turn.chunks.length})</span>
-            <span className="inline-flex flex-wrap gap-1.5 align-middle">
+            <span className={styles.sourceBadges}>
               {turn.chunks.map((c, i) => (
-                <Badge key={i} title={`Relevance ${c.score.toFixed(2)}`} className="font-mono">
+                <Badge
+                  key={i}
+                  title={`Relevance ${c.score.toFixed(2)}`}
+                  className="font-mono"
+                >
                   [{i + 1}] {c.doc}
                   {c.page ? ` · ${pageLabel(c.page, c.end_page, true)}` : ""}
                 </Badge>
               ))}
             </span>
+            <ChevronDown
+              className={styles.evidenceChevron}
+              aria-hidden="true"
+            />
           </summary>
-          <div className="mt-3 grid gap-2">
+          <div className={styles.passages}>
             {turn.chunks.map((c, i) => (
               <ChunkCard key={i} chunk={c} query={turn.question} index={i} />
             ))}
           </div>
         </details>
       ) : turn.status !== "streaming" && !turn.error ? (
-        <p className="text-sm text-muted">No matching passages were found in your sources.</p>
+        <p className="text-sm text-muted">
+          No matching passages were found in your sources.
+        </p>
       ) : null}
     </Card>
   );

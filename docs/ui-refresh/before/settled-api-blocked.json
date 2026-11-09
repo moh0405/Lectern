@@ -1,0 +1,22 @@
+[
+  {
+    "route": "sources",
+    "width": 1440,
+    "text": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nSources\n\nEverything you add is split into passages and indexed, so answers can cite it. Only new or changed files are processed.\n\nDOCUMENTS\n\n…\n\nPASSAGES\n\n…\n\nSEARCH\n\n…\n\nEMBEDDER\n\n…\n\nMy documents\n\nAdd your own PDF or notes. They are read and searched inside this browser: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.\n\nDrop PDFs, .txt or .md files here, or\n\nChoose files\n\nThe first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.\n\nIndexed sources\nCannot reach the API at /api/backend. Is the backend running?"
+  },
+  {
+    "route": "visualize",
+    "width": 1440,
+    "text": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nEmbedding map\n\nEvery passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster.\n\nCannot reach the API at /api/backend. Is the backend running?"
+  },
+  {
+    "route": "sources",
+    "width": 390,
+    "text": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nSources\n\nEverything you add is split into passages and indexed, so answers can cite it. Only new or changed files are processed.\n\nDOCUMENTS\n\n…\n\nPASSAGES\n\n…\n\nSEARCH\n\n…\n\nEMBEDDER\n\n…\n\nMy documents\n\nAdd your own PDF or notes. They are read and searched inside this browser: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.\n\nDrop PDFs, .txt or .md files here, or\n\nChoose files\n\nThe first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.\n\nIndexed sources\nCannot reach the API at /api/backend. Is the backend running?"
+  },
+  {
+    "route": "visualize",
+    "width": 390,
+    "text": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nEmbedding map\n\nEvery passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster.\n\nCannot reach the API at /api/backend. Is the backend running?"
+  }
+]

@@ -1,150 +1,165 @@
 "use client";
 
-import { FileText, Trash2, Upload } from "lucide-react";
+import { ArrowUpRight, Database, FileText, HardDrive, Info, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, ErrorNotice, Notice, Spinner } from "@/components/ui/feedback";
 import { chunkPages } from "@/lib/browser-rag/chunk";
 import { EMBEDDING_DIM, embedTexts, embeddingsEnabled, loadEmbedder } from "@/lib/browser-rag/embed";
-import { ACCEPT, extractPages } from "@/lib/browser-rag/extract";
+import { ACCEPT, MAX_FILE_MB, extractPages } from "@/lib/browser-rag/extract";
 import { deleteDoc, newDocId, saveDoc } from "@/lib/browser-rag/store";
 import { LOCAL_DOCS_KEY, useLocalDocs } from "@/lib/browser-rag/use-local-docs";
 import { errorMessage } from "@/lib/api";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import styles from "./sources.module.css";
 
 const MAX_PASSAGES = 8000;
+const subscribeToBrowser = () => () => {};
 
-/** Add documents that never leave this browser. Used in the public demo, where the shared index is read-only. */
+/** Public-demo documents stay in IndexedDB; only matching passages are sent when asking. */
 export function MyDocumentsCard() {
   const qc = useQueryClient();
   const docs = useLocalDocs();
   const input = useRef<HTMLInputElement>(null);
+  const processing = useRef(false);
+  const controlId = useId();
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [keywordOnly, setKeywordOnly] = useState(false);
-  // The page's HTML shows before its scripts run; a file chosen in that gap would be silently ignored. Offer the picker only once it can act.
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  const [limited, setLimited] = useState<string[]>([]);
+  const [completion, setCompletion] = useState("");
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  // Hydration must finish before a file picker can safely handle a selection.
+  const ready = useSyncExternalStore(subscribeToBrowser, () => true, () => false);
+  const storageSupported = !ready || typeof indexedDB !== "undefined";
+
+  useEffect(() => { if (confirm) document.getElementById(`${controlId}-confirm`)?.focus(); }, [confirm, controlId]);
+
+  function cancelRemove(id: string) {
+    setConfirm(null);
+    setRemoveError(null);
+    requestAnimationFrame(() => document.getElementById(`${controlId}-${encodeURIComponent(id)}`)?.focus());
+  }
 
   async function addFile(file: File) {
     setBusy(`Reading ${file.name}…`);
     const pages = await extractPages(file, (n, total) => setBusy(`Reading ${file.name}: page ${n} of ${total}`));
-    const passages = chunkPages(pages).slice(0, MAX_PASSAGES);
+    const allPassages = chunkPages(pages);
+    const passages = allPassages.slice(0, MAX_PASSAGES);
     setBusy(`Preparing ${file.name} for meaning search…`);
     await loadEmbedder((s) => setBusy(s));
     const vectors = await embedTexts(
       passages.map((p) => p.text),
       (done, total) => setBusy(`Indexing ${file.name}: ${done} of ${total} passages`),
     );
-    if (!vectors && embeddingsEnabled()) setKeywordOnly(true);
     const flat = vectors ? new Float32Array(vectors.length * EMBEDDING_DIM) : null;
     vectors?.forEach((v, i) => flat!.set(v, i * EMBEDDING_DIM));
     await saveDoc({ id: newDocId(), name: file.name, addedAt: Date.now(), pages: pages.length, passages, vectors: flat, dim: EMBEDDING_DIM });
+    if (!vectors && embeddingsEnabled()) setKeywordOnly(true);
+    if (allPassages.length > MAX_PASSAGES) setLimited((current) => [...current, file.name]);
     await qc.invalidateQueries({ queryKey: LOCAL_DOCS_KEY });
   }
 
   async function addFiles(list: FileList | File[] | null) {
     const files = Array.from(list ?? []);
-    if (!files.length) return;
+    if (!files.length || processing.current || !ready || !storageSupported) return;
+    processing.current = true;
     setErrors([]);
     setKeywordOnly(false);
-    for (const f of files) {
-      try {
-        await addFile(f);
-      } catch (e) {
-        setErrors((prev) => [...prev, errorMessage(e)]);
+    setLimited([]);
+    setCompletion("");
+    let added = 0;
+    try {
+      for (const file of files) {
+        try { await addFile(file); added += 1; }
+        catch (error) { setErrors((prev) => [...prev, `${file.name}: ${errorMessage(error)}`]); }
       }
+      if (added) setCompletion(`${plural(added, "document")} added to this browser. Ready to ask about.`);
+    } finally {
+      setBusy(null);
+      processing.current = false;
     }
-    setBusy(null);
   }
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
+  async function removeDocument(id: string) {
+    setRemoving(id);
+    setRemoveError(null);
+    try {
+      await deleteDoc(id);
+      await qc.invalidateQueries({ queryKey: LOCAL_DOCS_KEY });
+      setConfirm(null);
+      setCompletion("Document removed from this browser.");
+    } catch (error) {
+      setRemoveError(errorMessage(error));
+    } finally { setRemoving(null); }
+  }
+
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
     setOver(false);
-    void addFiles(e.dataTransfer.files);
+    void addFiles(event.dataTransfer.files);
   };
 
   return (
-    <Card aria-label="My documents">
-      <CardTitle className="mb-1">My documents</CardTitle>
-      <p className="mb-3 text-sm text-muted">
-        Add your own PDF or notes. They are read and searched <strong className="font-medium text-fg">inside this browser</strong>: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.
-      </p>
+    <Card aria-label="My documents" className={`sources-local-card ${styles.localCard}`}>
+      <div className={styles.sectionHead}>
+        <div>
+          <div className={styles.titleRow}><CardTitle>My documents</CardTitle><span className={styles.scope}><HardDrive className="h-3 w-3" aria-hidden="true" />This browser only</span></div>
+          <p className="text-muted">Your course notes, readings, and PDFs. Files are read and searched here; only matching passages are sent to the model when you ask a question.</p>
+        </div>
+      </div>
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
-        }}
+        onDragOver={(event) => { event.preventDefault(); if (!processing.current && storageSupported) setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={onDrop}
-        className={cn("flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors", over ? "border-accent bg-accent/10" : "border-border")}
+        className={cn(styles.dropzone, over && styles.dropOver)}
       >
-        {busy ? <Spinner className="h-6 w-6" /> : <Upload className="h-6 w-6 text-muted" />}
-        <p className="text-sm" role="status">{busy ?? "Drop PDFs, .txt or .md files here, or"}</p>
-        <Button type="button" onClick={() => input.current?.click()} disabled={busy !== null || !ready}>
-          Choose files
-        </Button>
-        {ready ? (
-          <input
-            ref={input}
-            type="file"
-            multiple
-            accept={ACCEPT}
-            aria-label="Add my documents"
-            className="sr-only"
-            onChange={(e) => {
-              void addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        ) : null}
-        <p className="text-xs text-muted">The first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.</p>
+        <span className={styles.dropIcon}>{busy ? <Spinner className="h-5 w-5" /> : <Upload className="h-5 w-5" aria-hidden="true" />}</span>
+        <div className={styles.dropCopy}>
+          <p role="status" aria-live="polite">{busy ?? "Drop your study material here"}</p>
+          <span>PDF, plain text, or Markdown · up to {MAX_FILE_MB} MB per file</span>
+        </div>
+        <Button type="button" onClick={() => input.current?.click()} disabled={busy !== null || !ready || !storageSupported}>Choose files</Button>
+        {ready ? <input ref={input} type="file" multiple accept={ACCEPT} aria-label="Add my documents" className="sr-only" disabled={busy !== null || !storageSupported} onChange={(event) => { void addFiles(event.target.files); event.target.value = ""; }} /> : null}
       </div>
-      {keywordOnly ? (
-        <Notice className="mt-3">The search model could not be downloaded, so this document uses keyword search only. Adding it again later may enable meaning search.</Notice>
-      ) : null}
-      {errors.map((m) => (
-        <ErrorNotice key={m} className="mt-3">{m}</ErrorNotice>
-      ))}
-      {docs.data?.length ? (
-        <ul className="mt-4 space-y-2" aria-label="Your documents">
-          {docs.data.map((d) => (
-            <li key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface/80 p-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <FileText className="h-4 w-4 shrink-0 text-muted" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{d.name}</p>
-                  <p className="text-xs text-muted">
-                    {plural(d.pages, "page")} · {plural(d.passages.length, "passage")}
-                  </p>
-                </div>
-                <Badge>{d.vectors ? "meaning + keyword search" : "keyword search"}</Badge>
+      <div className={styles.details}><Info aria-hidden="true" /><p>{embeddingsEnabled() ? "Meaning search downloads a model on first use (about 25 MB, then cached). Large books can take a few minutes." : "Meaning search is disabled on this deployment; documents use keyword search."} Scanned PDFs need selectable text or OCR first.</p></div>
+      <div className={styles.details}><Database aria-hidden="true" /><p>Documents stay in this browser’s storage, not the shared textbook index. Clearing browser data removes them; keep your original files. Storage capacity depends on your device.</p></div>
+      {!storageSupported ? <ErrorNotice className="mt-3">This browser does not support the document storage Lectern needs. Try a browser with IndexedDB enabled. Shared textbooks below are still available.</ErrorNotice> : null}
+      {keywordOnly ? <Notice className="mt-3">Meaning search was unavailable for one or more added documents, so they use keyword search only. Adding them again later may enable meaning search.</Notice> : null}
+      {limited.map((name, index) => <Notice key={`${name}-${index}`} className="mt-3">{name}: only the first {MAX_PASSAGES.toLocaleString()} passages were indexed. Split a large document to search the remaining material.</Notice>)}
+      {errors.map((message, index) => <ErrorNotice key={`${index}-${message}`} className="mt-3"><p>{message}</p><p className="mt-1">Check the file and browser storage permissions, then choose it again to retry.</p></ErrorNotice>)}
+      {completion && !busy ? <p className="mt-3 text-sm text-good" role="status">{completion}</p> : null}
+      {docs.isPending ? <p className="mt-4 text-sm text-muted" role="status">Loading documents from this browser…</p> : docs.data?.length ? (
+        <ul className={styles.localList} aria-label="Your documents">
+          {docs.data.map((document) => (
+            <li key={document.id} className={`${styles.row} ${styles.localRow}`}>
+              <span className={styles.rowIcon}><FileText className="h-4 w-4" aria-hidden="true" /></span>
+              <div className={styles.rowBody}>
+                <p className={styles.rowName}>{document.name}</p>
+                <div className={styles.rowMeta}><span>{plural(document.pages, "page")} · {plural(document.passages.length, "passage")}</span><Badge>{document.vectors ? "meaning + keyword search" : "keyword search"}</Badge></div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Remove ${d.name}`}
-                onClick={async () => {
-                  await deleteDoc(d.id);
-                  await qc.invalidateQueries({ queryKey: LOCAL_DOCS_KEY });
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className={styles.rowActions}>
+                {confirm === document.id ? <div className={styles.confirm} role="group" aria-label={`Remove ${document.name}?`} onKeyDown={(event) => { if (event.key === "Escape" && removing === null) cancelRemove(document.id); }}>
+                  <p>Remove this document and its search index from this browser? Keep the original file to add it again.</p>
+                  <div className={styles.confirmActions}>
+                    <Button id={`${controlId}-confirm`} variant="danger" size="sm" disabled={removing !== null} onClick={() => void removeDocument(document.id)}>{removing === document.id ? "Removing…" : "Confirm remove"}</Button>
+                    <Button variant="ghost" size="sm" disabled={removing !== null} onClick={() => cancelRemove(document.id)}>Cancel</Button>
+                  </div>
+                </div> : <Button id={`${controlId}-${encodeURIComponent(document.id)}`} variant="ghost" size="icon" aria-label={`Remove ${document.name}`} onClick={() => { setConfirm(document.id); setRemoveError(null); }}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
+              </div>
             </li>
           ))}
         </ul>
-      ) : null}
-      {docs.data?.length ? (
-        <p className="mt-3 text-sm">
-          <Link href="/ask" className="text-accent-2 underline">Ask about your documents</Link>
-        </p>
-      ) : null}
+      ) : <p className={styles.emptyLocal}><FileText className="h-4 w-4 shrink-0" aria-hidden="true" />No documents added in this browser yet. Choose a file above to begin.</p>}
+      {removeError ? <ErrorNotice className="mt-3">Could not remove this document: {removeError}. Try again; the document has not been marked as removed.</ErrorNotice> : null}
+      {docs.data?.length ? <div className={styles.footerAction}><p>{plural(docs.data.length, "document")} in this browser</p><Link href="/ask">Ask about your documents <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link></div> : null}
     </Card>
   );
 }

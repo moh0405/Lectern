@@ -31,7 +31,7 @@ test("when the model cannot be downloaded, the document still works with keyword
   await expect(list).toContainText("graphs.pdf", { timeout: 100_000 });
   await expect(list).toContainText("keyword search");
   await expect(list).not.toContainText("meaning + keyword search");
-  await expect(page.getByText(/could not be downloaded/)).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /Meaning search was unavailable.*keyword search only/ })).toBeVisible();
 
   await page.goto("/ask");
   await page.getByLabel("Your question").fill("How are graphs represented?");

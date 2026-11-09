@@ -170,3 +170,29 @@ describe("TurnCard for agentic answers", () => {
     expect(screen.queryByText("agentic")).toBeNull();
   });
 });
+
+
+describe("TurnCard clipboard recovery", () => {
+  it("explains how to copy an answer when clipboard permission is denied", async () => {
+    const user = userEvent.setup();
+    const write = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockRejectedValue(new Error("Permission denied"));
+    render(
+      <TurnCard
+        turn={turn({ answer: "A heap is a tree." })}
+        onStop={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Copy answer" }));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Select the answer text to copy it manually",
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy answer" }),
+    ).toHaveAccessibleDescription(/Copy is unavailable/);
+    expect(screen.getByText("A heap is a tree.")).toBeInTheDocument();
+    write.mockRestore();
+  });
+});

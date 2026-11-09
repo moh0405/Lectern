@@ -22,7 +22,7 @@ test("the agent chooses a tool, you see the call and its result, then a cited an
   await expect(page.getByTestId("run-cost")).toContainText("1 tool call · 2 model calls");
   await page.getByText(/Passages the tools returned/).click();
   await expect(page.getByText(/heaps\.pdf · p\.1/)).toBeVisible();
-  await expect(page.getByRole("status")).toHaveCount(0); // no citation warning
+  await expect(page.getByRole("status").filter({ hasText: /This answer cites .* the tools never returned/ })).toHaveCount(0); // no citation warning
 });
 
 test("it is in the navigation and the example prompts run the agent", async ({ page }) => {

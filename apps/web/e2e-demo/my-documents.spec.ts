@@ -53,5 +53,7 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
   // 6) removing the document returns the page to the shared textbooks
   await page.goto("/sources");
   await page.getByRole("button", { name: "Remove graphs.pdf" }).click();
+  await expect(page.getByRole("list", { name: "Your documents" })).toContainText("graphs.pdf");
+  await page.getByRole("group", { name: "Remove graphs.pdf?", exact: true }).getByRole("button", { name: "Confirm remove" }).click();
   await expect(page.getByRole("list", { name: "Your documents" })).toHaveCount(0);
 });

@@ -1,0 +1,533 @@
+.workspace {
+  min-width: 0;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+.masthead {
+  padding: 4px 0 4px;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 13px;
+  color: var(--color-muted);
+  font: 500 10px/1.5 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.14em;
+}
+.eyebrow svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-accent-2);
+}
+.masthead h1 {
+  font-size: clamp(30px, 3.5vw, 44px);
+  font-weight: 550;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+.masthead header > div > p {
+  font-size: 15px;
+  line-height: 1.8;
+  margin-top: 12px;
+  max-width: 60ch;
+}
+.composer {
+  position: relative;
+  padding: 0 !important;
+  margin-bottom: 32px;
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.composer::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-accent), transparent 75%);
+  pointer-events: none;
+}
+.composerForm {
+  display: flex;
+  flex-direction: column;
+}
+.questionField {
+  padding: 25px 26px 0;
+}
+.composerHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+.composerHeading label {
+  font-size: 13px;
+  margin: 0;
+  color: var(--color-fg);
+  font-weight: 550;
+}
+.composerHeading > span {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-align: right;
+}
+.questionField textarea {
+  padding: 14px 0;
+  min-height: 122px;
+  max-height: 360px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: clamp(18px, 2vw, 23px);
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.02em;
+  box-shadow: none;
+  resize: vertical;
+}
+.questionField textarea:focus {
+  box-shadow: none;
+}
+.questionField textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 5px;
+  border-radius: 3px;
+}
+.questionField textarea::placeholder {
+  color: var(--color-muted);
+  opacity: 0.8;
+}
+.starters {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 4px 26px 24px;
+}
+.starterLabel {
+  flex-basis: 100%;
+  font-size: 10px;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+.starter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+  min-height: 33px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.starter svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.starter:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-fg);
+  background: var(--color-surface-2);
+}
+.starter:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.starter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.composerForm > div:has(> label[for="source"]) {
+  padding: 0 26px 20px;
+}
+.composeControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px auto;
+  align-items: end;
+  gap: 14px;
+  border-top: 1px solid var(--color-border);
+  padding: 20px 26px;
+  background: var(--color-bg);
+}
+.composeControls label {
+  font-size: 11px;
+  margin-bottom: 7px;
+  color: var(--color-muted);
+}
+.composeControls select {
+  min-height: 43px;
+  font-size: 13px;
+}
+.composeControls button {
+  min-width: 104px;
+  min-height: 43px;
+}
+.advanced {
+  border-top: 1px solid var(--color-border);
+  padding: 0 26px;
+}
+.advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 49px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.advanced > summary svg {
+  width: 14px;
+  height: 14px;
+}
+.advanced > summary > span {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.8;
+  text-align: right;
+}
+.advanced > summary:hover {
+  color: var(--color-fg);
+}
+.advanced > summary:focus-visible,
+.evidenceSummary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+.advancedGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 5px 0 22px;
+  font-size: 12px;
+}
+.advancedGrid > label:first-child {
+  grid-column: 1/-1;
+  padding: 12px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.advancedGrid input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+}
+.advancedGrid label {
+  line-height: 1.7;
+}
+.composerFootnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--color-border);
+  padding: 13px 26px;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+.composerFootnote p {
+  margin: 0;
+}
+.composerFootnote kbd {
+  font-family: inherit;
+  color: var(--color-fg);
+}
+.conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.turn {
+  padding: 26px !important;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow-wrap: anywhere;
+}
+.turn > * + * {
+  margin-top: 22px;
+}
+.turnHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 21px;
+  border-bottom: 1px solid var(--color-border);
+}
+.turnHeading .eyebrow {
+  font-size: 9px;
+  margin-bottom: 9px;
+}
+.turnQuestion {
+  font-size: clamp(19px, 2vw, 25px);
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.turnActions {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.answer {
+  font-size: 16px;
+  line-height: 1.85;
+  max-width: 82ch;
+}
+.answerLabel {
+  font-size: 11px;
+  color: var(--color-accent-2);
+  letter-spacing: 0.03em;
+  margin: 0 0 16px;
+  font-weight: 550;
+}
+.answer > div {
+  font-size: inherit;
+  line-height: inherit;
+}
+.answer pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.evidence {
+  border-top: 1px solid var(--color-border);
+  padding-top: 17px;
+}
+.evidenceSummary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+.evidenceSummary::-webkit-details-marker {
+  display: none;
+}
+.evidenceSummary > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-accent-2);
+}
+.evidenceSummary > span:first-of-type {
+  color: var(--color-fg);
+  font-weight: 550;
+  white-space: nowrap;
+}
+.sourceBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+.sourceBadges > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 400;
+}
+.evidenceSummary > .evidenceChevron {
+  margin-left: auto;
+  color: var(--color-muted);
+  transition: transform 0.15s;
+}
+.evidence[open] .evidenceChevron {
+  transform: rotate(180deg);
+}
+.passages {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.passages article {
+  padding: 17px;
+  box-shadow: none;
+  background: var(--color-bg);
+  line-height: 1.8;
+}
+.passages article > div {
+  flex-wrap: wrap;
+  row-gap: 9px;
+}
+.passages article p {
+  line-height: 1.85;
+  font-size: 13px;
+}
+.notes {
+  padding: 23px 26px !important;
+  box-shadow: none;
+  backdrop-filter: none;
+  background: var(--color-bg);
+}
+.notesHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.notesHeading .eyebrow {
+  font-size: 9px;
+  margin-bottom: 7px;
+}
+.notesHeading h2 {
+  font-size: 19px;
+  font-weight: 550;
+  letter-spacing: -0.025em;
+}
+.notesHeading button {
+  font-size: 11px;
+}
+.notesContent {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 24px;
+  border-radius: 8px;
+  line-height: 1.85;
+}
+@media (min-width: 1200px) {
+  .composerHeading,
+  .questionField textarea {
+    max-width: 870px;
+  }
+}
+@media (max-width: 640px) {
+  .questionField {
+    padding: 21px 18px 0;
+  }
+  .composerHeading {
+    align-items: start;
+  }
+  .composerHeading > span {
+    max-width: 135px;
+    font-size: 10px;
+  }
+  .starters {
+    padding: 4px 18px 20px;
+  }
+  .starter {
+    font-size: 10px;
+  }
+  .composeControls {
+    grid-template-columns: minmax(0, 1fr) 100px;
+    gap: 12px;
+    padding: 18px;
+  }
+  .composeControls > div:last-child {
+    grid-column: 1/-1;
+  }
+  .composeControls button {
+    width: 100%;
+    min-height: 45px;
+  }
+  .advanced {
+    padding-inline: 18px;
+  }
+  .advancedGrid {
+    grid-template-columns: 1fr;
+  }
+  .advanced > summary > span {
+    max-width: 150px;
+  }
+  .composerFootnote {
+    padding: 13px 18px;
+    font-size: 9px;
+  }
+  .turn {
+    padding: 20px 18px !important;
+  }
+  .turnHeading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .turnActions {
+    margin-left: auto;
+  }
+  .sourceBadges {
+    flex-basis: 100%;
+    order: 3;
+  }
+  .evidenceSummary > .evidenceChevron {
+    margin-left: auto;
+  }
+  .answer {
+    font-size: 15px;
+  }
+  .notes {
+    padding: 21px 18px !important;
+  }
+  .notesHeading > div:last-child {
+    width: 100%;
+  }
+  .notesHeading > div:last-child button {
+    justify-content: flex-start;
+  }
+  .notesContent {
+    padding: 17px;
+  }
+  .passages article {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .starter,
+  .evidenceChevron {
+    transition: none;
+  }
+}
+
+.copyControl {
+  display: inline-flex;
+}
+.copyFeedback {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 5;
+  width: 240px;
+  max-width: 70vw;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  font-size: 12px;
+  line-height: 1.7;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-bg) 65%, transparent);
+}

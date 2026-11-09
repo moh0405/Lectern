@@ -1,0 +1,3755 @@
+{
+  "source": "https://lectern-tutor.vercel.app",
+  "scope": "Read-only public UI. API and non-GET requests blocked. No model invocation, shared database write, or embedding download.",
+  "blocked": [
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/documents"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/embeddings/projection?limit=400"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/search?query=&top_k=20"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/documents"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/embeddings/projection?limit=400"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/search?query=&top_k=20"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/documents"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/embeddings/projection?limit=400"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/stats"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/leetcode/search?query=&top_k=20"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    },
+    {
+      "method": "GET",
+      "url": "https://lectern-tutor.vercel.app/api/backend/health"
+    }
+  ],
+  "pages": [
+    {
+      "route": "ask",
+      "width": 1440,
+      "title": "Ask · Lectern",
+      "h1": [
+        "Ask"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAsk\n\nAsk a question about your own material. Answers cite the passages they came from.\n\nYOUR QUESTION\nExplain dynamic programming\nWhat is a hash table?\nDifference between BFS and DFS\nHow does quicksort work?\nSTYLE\nDefault\nELI5 (simple)\nTechnical\nInterview prep\nQuick summary\nPASSAGES\n1\n2\n3\n4\n5\n6\n8\n10\nAsk\nAgentic mode rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)\nAdvanced\n\nPress Ctrl/⌘ + Enter to send.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 373,
+          "y": 145,
+          "w": 934,
+          "h": 96
+        },
+        {
+          "text": "Explain dynamic programming",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 259,
+          "w": 197.609375,
+          "h": 26
+        },
+        {
+          "text": "What is a hash table?",
+          "tag": "BUTTON",
+          "x": 578.609375,
+          "y": 259,
+          "w": 146.4375,
+          "h": 26
+        },
+        {
+          "text": "Difference between BFS and DFS",
+          "tag": "BUTTON",
+          "x": 733.046875,
+          "y": 259,
+          "w": 214.765625,
+          "h": 26
+        },
+        {
+          "text": "How does quicksort work?",
+          "tag": "BUTTON",
+          "x": 955.8125,
+          "y": 259,
+          "w": 176.890625,
+          "h": 26
+        },
+        {
+          "text": "DefaultELI5 (simple)TechnicalInterview prepQuick summary",
+          "tag": "SELECT",
+          "x": 373,
+          "y": 317,
+          "w": 700.75,
+          "h": 40
+        },
+        {
+          "text": "123456810",
+          "tag": "SELECT",
+          "x": 1085.75,
+          "y": 317,
+          "w": 128,
+          "h": 40
+        },
+        {
+          "text": "Ask",
+          "tag": "BUTTON",
+          "x": 1225.75,
+          "y": 317,
+          "w": 81.25,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 373,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 453,
+          "w": 461,
+          "h": 16
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 846,
+          "y": 453,
+          "w": 461,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 508.5,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 846,
+          "y": 508.5,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    },
+    {
+      "route": "sources",
+      "width": 1440,
+      "title": "Sources · Lectern",
+      "h1": [
+        "Sources"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nSources\n\nEverything you add is split into passages and indexed, so answers can cite it. Only new or changed files are processed.\n\nDOCUMENTS\n\n…\n\nPASSAGES\n\n…\n\nSEARCH\n\n…\n\nEMBEDDER\n\n…\n\nMy documents\n\nAdd your own PDF or notes. They are read and searched inside this browser: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.\n\nDrop PDFs, .txt or .md files here, or\n\nChoose files\n\nThe first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.\n\nIndexed sources",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Choose files",
+          "tag": "BUTTON",
+          "x": 782.359375,
+          "y": 416,
+          "w": 115.28125,
+          "h": 40
+        },
+        {
+          "text": "Add my documents",
+          "tag": "INPUT",
+          "x": 839.5,
+          "y": 355,
+          "w": 1,
+          "h": 1
+        }
+      ]
+    },
+    {
+      "route": "study",
+      "width": 1440,
+      "title": "Flashcards · Lectern",
+      "h1": [
+        "Flashcards"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nFlashcards\n\nSpaced repetition (SM-2, the scheduler behind Anki). Cards you remember come back less and less often; cards you forget come back tomorrow.\n\nDUE NOW\n\n0\n\nNEW\n\n0\n\nMATURE (21+ DAYS)\n\n0\n\nTOTAL\n\n0\n\nNo flashcards yet\n\nAdd a card below, or let the model write some from your material.\n\nAdd a card\nFRONT (QUESTION)\nBACK (ANSWER)\nAdd card\nWrite cards from your material\n\nThe model reads passages from your sources and writes up to five cards. Review them below; delete any you do not like.\n\nTOPIC (OPTIONAL)\nWriting cards needs the model and your own sources, so it is off in the public demo. Your hand-made cards are saved in this browser only.\nGenerate cards\nDeck (0)",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 441,
+          "w": 438,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 373,
+          "y": 513,
+          "w": 438,
+          "h": 96
+        },
+        {
+          "text": "Add card",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 627,
+          "w": 116.828125,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 869,
+          "y": 493,
+          "w": 438,
+          "h": 40
+        },
+        {
+          "text": "Generate cards",
+          "tag": "BUTTON",
+          "x": 869,
+          "y": 643,
+          "w": 158.71875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "visualize",
+      "width": 1440,
+      "title": "Embedding map · Lectern",
+      "h1": [
+        "Embedding map"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nEmbedding map\n\nEvery passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "agent",
+      "width": 1440,
+      "title": "Agent · Lectern",
+      "h1": [
+        "Agent"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAgent\n\nGive it a task. The model decides which tools to use (search your material, read a page, solve math, find a practice problem), and you can watch each call. It stops after a fixed number of steps.\n\nTASK\nExplain how hash tables handle collisions, using my material.\nIntegrate x^2 + 3x, then find an Easy LeetCode problem that uses a hash table.\nWhich of my documents covers graph traversal, and what do they say about BFS?\nMOST STEPS\n3\n4\n5\n6\n7\n8\nRun agent\n\nEach step is a model call; it counts against the daily limit.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 373,
+          "y": 165,
+          "w": 934,
+          "h": 96
+        },
+        {
+          "text": "Explain how hash tables handle collisions, using my material.",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 279,
+          "w": 370.046875,
+          "h": 26
+        },
+        {
+          "text": "Integrate x^2 + 3x, then find an Easy LeetCode problem that uses a has",
+          "tag": "BUTTON",
+          "x": 751.046875,
+          "y": 279,
+          "w": 471.9375,
+          "h": 26
+        },
+        {
+          "text": "Which of my documents covers graph traversal, and what do they say abo",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 313,
+          "w": 489.84375,
+          "h": 26
+        },
+        {
+          "text": "345678",
+          "tag": "SELECT",
+          "x": 373,
+          "y": 371,
+          "w": 112,
+          "h": 40
+        },
+        {
+          "text": "Run agent",
+          "tag": "BUTTON",
+          "x": 497,
+          "y": 371,
+          "w": 123.671875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "tutor",
+      "width": 1440,
+      "title": "Tutor tools · Lectern",
+      "h1": [
+        "Tutor tools"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nTutor tools\n\nSee how the ideas in a topic connect.\n\nConcept map\nSocratic tutor\nCompare sources\nExplain at my level\nTOPIC\nGenerate map",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Concept map",
+          "tag": "BUTTON",
+          "x": 352,
+          "y": 104,
+          "w": 120.84375,
+          "h": 38
+        },
+        {
+          "text": "Socratic tutor",
+          "tag": "BUTTON",
+          "x": 476.84375,
+          "y": 104,
+          "w": 121.390625,
+          "h": 38
+        },
+        {
+          "text": "Compare sources",
+          "tag": "BUTTON",
+          "x": 602.234375,
+          "y": 104,
+          "w": 149.25,
+          "h": 38
+        },
+        {
+          "text": "Explain at my level",
+          "tag": "BUTTON",
+          "x": 755.484375,
+          "y": 104,
+          "w": 154.15625,
+          "h": 38
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 203,
+          "w": 771.75,
+          "h": 40
+        },
+        {
+          "text": "Generate map",
+          "tag": "BUTTON",
+          "x": 1156.75,
+          "y": 203,
+          "w": 150.25,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "leetcode",
+      "width": 1440,
+      "title": "LeetCode · Lectern",
+      "h1": [
+        "LeetCode"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nLeetCode\n\nSearch a bank of coding problems and get an AI study guide for any of them.\n\nYour study plan\n\n0 solved · 0 attempted\n\nYour marks and notes are saved in this browser only. The personalised plan needs a private deployment; run the project locally to use it.\n\nEasy\nMedium\nHard\n\nPick a problem\n\nOpen one to read it and generate a study guide.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Search problems",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 239,
+          "w": 934,
+          "h": 40
+        },
+        {
+          "text": "Easy",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 291,
+          "w": 53.03125,
+          "h": 26
+        },
+        {
+          "text": "Medium",
+          "tag": "BUTTON",
+          "x": 434.03125,
+          "y": 291,
+          "w": 71.703125,
+          "h": 26
+        },
+        {
+          "text": "Hard",
+          "tag": "BUTTON",
+          "x": 513.734375,
+          "y": 291,
+          "w": 53.328125,
+          "h": 26
+        }
+      ]
+    },
+    {
+      "route": "analytics",
+      "width": 1440,
+      "title": "Analytics · Lectern",
+      "h1": [
+        "Analytics"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAnalytics\n\nWhat you have asked and which sources answered. Stored on the server, so it survives restarts.\n\nThis feature is turned off in the public demo. Run the project locally to use it.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "math",
+      "width": 1440,
+      "title": "Math · Lectern",
+      "h1": [
+        "Math"
+      ],
+      "overflow": false,
+      "scrollWidth": 1440,
+      "body": "Lectern\nJump to…\nCtrl K\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nMath\n\nDifferentiate, integrate, simplify, expand, factor or solve, with the result as typeset math.\n\nEXPRESSION\nCompute\ndifferentiate sin(x)*x^2\nintegrate x^2 + 3x\nsimplify (x^2 - 1)/(x - 1)\nsolve x^2 - 5x + 6 = 0\nexpand (x + 1)^4\nfactor x^3 - x\n\nCommands: differentiate, integrate, simplify, expand, factor, solve … for x, or just an expression. Use ^ for powers; x, pi, sin, log, sqrt and friends are available.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 92,
+          "y": 56,
+          "w": 215,
+          "h": 36
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 88,
+          "y": 104,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 88,
+          "y": 144,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 88,
+          "y": 184,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 88,
+          "y": 224,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 88,
+          "y": 264,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 88,
+          "y": 304,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 88,
+          "y": 344,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 88,
+          "y": 384,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 88,
+          "y": 424,
+          "w": 223,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 373,
+          "y": 145,
+          "w": 808.90625,
+          "h": 40
+        },
+        {
+          "text": "Compute",
+          "tag": "BUTTON",
+          "x": 1189.90625,
+          "y": 145,
+          "w": 117.09375,
+          "h": 40
+        },
+        {
+          "text": "differentiate sin(x)*x^2",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 197,
+          "w": 198.8125,
+          "h": 26
+        },
+        {
+          "text": "integrate x^2 + 3x",
+          "tag": "BUTTON",
+          "x": 579.8125,
+          "y": 197,
+          "w": 155.609375,
+          "h": 26
+        },
+        {
+          "text": "simplify (x^2 - 1)/(x - 1)",
+          "tag": "BUTTON",
+          "x": 743.421875,
+          "y": 197,
+          "w": 213.203125,
+          "h": 26
+        },
+        {
+          "text": "solve x^2 - 5x + 6 = 0",
+          "tag": "BUTTON",
+          "x": 964.625,
+          "y": 197,
+          "w": 184.40625,
+          "h": 26
+        },
+        {
+          "text": "expand (x + 1)^4",
+          "tag": "BUTTON",
+          "x": 1157.03125,
+          "y": 197,
+          "w": 141.203125,
+          "h": 26
+        },
+        {
+          "text": "factor x^3 - x",
+          "tag": "BUTTON",
+          "x": 373,
+          "y": 231,
+          "w": 126.8125,
+          "h": 26
+        }
+      ]
+    },
+    {
+      "route": "ask",
+      "width": 390,
+      "title": "Ask · Lectern",
+      "h1": [
+        "Ask"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAsk\n\nAsk a question about your own material. Answers cite the passages they came from.\n\nYOUR QUESTION\nExplain dynamic programming\nWhat is a hash table?\nDifference between BFS and DFS\nHow does quicksort work?\nSTYLE\nDefault\nELI5 (simple)\nTechnical\nInterview prep\nQuick summary\nPASSAGES\n1\n2\n3\n4\n5\n6\n8\n10\nAsk\nAgentic mode rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)\nAdvanced\n\nPress Ctrl/⌘ + Enter to send.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 298,
+          "w": 316,
+          "h": 96
+        },
+        {
+          "text": "Explain dynamic programming",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 412,
+          "w": 197.609375,
+          "h": 26
+        },
+        {
+          "text": "What is a hash table?",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 446,
+          "w": 146.4375,
+          "h": 26
+        },
+        {
+          "text": "Difference between BFS and DFS",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 480,
+          "w": 214.765625,
+          "h": 26
+        },
+        {
+          "text": "How does quicksort work?",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 514,
+          "w": 176.890625,
+          "h": 26
+        },
+        {
+          "text": "DefaultELI5 (simple)TechnicalInterview prepQuick summary",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 572,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "123456810",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 644,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "Ask",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 696,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 752,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 872,
+          "w": 316,
+          "h": 16
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 925,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 990.5,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 1032.5,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    },
+    {
+      "route": "sources",
+      "width": 390,
+      "title": "Sources · Lectern",
+      "h1": [
+        "Sources"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nSources\n\nEverything you add is split into passages and indexed, so answers can cite it. Only new or changed files are processed.\n\nDOCUMENTS\n\n…\n\nPASSAGES\n\n…\n\nSEARCH\n\n…\n\nEMBEDDER\n\n…\n\nMy documents\n\nAdd your own PDF or notes. They are read and searched inside this browser: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.\n\nDrop PDFs, .txt or .md files here, or\n\nChoose files\n\nThe first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.\n\nIndexed sources",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Choose files",
+          "tag": "BUTTON",
+          "x": 137.359375,
+          "y": 723,
+          "w": 115.28125,
+          "h": 40
+        },
+        {
+          "text": "Add my documents",
+          "tag": "INPUT",
+          "x": 194.5,
+          "y": 662,
+          "w": 1,
+          "h": 1
+        }
+      ]
+    },
+    {
+      "route": "study",
+      "width": 390,
+      "title": "Flashcards · Lectern",
+      "h1": [
+        "Flashcards"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nFlashcards\n\nSpaced repetition (SM-2, the scheduler behind Anki). Cards you remember come back less and less often; cards you forget come back tomorrow.\n\nDUE NOW\n\n0\n\nNEW\n\n0\n\nMATURE (21+ DAYS)\n\n0\n\nTOTAL\n\n0\n\nNo flashcards yet\n\nAdd a card below, or let the model write some from your material.\n\nAdd a card\nFRONT (QUESTION)\nBACK (ANSWER)\nAdd card\nWrite cards from your material\n\nThe model reads passages from your sources and writes up to five cards. Review them below; delete any you do not like.\n\nTOPIC (OPTIONAL)\nWriting cards needs the model and your own sources, so it is off in the public demo. Your hand-made cards are saved in this browser only.\nGenerate cards\nDeck (0)",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 712,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 784,
+          "w": 316,
+          "h": 96
+        },
+        {
+          "text": "Add card",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 898,
+          "w": 116.828125,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 1124,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "Generate cards",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 1294,
+          "w": 158.71875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "visualize",
+      "width": 390,
+      "title": "Embedding map · Lectern",
+      "h1": [
+        "Embedding map"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nEmbedding map\n\nEvery passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "agent",
+      "width": 390,
+      "title": "Agent · Lectern",
+      "h1": [
+        "Agent"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAgent\n\nGive it a task. The model decides which tools to use (search your material, read a page, solve math, find a practice problem), and you can watch each call. It stops after a fixed number of steps.\n\nTASK\nExplain how hash tables handle collisions, using my material.\nIntegrate x^2 + 3x, then find an Easy LeetCode problem that uses a hash table.\nWhich of my documents covers graph traversal, and what do they say about BFS?\nMOST STEPS\n3\n4\n5\n6\n7\n8\nRun agent\n\nEach step is a model call; it counts against the daily limit.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 338,
+          "w": 316,
+          "h": 96
+        },
+        {
+          "text": "Explain how hash tables handle collisions, using my material.",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 452,
+          "w": 316,
+          "h": 42
+        },
+        {
+          "text": "Integrate x^2 + 3x, then find an Easy LeetCode problem that uses a has",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 502,
+          "w": 316,
+          "h": 42
+        },
+        {
+          "text": "Which of my documents covers graph traversal, and what do they say abo",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 552,
+          "w": 316,
+          "h": 42
+        },
+        {
+          "text": "345678",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 626,
+          "w": 112,
+          "h": 40
+        },
+        {
+          "text": "Run agent",
+          "tag": "BUTTON",
+          "x": 161,
+          "y": 626,
+          "w": 123.671875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "tutor",
+      "width": 390,
+      "title": "Tutor tools · Lectern",
+      "h1": [
+        "Tutor tools"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nTutor tools\n\nSee how the ideas in a topic connect.\n\nConcept map\nSocratic tutor\nCompare sources\nExplain at my level\nTOPIC\nGenerate map",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Concept map",
+          "tag": "BUTTON",
+          "x": 16,
+          "y": 237,
+          "w": 120.84375,
+          "h": 38
+        },
+        {
+          "text": "Socratic tutor",
+          "tag": "BUTTON",
+          "x": 140.84375,
+          "y": 237,
+          "w": 121.390625,
+          "h": 38
+        },
+        {
+          "text": "Compare sources",
+          "tag": "BUTTON",
+          "x": 266.234375,
+          "y": 237,
+          "w": 149.25,
+          "h": 38
+        },
+        {
+          "text": "Explain at my level",
+          "tag": "BUTTON",
+          "x": 419.484375,
+          "y": 237,
+          "w": 154.15625,
+          "h": 38
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 336,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "Generate map",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 388,
+          "w": 316,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "leetcode",
+      "width": 390,
+      "title": "LeetCode · Lectern",
+      "h1": [
+        "LeetCode"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nLeetCode\n\nSearch a bank of coding problems and get an AI study guide for any of them.\n\nYour study plan\n\n0 solved · 0 attempted\n\nYour marks and notes are saved in this browser only. The personalised plan needs a private deployment; run the project locally to use it.\n\nEasy\nMedium\nHard\n\nPick a problem\n\nOpen one to read it and generate a study guide.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Search problems",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 432,
+          "w": 316,
+          "h": 40
+        },
+        {
+          "text": "Easy",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 484,
+          "w": 53.03125,
+          "h": 26
+        },
+        {
+          "text": "Medium",
+          "tag": "BUTTON",
+          "x": 98.03125,
+          "y": 484,
+          "w": 71.703125,
+          "h": 26
+        },
+        {
+          "text": "Hard",
+          "tag": "BUTTON",
+          "x": 177.734375,
+          "y": 484,
+          "w": 53.328125,
+          "h": 26
+        }
+      ]
+    },
+    {
+      "route": "analytics",
+      "width": 390,
+      "title": "Analytics · Lectern",
+      "h1": [
+        "Analytics"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAnalytics\n\nWhat you have asked and which sources answered. Stored on the server, so it survives restarts.\n\nThis feature is turned off in the public demo. Run the project locally to use it.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "math",
+      "width": 390,
+      "title": "Math · Lectern",
+      "h1": [
+        "Math"
+      ],
+      "overflow": false,
+      "scrollWidth": 390,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nMath\n\nDifferentiate, integrate, simplify, expand, factor or solve, with the result as typeset math.\n\nEXPRESSION\nCompute\ndifferentiate sin(x)*x^2\nintegrate x^2 + 3x\nsimplify (x^2 - 1)/(x - 1)\nsolve x^2 - 5x + 6 = 0\nexpand (x + 1)^4\nfactor x^3 - x\n\nCommands: differentiate, integrate, simplify, expand, factor, solve … for x, or just an expression. Use ^ for powers; x, pi, sin, log, sqrt and friends are available.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 298,
+          "w": 190.90625,
+          "h": 40
+        },
+        {
+          "text": "Compute",
+          "tag": "BUTTON",
+          "x": 235.90625,
+          "y": 298,
+          "w": 117.09375,
+          "h": 40
+        },
+        {
+          "text": "differentiate sin(x)*x^2",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 350,
+          "w": 198.8125,
+          "h": 26
+        },
+        {
+          "text": "integrate x^2 + 3x",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 384,
+          "w": 155.609375,
+          "h": 26
+        },
+        {
+          "text": "simplify (x^2 - 1)/(x - 1)",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 418,
+          "w": 213.203125,
+          "h": 26
+        },
+        {
+          "text": "solve x^2 - 5x + 6 = 0",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 452,
+          "w": 184.40625,
+          "h": 26
+        },
+        {
+          "text": "expand (x + 1)^4",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 486,
+          "w": 141.203125,
+          "h": 26
+        },
+        {
+          "text": "factor x^3 - x",
+          "tag": "BUTTON",
+          "x": 186.203125,
+          "y": 486,
+          "w": 126.8125,
+          "h": 26
+        }
+      ]
+    },
+    {
+      "route": "ask",
+      "width": 320,
+      "title": "Ask · Lectern",
+      "h1": [
+        "Ask"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAsk\n\nAsk a question about your own material. Answers cite the passages they came from.\n\nYOUR QUESTION\nExplain dynamic programming\nWhat is a hash table?\nDifference between BFS and DFS\nHow does quicksort work?\nSTYLE\nDefault\nELI5 (simple)\nTechnical\nInterview prep\nQuick summary\nPASSAGES\n1\n2\n3\n4\n5\n6\n8\n10\nAsk\nAgentic mode rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)\nAdvanced\n\nPress Ctrl/⌘ + Enter to send.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 318,
+          "w": 246,
+          "h": 96
+        },
+        {
+          "text": "Explain dynamic programming",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 432,
+          "w": 197.609375,
+          "h": 26
+        },
+        {
+          "text": "What is a hash table?",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 466,
+          "w": 146.4375,
+          "h": 26
+        },
+        {
+          "text": "Difference between BFS and DFS",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 500,
+          "w": 214.765625,
+          "h": 26
+        },
+        {
+          "text": "How does quicksort work?",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 534,
+          "w": 176.890625,
+          "h": 26
+        },
+        {
+          "text": "DefaultELI5 (simple)TechnicalInterview prepQuick summary",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 592,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "123456810",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 664,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "Ask",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 716,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 772,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 912,
+          "w": 246,
+          "h": 16
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 965,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 1030.5,
+          "w": 13,
+          "h": 13
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 1082.5,
+          "w": 13,
+          "h": 13
+        }
+      ]
+    },
+    {
+      "route": "sources",
+      "width": 320,
+      "title": "Sources · Lectern",
+      "h1": [
+        "Sources"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nSources\n\nEverything you add is split into passages and indexed, so answers can cite it. Only new or changed files are processed.\n\nDOCUMENTS\n\n…\n\nPASSAGES\n\n…\n\nSEARCH\n\n…\n\nEMBEDDER\n\n…\n\nMy documents\n\nAdd your own PDF or notes. They are read and searched inside this browser: the file is never uploaded, and there is no size limit from the server. Only the few passages that match a question are sent to the model when you ask.\n\nDrop PDFs, .txt or .md files here, or\n\nChoose files\n\nThe first one downloads a small search model (about 25 MB, then cached). Large books take a few minutes.\n\nIndexed sources",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Choose files",
+          "tag": "BUTTON",
+          "x": 102.359375,
+          "y": 783,
+          "w": 115.28125,
+          "h": 40
+        },
+        {
+          "text": "Add my documents",
+          "tag": "INPUT",
+          "x": 159.5,
+          "y": 702,
+          "w": 1,
+          "h": 1
+        }
+      ]
+    },
+    {
+      "route": "study",
+      "width": 320,
+      "title": "Flashcards · Lectern",
+      "h1": [
+        "Flashcards"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nFlashcards\n\nSpaced repetition (SM-2, the scheduler behind Anki). Cards you remember come back less and less often; cards you forget come back tomorrow.\n\nDUE NOW\n\n0\n\nNEW\n\n0\n\nMATURE (21+ DAYS)\n\n0\n\nTOTAL\n\n0\n\nNo flashcards yet\n\nAdd a card below, or let the model write some from your material.\n\nAdd a card\nFRONT (QUESTION)\nBACK (ANSWER)\nAdd card\nWrite cards from your material\n\nThe model reads passages from your sources and writes up to five cards. Review them below; delete any you do not like.\n\nTOPIC (OPTIONAL)\nWriting cards needs the model and your own sources, so it is off in the public demo. Your hand-made cards are saved in this browser only.\nGenerate cards\nDeck (0)",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 768,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 840,
+          "w": 246,
+          "h": 96
+        },
+        {
+          "text": "Add card",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 954,
+          "w": 116.828125,
+          "h": 40
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 1200,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "Generate cards",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 1390,
+          "w": 158.71875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "visualize",
+      "width": 320,
+      "title": "Embedding map · Lectern",
+      "h1": [
+        "Embedding map"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nEmbedding map\n\nEvery passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "agent",
+      "width": 320,
+      "title": "Agent · Lectern",
+      "h1": [
+        "Agent"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAgent\n\nGive it a task. The model decides which tools to use (search your material, read a page, solve math, find a practice problem), and you can watch each call. It stops after a fixed number of steps.\n\nTASK\nExplain how hash tables handle collisions, using my material.\nIntegrate x^2 + 3x, then find an Easy LeetCode problem that uses a hash table.\nWhich of my documents covers graph traversal, and what do they say about BFS?\nMOST STEPS\n3\n4\n5\n6\n7\n8\nRun agent\n\nEach step is a model call; it counts against the daily limit.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "TEXTAREA",
+          "x": 37,
+          "y": 358,
+          "w": 246,
+          "h": 96
+        },
+        {
+          "text": "Explain how hash tables handle collisions, using my material.",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 472,
+          "w": 246,
+          "h": 42
+        },
+        {
+          "text": "Integrate x^2 + 3x, then find an Easy LeetCode problem that uses a has",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 522,
+          "w": 246,
+          "h": 58
+        },
+        {
+          "text": "Which of my documents covers graph traversal, and what do they say abo",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 588,
+          "w": 246,
+          "h": 58
+        },
+        {
+          "text": "345678",
+          "tag": "SELECT",
+          "x": 37,
+          "y": 678,
+          "w": 112,
+          "h": 40
+        },
+        {
+          "text": "Run agent",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 730,
+          "w": 123.671875,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "tutor",
+      "width": 320,
+      "title": "Tutor tools · Lectern",
+      "h1": [
+        "Tutor tools"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nTutor tools\n\nSee how the ideas in a topic connect.\n\nConcept map\nSocratic tutor\nCompare sources\nExplain at my level\nTOPIC\nGenerate map",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Concept map",
+          "tag": "BUTTON",
+          "x": 16,
+          "y": 237,
+          "w": 120.84375,
+          "h": 38
+        },
+        {
+          "text": "Socratic tutor",
+          "tag": "BUTTON",
+          "x": 140.84375,
+          "y": 237,
+          "w": 121.390625,
+          "h": 38
+        },
+        {
+          "text": "Compare sources",
+          "tag": "BUTTON",
+          "x": 266.234375,
+          "y": 237,
+          "w": 149.25,
+          "h": 38
+        },
+        {
+          "text": "Explain at my level",
+          "tag": "BUTTON",
+          "x": 419.484375,
+          "y": 237,
+          "w": 154.15625,
+          "h": 38
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 336,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "Generate map",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 388,
+          "w": 246,
+          "h": 40
+        }
+      ]
+    },
+    {
+      "route": "leetcode",
+      "width": 320,
+      "title": "LeetCode · Lectern",
+      "h1": [
+        "LeetCode"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nLeetCode\n\nSearch a bank of coding problems and get an AI study guide for any of them.\n\nYour study plan\n\n0 solved · 0 attempted\n\nYour marks and notes are saved in this browser only. The personalised plan needs a private deployment; run the project locally to use it.\n\nEasy\nMedium\nHard\n\nPick a problem\n\nOpen one to read it and generate a study guide.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "Search problems",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 480,
+          "w": 246,
+          "h": 40
+        },
+        {
+          "text": "Easy",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 532,
+          "w": 53.03125,
+          "h": 26
+        },
+        {
+          "text": "Medium",
+          "tag": "BUTTON",
+          "x": 98.03125,
+          "y": 532,
+          "w": 71.703125,
+          "h": 26
+        },
+        {
+          "text": "Hard",
+          "tag": "BUTTON",
+          "x": 177.734375,
+          "y": 532,
+          "w": 53.328125,
+          "h": 26
+        }
+      ]
+    },
+    {
+      "route": "analytics",
+      "width": 320,
+      "title": "Analytics · Lectern",
+      "h1": [
+        "Analytics"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nAnalytics\n\nWhat you have asked and which sources answered. Stored on the server, so it survives restarts.\n\nThis feature is turned off in the public demo. Run the project locally to use it.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        }
+      ]
+    },
+    {
+      "route": "math",
+      "width": 320,
+      "title": "Math · Lectern",
+      "h1": [
+        "Math"
+      ],
+      "overflow": false,
+      "scrollWidth": 320,
+      "body": "Lectern\nAsk\nSources\nFlashcards\nLeetCode\nAgent\nTutor tools\nMath\nEmbedding map\nAnalytics\nAPI offline\nMath\n\nDifferentiate, integrate, simplify, expand, factor or solve, with the result as typeset math.\n\nEXPRESSION\nCompute\ndifferentiate sin(x)*x^2\nintegrate x^2 + 3x\nsimplify (x^2 - 1)/(x - 1)\nsolve x^2 - 5x + 6 = 0\nexpand (x + 1)^4\nfactor x^3 - x\n\nCommands: differentiate, integrate, simplify, expand, factor, solve … for x, or just an expression. Use ^ for powers; x, pi, sin, log, sqrt and friends are available.",
+      "targets": [
+        {
+          "text": "Jump to…Ctrl K",
+          "tag": "BUTTON",
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "text": "Ask",
+          "tag": "A",
+          "x": 8,
+          "y": 56,
+          "w": 72.734375,
+          "h": 36
+        },
+        {
+          "text": "Sources",
+          "tag": "A",
+          "x": 84.734375,
+          "y": 56,
+          "w": 102.25,
+          "h": 36
+        },
+        {
+          "text": "Flashcards",
+          "tag": "A",
+          "x": 190.984375,
+          "y": 56,
+          "w": 120.1875,
+          "h": 36
+        },
+        {
+          "text": "LeetCode",
+          "tag": "A",
+          "x": 315.171875,
+          "y": 56,
+          "w": 112.1875,
+          "h": 36
+        },
+        {
+          "text": "Agent",
+          "tag": "A",
+          "x": 431.359375,
+          "y": 56,
+          "w": 87.265625,
+          "h": 36
+        },
+        {
+          "text": "Tutor tools",
+          "tag": "A",
+          "x": 522.625,
+          "y": 56,
+          "w": 118.34375,
+          "h": 36
+        },
+        {
+          "text": "Math",
+          "tag": "A",
+          "x": 644.96875,
+          "y": 56,
+          "w": 81.375,
+          "h": 36
+        },
+        {
+          "text": "Embedding map",
+          "tag": "A",
+          "x": 730.34375,
+          "y": 56,
+          "w": 155.453125,
+          "h": 36
+        },
+        {
+          "text": "Analytics",
+          "tag": "A",
+          "x": 889.796875,
+          "y": 56,
+          "w": 108.6875,
+          "h": 36
+        },
+        {
+          "text": "",
+          "tag": "INPUT",
+          "x": 37,
+          "y": 318,
+          "w": 120.90625,
+          "h": 40
+        },
+        {
+          "text": "Compute",
+          "tag": "BUTTON",
+          "x": 165.90625,
+          "y": 318,
+          "w": 117.09375,
+          "h": 40
+        },
+        {
+          "text": "differentiate sin(x)*x^2",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 370,
+          "w": 198.8125,
+          "h": 26
+        },
+        {
+          "text": "integrate x^2 + 3x",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 404,
+          "w": 155.609375,
+          "h": 26
+        },
+        {
+          "text": "simplify (x^2 - 1)/(x - 1)",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 438,
+          "w": 213.203125,
+          "h": 26
+        },
+        {
+          "text": "solve x^2 - 5x + 6 = 0",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 472,
+          "w": 184.40625,
+          "h": 26
+        },
+        {
+          "text": "expand (x + 1)^4",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 506,
+          "w": 141.203125,
+          "h": 26
+        },
+        {
+          "text": "factor x^3 - x",
+          "tag": "BUTTON",
+          "x": 37,
+          "y": 540,
+          "w": 126.8125,
+          "h": 26
+        }
+      ]
+    }
+  ]
+}
