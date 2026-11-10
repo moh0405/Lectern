@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorNotice, Notice, Skeleton } from "@/components/ui/feedback";
 import { Label, Select } from "@/components/ui/field";
@@ -30,7 +31,7 @@ export function VisualizeView() {
         title="Embedding map"
         description="Every passage you indexed, placed in 3D by how similar its meaning is. Passages from the same topic should cluster."
       />
-      {q.isError ? <ErrorNotice>{errorMessage(q.error)}</ErrorNotice> : null}
+      {q.isError ? <div className="mb-4 space-y-3"><ErrorNotice>{errorMessage(q.error)}</ErrorNotice><Button variant="secondary" disabled={q.isFetching} onClick={() => void q.refetch()}>{q.isFetching ? "Checking…" : "Try loading the map again"}</Button></div> : null}
 
       {q.isPending ? (
         <Skeleton className="h-[30rem]" />

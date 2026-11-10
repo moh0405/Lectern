@@ -337,6 +337,7 @@ export function AskView() {
           <TurnCard
             key={t.id}
             turn={t}
+            busy={busy}
             onStop={() => stop(t.id)}
             onRemove={() => remove(t.id)}
             onFresh={() =>

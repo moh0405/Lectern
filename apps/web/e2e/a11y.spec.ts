@@ -24,7 +24,7 @@ async function violations(page: Page) {
 
 const PAGES: [string, string, (page: Page) => Promise<void>][] = [
   ["Ask", "/ask", async () => {}],
-  ["Sources", "/sources", async (p) => void (await p.getByText("Indexed sources").waitFor())],
+  ["Sources", "/sources", async (p) => void (await p.getByRole("heading", { name: "Indexed sources", exact: true }).waitFor())],
   ["Flashcards", "/study", async (p) => void (await p.getByRole("button", { name: "Show answer" }).waitFor())],
   ["LeetCode", "/leetcode?q=two+sum&p=1", async (p) => void (await p.getByLabel("Problem detail").getByRole("heading").first().waitFor())],
   ["Agent", "/agent", async () => {}],

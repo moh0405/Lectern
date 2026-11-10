@@ -196,3 +196,18 @@ describe("TurnCard clipboard recovery", () => {
     write.mockRestore();
   });
 });
+
+describe("retry after a failed answer", () => {
+  it("keeps the original question visible and retries only when requested", async () => {
+    const onFresh=vi.fn();
+    render(<TurnCard turn={turn({status:"error",error:{code:"rate_limited",message:"Wait about a minute, then try again."}})} onStop={()=>{}} onRemove={()=>{}} onFresh={onFresh} />);
+    expect(screen.getByRole("heading",{name:"what is a heap"})).toBeInTheDocument();
+    expect(onFresh).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button",{name:"Try this question again"}));
+    expect(onFresh).toHaveBeenCalledTimes(1);
+  });
+  it("disables another retry while a question is running", () => {
+    render(<TurnCard turn={turn({status:"error",error:{code:"rate_limited",message:"Wait before retrying."}})} onStop={()=>{}} onRemove={()=>{}} onFresh={()=>{}} busy />);
+    expect(screen.getByRole("button",{name:"Try this question again"})).toBeDisabled();
+  });
+});

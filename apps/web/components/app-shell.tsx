@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { NAV } from "@/lib/nav";
-import { api, unwrap } from "@/lib/api";
+import { api, ApiError, unwrap } from "@/lib/api";
 import { useDemo } from "@/lib/demo";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -37,16 +37,16 @@ function ReadingTheme() {
 }
 
 function ApiStatus() {
-  const { data, isError, isPending } = useQuery({
+  const { data, isError, isPending, error } = useQuery({
     queryKey: ["health"],
     queryFn: async () => unwrap(await api.http.GET("/health")),
     refetchInterval: 30_000,
     retry: false,
   });
-  const state = isPending ? "checking" : isError ? "offline" : "online";
+  const state = isPending ? "checking" : error instanceof ApiError && error.status === 429 ? "busy" : isError ? "offline" : "online";
   return <div className="api-status" title={data ? `API v${data.version}` : undefined} role="status">
     <span aria-hidden="true" className={cn("api-status-dot", state)} />
-    {state === "online" && data ? `${plural(data.chunks, "chunk")} · ${data.semantic_search ? "semantic" : "keyword"} search` : state === "offline" ? "API offline" : "Connecting…"}
+    {state === "online" && data ? `${plural(data.chunks, "chunk")} · ${data.semantic_search ? "semantic" : "keyword"} search` : state === "busy" ? "Service busy · retrying shortly" : state === "offline" ? "API offline" : "Connecting…"}
   </div>;
 }
 

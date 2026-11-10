@@ -1,0 +1,15 @@
+{
+  "origin": "https://lectern-tutor.vercel.app",
+  "question": "In two sentences, what is a binary heap?",
+  "answer": "A binary heap is a binary tree data structure that acts as a hybrid between a binary tree and an array list, serving as the most common implementation for the priority queue abstract data type [Introduction to Computer Science.pdf (page 107)]. It stores data as an array list in memory and organizes elements based on the heap property, which requires the priority value of each node to be greater than or equal to the priority values of its children [Introduction to Computer Science.pdf (page 107)].",
+  "responses": [
+    {
+      "url": "https://lectern-tutor.vercel.app/api/backend/api/v1/ask/stream",
+      "status": 200
+    }
+  ],
+  "pageErrors": [],
+  "sourceCount": 3,
+  "theme": "light",
+  "caption": "Actual hosted interface and response from the shared textbook corpus; not a new answer-quality evaluation."
+}

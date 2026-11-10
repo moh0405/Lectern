@@ -47,3 +47,13 @@ Physical touch devices, real Safari on hardware, cloud latency and semantic embe
 Existing end-to-end expectations were updated to use the visible Advanced disclosure, the new confirmed deletion step, the user-facing passage terminology, and warning-specific status regions. Assertions continue to check the original behavior. The new library health status remains accessible without making unrelated warning assertions ambiguous.
 
 The Python backend and generated API contracts are unchanged. These UI checks do not establish answer accuracy, a new retrieval benchmark, or clinical/production semantic quality. Deployment and portfolio capture follow this local verification.
+
+## Follow-up: hosted capacity and recovery
+
+A live browser sweep reproduced raw429responses, including health requests. Read-only AWS checks confirmed an account concurrency quota of10; the function reached10concurrent executions and CloudWatch recorded12throttles in the diagnostic window. A later hosted answer request succeeded (HTTP200, visible Gemini3.6response and source citations), so deployment failure and permanent provider unavailability were not established. No AWS quota, concurrency reservation, budget, or backend code was changed.
+
+The frontend now distinguishes busy capacity from an offline API, explains bare429responses, and offers explicit retry actions for answers and the embedding map. Answer retries are disabled while another answer is streaming. The proxy coalesces successful shared metadata requests and caches them for10seconds per process, with64entry/1MiB retention bounds. Private/write-enabled deployments, search, questions, writes and error responses bypass this cache. Configuration and key rotation are isolated; one caller's cancellation cannot cancel other waiters. Shared metadata requests have a60second deadline to accommodate a cold backend.
+
+169unit tests passed, including cache expiry/error/configuration/abort/bounds and busy/retry regressions. The61-test production integration run completed; an old partial-text Sources readiness selector matched both a heading and the new loading announcement, then passed on retry. That selector now targets the exact heading; the focused accessibility/capacity rerun passed all13tests without retries. No automatic live stress sweep will be repeated against the constrained backend.
+
+Live captures in `live/` show the actual hosted workspace and a response from its shared textbook corpus. They are interface/provenance evidence, not a new retrieval or answer-quality benchmark. The final portfolio uses these hosted captures; independent staging screenshots remain labelled FakeGemini fixtures.

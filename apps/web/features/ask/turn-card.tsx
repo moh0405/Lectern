@@ -179,11 +179,13 @@ export function TurnCard({
   onStop,
   onRemove,
   onFresh,
+  busy = false,
 }: {
   turn: Turn;
   onStop: () => void;
   onRemove: () => void;
   onFresh?: () => void;
+  busy?: boolean;
 }) {
   const streaming = turn.status === "streaming";
   const noKey = turn.error?.code === "llm_unavailable";
@@ -217,7 +219,7 @@ export function TurnCard({
           ) : (
             <>
               {turn.cached && onFresh ? (
-                <Button variant="ghost" size="sm" onClick={onFresh}>
+                <Button variant="ghost" size="sm" onClick={onFresh} disabled={busy}>
                   Fresh answer
                 </Button>
               ) : null}
@@ -245,7 +247,7 @@ export function TurnCard({
           found.
         </Notice>
       ) : turn.error ? (
-        <ErrorNotice>{turn.error.message}</ErrorNotice>
+        <div className="space-y-3"><ErrorNotice>{turn.error.message}</ErrorNotice>{onFresh ? <Button variant="secondary" onClick={onFresh} disabled={busy}>Try this question again</Button> : null}</div>
       ) : null}
 
       <AgentSteps turn={turn} />
