@@ -1,5 +1,7 @@
 # Lectern
 
+**Agent continuation:** read [HANDOFF.md](HANDOFF.md) for the live/prototype distinction, latest user feedback, design previews and validation.
+
 > Formerly *AI Study Mentor*. The GitHub repository, app and documentation now use the name Lectern.
 
 **A retrieval-augmented tutor for Computer Science study material: ask questions of your own textbooks, lectures and repos, and get answers with citations that are checked against the passages the model actually saw.**

@@ -1,0 +1,50 @@
+{
+  "checks": [
+    {
+      "name": "a wide opening uses viewport",
+      "pass": true
+    },
+    {
+      "name": "a sample content appears",
+      "pass": true
+    },
+    {
+      "name": "a narrow layout fits",
+      "pass": true
+    },
+    {
+      "name": "b wide opening uses viewport",
+      "pass": true
+    },
+    {
+      "name": "b sample content appears",
+      "pass": true
+    },
+    {
+      "name": "b narrow layout fits",
+      "pass": true
+    },
+    {
+      "name": "c wide opening uses viewport",
+      "pass": true
+    },
+    {
+      "name": "c sample content appears",
+      "pass": true
+    },
+    {
+      "name": "Local quiz gives honest deterministic feedback",
+      "pass": true
+    },
+    {
+      "name": "c narrow layout fits",
+      "pass": true
+    },
+    {
+      "name": "Three option links are available",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "external": []
+}

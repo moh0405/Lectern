@@ -1,0 +1,45 @@
+{
+  "checks": [
+    {
+      "name": "Full width remains",
+      "pass": true
+    },
+    {
+      "name": "Citation connector has a drawn path",
+      "pass": true
+    },
+    {
+      "name": "Keyboard citation selection updates the exact source",
+      "pass": true
+    },
+    {
+      "name": "Source context expands",
+      "pass": true
+    },
+    {
+      "name": "Trace is user controlled",
+      "pass": true
+    },
+    {
+      "name": "Chaining collision actually changes the visual",
+      "pass": true
+    },
+    {
+      "name": "Probing shows its different behavior",
+      "pass": true
+    },
+    {
+      "name": "Keeping an idea preserves edited text",
+      "pass": true
+    },
+    {
+      "name": "Understanding check has working local feedback",
+      "pass": true
+    },
+    {
+      "name": "New reflection flow fits phone",
+      "pass": true
+    }
+  ],
+  "errors": []
+}
