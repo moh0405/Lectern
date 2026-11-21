@@ -211,3 +211,37 @@ describe("retry after a failed answer", () => {
     expect(screen.getByRole("button",{name:"Try this question again"})).toBeDisabled();
   });
 });
+
+describe("citation chips on the Evidence Desk", () => {
+  const answer = "A heap keeps the smallest key on top [heaps.pdf (page 1)]. Also [Invented.pdf (page 9)].";
+  const citations = [
+    { label: "heaps.pdf (page 1)", doc: "heaps.pdf", page: 1, status: "ok" as const },
+    { label: "Invented.pdf (page 9)", doc: "Invented.pdf", page: 9, status: "unknown_source" as const },
+  ];
+
+  it("turns checked citations into chips that open the passage", async () => {
+    const onSelect = vi.fn();
+    render(<TurnCard turn={turn({ answer, chunks, citations })} onStop={() => {}} onRemove={() => {}} selection={{ ref: null, chunk: null }} onSelect={onSelect} />);
+    const chip = screen.getByRole("button", { name: /Citation heaps\.pdf \(page 1\): show passage 1/ });
+    expect(chip).toHaveTextContent("01");
+    expect(screen.queryByText(/\[heaps\.pdf \(page 1\)\]/)).toBeNull();
+    await userEvent.click(chip);
+    expect(onSelect).toHaveBeenCalledWith({ ref: 0, chunk: 0 });
+    expect(screen.getByText(/Select a citation to open its passage/)).toBeInTheDocument();
+  });
+
+  it("marks an invented citation as unverified instead of linking it to a passage", async () => {
+    const onSelect = vi.fn();
+    render(<TurnCard turn={turn({ answer, chunks, citations })} onStop={() => {}} onRemove={() => {}} selection={{ ref: 1, chunk: null }} onSelect={onSelect} />);
+    const chip = screen.getByRole("button", { name: /Unverified citation Invented\.pdf \(page 9\)/ });
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(chip);
+    expect(onSelect).toHaveBeenCalledWith({ ref: 1, chunk: null });
+  });
+
+  it("keeps the citation text as written outside the desk and while streaming", () => {
+    render(<TurnCard turn={turn({ answer, chunks, citations, status: "streaming" })} onStop={() => {}} onRemove={() => {}} onSelect={() => {}} />);
+    expect(screen.getByText(/\[heaps\.pdf \(page 1\)\]/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Citation heaps/ })).toBeNull();
+  });
+});

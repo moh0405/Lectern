@@ -15,7 +15,7 @@ test("agentic mode shows what the workflow did and answers from the passages it 
 
   const answer = page.locator(".md-body").first();
   await expect(answer).toContainText("From your material", { timeout: 30_000 });
-  await expect(answer).toContainText("[heaps.pdf (page 1)]");
+  await expect(page.getByRole("button", { name: /^Citation heaps\.pdf \(page 1\)/ }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("agentic", { exact: true })).toBeVisible();
 
   const how = page.getByLabel("How it answered");
@@ -35,7 +35,8 @@ test("an answer that invents a source is rewritten, and the result is clean", as
   await page.getByRole("button", { name: "Ask", exact: true }).click();
 
   const answer = page.locator(".md-body").first();
-  await expect(answer).toContainText("[heaps.pdf (page 1)]", { timeout: 30_000 });
+  await expect(answer).toContainText("From your material", { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: /^Citation heaps\.pdf \(page 1\)/ }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/cited sources it was not given, so it was rewritten/)).toBeAttached();
   await expect(answer).not.toContainText("Invented Notes.pdf");
   await expect(page.getByRole("status").filter({ hasText: "cites something it was not given" })).toHaveCount(0); // no warning: the final answer is clean

@@ -28,7 +28,14 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
 
   const answer = page.locator(".md-body").first();
   await expect(answer).toContainText("From your material", { timeout: 20_000 });
-  await expect(answer).toContainText("[heaps.pdf (page 1)]");
+  // the checked citation becomes a chip that opens its passage in the source margin
+  const chip = answer.getByRole("button", { name: /^Citation heaps\.pdf \(page 1\): show passage 1/ });
+  await expect(chip).toHaveText("01");
+  await expect(chip).toHaveAttribute("aria-pressed", "true"); // the first citation is open by default
+  const margin = page.getByRole("complementary", { name: "Source margin" });
+  await expect(margin.getByRole("region", { name: /Passage 1: heaps\.pdf · page 1/ })).toBeVisible();
+  await expect(margin.locator("mark")).toHaveCount(1); // the sentence closest to the citing sentence
+  await expect(page.getByRole("button", { name: "Trace on" })).toHaveAttribute("aria-pressed", "true");
 
   // 3) the retrieved passage is listed as a source, with the query term highlighted
   const summary = page.getByText("Sources (").first();
@@ -47,7 +54,7 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
   await expect(page.getByRole("button", { name: "Copy answer" }).first()).toBeVisible();
   await page.reload();
   await expect(heading).toBeVisible();
-  await expect(page.locator(".md-body").first()).toContainText("[heaps.pdf (page 1)]");
+  await expect(page.locator(".md-body").first().getByRole("button", { name: /^Citation heaps\.pdf/ })).toBeVisible();
   await page.getByRole("button", { name: /Clear session/ }).click();
   await expect(heading).toHaveCount(0);
 });
@@ -103,10 +110,17 @@ test("flags a citation the model invented, and reuses a repeated answer", async 
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByText("cached", { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Fresh answer" }).click();
-  const turns = page.getByRole("heading", { name: /hallucinate about binary heaps/i });
+  const session = page.getByRole("list", { name: "This session" });
+  const turns = session.getByRole("button", { name: /hallucinate about binary heaps/i });
   await expect(turns).toHaveCount(3, { timeout: 20_000 }); // the fresh answer is a new turn
   await expect(page.locator(".md-body").first()).toContainText("From your material", { timeout: 20_000 });
-  await expect(page.getByText("cached", { exact: true })).toHaveCount(1); // only the earlier repeat was cached; the new one is not
+  await expect(page.getByText("cached", { exact: true })).toHaveCount(0); // the desk shows the fresh answer, which is not cached
+  await turns.nth(1).click(); // the earlier repeat, picked from the session list, was the cached one
+  await expect(page.getByText("cached", { exact: true })).toHaveCount(1);
+  // the invented citation is marked, and the margin explains instead of showing a passage
+  await turns.nth(2).click();
+  await page.locator(".md-body").first().getByRole("button", { name: /^Unverified citation Invented Notes\.pdf/ }).click();
+  await expect(page.getByRole("complementary", { name: "Source margin" }).getByText("This citation could not be checked")).toBeVisible();
 });
 
 test("a source can be deleted (with confirmation)", async ({ page }) => {

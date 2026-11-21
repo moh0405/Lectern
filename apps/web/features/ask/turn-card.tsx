@@ -2,22 +2,26 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
+  ArrowUpRight,
   BookOpen,
   Check,
   ChevronDown,
   Copy,
   Layers,
+  Link2,
+  Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { ChunkCard } from "@/components/chunk-card";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { pageLabel } from "@/lib/format";
+import { CITE_PREFIX, linkCitations, twoDigits, type CiteRef } from "./citations";
 import { plainText } from "./flashcards";
 import type { Turn } from "./session";
 import styles from "./ask.module.css";
@@ -174,26 +178,80 @@ function CitationWarnings({ turn }: { turn: Turn }) {
   );
 }
 
+/** What the source margin is showing: a citation chip (ref) and/or a retrieved passage (chunk). */
+export interface Selection {
+  ref: number | null;
+  chunk: number | null;
+}
+
+function CitationChip({ refInfo, active, onSelect }: { refInfo: CiteRef; active: boolean; onSelect: () => void }) {
+  const verified = refInfo.chunk !== null;
+  const label = verified
+    ? `Citation ${refInfo.label}: show passage ${refInfo.chunk! + 1} in the source margin`
+    : `Unverified citation ${refInfo.label}: ${CITE_PROBLEM[refInfo.status] ?? "it could not be matched to a passage"}`;
+  return (
+    <button
+      type="button"
+      className={verified ? "cite-chip" : "cite-chip unverified"}
+      aria-pressed={active}
+      aria-label={label}
+      title={refInfo.label}
+      data-cite-active={active ? "true" : undefined}
+      onClick={onSelect}
+    >
+      {verified ? (
+        <>
+          {twoDigits(refInfo.chunk! + 1)}
+          <ArrowUpRight aria-hidden="true" />
+        </>
+      ) : (
+        <>
+          <AlertTriangle aria-hidden="true" />?
+        </>
+      )}
+    </button>
+  );
+}
+
 export function TurnCard({
   turn,
   onStop,
   onRemove,
   onFresh,
   busy = false,
+  selection,
+  onSelect,
 }: {
   turn: Turn;
   onStop: () => void;
   onRemove: () => void;
   onFresh?: () => void;
   busy?: boolean;
+  /** On the Evidence Desk: which citation is open in the source margin, and how to open another. */
+  selection?: Selection;
+  onSelect?: (selection: Selection) => void;
 }) {
   const streaming = turn.status === "streaming";
   const noKey = turn.error?.code === "llm_unavailable";
+  // Citations become chips once the server has checked them (at the end of the stream).
+  const linked = useMemo(
+    () => (onSelect && turn.status === "done" ? linkCitations(turn.answer, turn.citations, turn.chunks) : null),
+    [onSelect, turn.status, turn.answer, turn.citations, turn.chunks],
+  );
+  const renderLink = useCallback(
+    (href: string) => {
+      if (!linked || !href.startsWith(CITE_PREFIX)) return undefined;
+      const ref = linked.refs[Number(href.slice(CITE_PREFIX.length))];
+      if (!ref) return undefined;
+      return <CitationChip refInfo={ref} active={selection?.ref === ref.id} onSelect={() => onSelect?.({ ref: ref.id, chunk: ref.chunk })} />;
+    },
+    [linked, selection?.ref, onSelect],
+  );
   return (
-    <Card className={`space-y-4 ${styles.turn}`} aria-busy={streaming}>
+    <div className={`space-y-4 ${styles.turn}`} aria-busy={streaming}>
       <div className={styles.turnHeading}>
         <div className="min-w-0">
-          <p className={styles.eyebrow}>YOUR QUESTION</p>
+          <p className={styles.eyebrow}>From a question to its evidence</p>
           <h2 className={styles.turnQuestion}>{turn.question}</h2>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {turn.mode ? <Badge>{MODE_LABEL[turn.mode]}</Badge> : null}
@@ -253,15 +311,26 @@ export function TurnCard({
       <AgentSteps turn={turn} />
 
       {turn.answer || streaming ? (
-        <div className={styles.answer} aria-live="polite">
+        <div className={styles.answer} aria-live="polite" data-step="evidence">
           <p className={styles.answerLabel}>
-            {streaming ? "Building your answer" : "Answer"}
+            <Sparkles aria-hidden="true" />
+            {streaming ? "Building your answer" : "An explanation you can inspect"}
           </p>
           {turn.answer ? (
-            <Markdown streaming={streaming}>{turn.answer}</Markdown>
+            <Markdown streaming={streaming} renderLink={linked?.refs.length ? renderLink : undefined}>
+              {linked?.markdown ?? turn.answer}
+            </Markdown>
           ) : (
             <p className="text-sm text-muted">Thinking…</p>
           )}
+          {linked?.refs.some((r) => r.chunk !== null) ? (
+            <p className={styles.traceHint}>
+              <Link2 aria-hidden="true" />
+              <span>
+                <strong>Read the connection.</strong> Select a citation to open its passage in the source margin.
+              </span>
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -282,6 +351,7 @@ export function TurnCard({
         <details
           open={!turn.answer || turn.status === "error"}
           className={styles.evidence}
+          data-step="evidence"
         >
           <summary className={styles.evidenceSummary}>
             <BookOpen aria-hidden="true" />
@@ -305,7 +375,14 @@ export function TurnCard({
           </summary>
           <div className={styles.passages}>
             {turn.chunks.map((c, i) => (
-              <ChunkCard key={i} chunk={c} query={turn.question} index={i} />
+              <div key={i} className={styles.passage}>
+                <ChunkCard chunk={c} query={turn.question} index={i} />
+                {onSelect ? (
+                  <button type="button" className={styles.passageOpen} aria-pressed={selection?.chunk === i && selection.ref === null} onClick={() => onSelect({ ref: null, chunk: i })}>
+                    Open passage {i + 1} in the margin
+                  </button>
+                ) : null}
+              </div>
             ))}
           </div>
         </details>
@@ -314,6 +391,6 @@ export function TurnCard({
           No matching passages were found in your sources.
         </p>
       ) : null}
-    </Card>
+    </div>
   );
 }

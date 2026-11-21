@@ -2,6 +2,7 @@
 
 import "highlight.js/styles/github-dark.css";
 import "katex/dist/katex.min.css";
+import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
@@ -19,12 +20,15 @@ export function Markdown({
   className,
   streaming,
   breaks,
+  renderLink,
 }: {
   children: string;
   className?: string;
   streaming?: boolean;
   /** Keep single newlines as line breaks (for plain-text problem statements). */
   breaks?: boolean;
+  /** Render some links differently (the Ask page turns `#cite-n` links into citation chips). Return undefined for a normal link. */
+  renderLink?: (href: string, children: ReactNode) => ReactNode | undefined;
 }) {
   return (
     <div className={cn("md-body", streaming && "streaming-cursor", className)}>
@@ -32,11 +36,12 @@ export function Markdown({
         remarkPlugins={breaks ? [remarkGfm, remarkMath, remarkBreaks] : [remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex, [rehypeHighlight, { detect: false, ignoreMissing: true }]]}
         components={{
-          a: ({ href, children: c }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {c}
-            </a>
-          ),
+          a: ({ href, children: c }) =>
+            (href && renderLink?.(href, c)) ?? (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {c}
+              </a>
+            ),
         }}
       >
         {children}

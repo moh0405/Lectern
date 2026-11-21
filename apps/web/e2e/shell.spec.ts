@@ -21,9 +21,15 @@ test("navigation marks the current page and works on a phone-sized screen", asyn
   await page.goto("/ask");
   const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav.getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page");
-  await nav.getByRole("link", { name: "Sources" }).click();
+  await nav.getByRole("link", { name: "Library" }).click();
   await expect(page).toHaveURL(/\/sources$/);
   await expect(page.getByRole("heading", { name: "Sources", exact: true })).toBeVisible();
+  // Practice and Tools group several pages; each section lists its own pages
+  await nav.getByRole("link", { name: "Tools" }).click();
+  await expect(page).toHaveURL(/\/tutor$/);
+  await page.getByRole("navigation", { name: "Tools pages" }).getByRole("link", { name: "Math" }).click();
+  await expect(page).toHaveURL(/\/math$/);
+  await expect(nav.getByRole("link", { name: "Tools" })).toHaveClass(/active/);
   // no horizontal page scroll on mobile
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

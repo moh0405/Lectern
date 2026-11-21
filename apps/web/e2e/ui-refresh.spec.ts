@@ -70,37 +70,37 @@ test("the question remains reachable and unobscured after keyboard focus on a na
 });
 
 
-test("all phone tools are discoverable, keyboard reachable and close on navigation", async ({ page }) => {
+test("every page is reachable from the four sections on a phone, by keyboard", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ask");
-  const open = page.getByRole("button", { name: "All tools", exact: true });
-  await expect(open).toBeVisible();
-  await expect.poll(() => open.evaluate(e => { const b = e.getBoundingClientRect(); return b.width >= 44 && b.height >= 44; })).toBe(true);
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
-  await expect(nav.getByRole("link", { name: "Ask", exact: true })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Sources", exact: true })).toBeVisible();
-  await open.focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: "Close tools", exact: true })).toHaveAttribute("aria-expanded", "true");
-  for (const name of ["Flashcards", "Tutor tools", "Math", "LeetCode", "Agent", "Embedding map", "Analytics"]) {
+  for (const name of ["Ask", "Library", "Practice", "Tools"]) {
     const link = nav.getByRole("link", { name, exact: true });
     await expect(link).toBeVisible();
-    await link.focus();
+    await expect.poll(() => link.evaluate(e => { const b = e.getBoundingClientRect(); return b.height >= 44; })).toBe(true);
     await expect.poll(() => withinViewport(link)).toBe(true);
   }
-  await page.keyboard.press("Escape");
-  await expect(open).toBeFocused();
-  await expect(open).toHaveAttribute("aria-expanded", "false");
-  await open.click();
-  await nav.getByRole("link", { name: "Embedding map", exact: true }).click();
+  const groups = [["Practice", ["Flashcards", "LeetCode"]], ["Tools", ["Tutor tools", "Math", "Agent", "Embedding map", "Analytics"]]] as const;
+  for (const [section, pages] of groups) {
+    await nav.getByRole("link", { name: section, exact: true }).focus();
+    await page.keyboard.press("Enter");
+    const sub = page.getByRole("navigation", { name: `${section} pages`, exact: true });
+    for (const name of pages) {
+      const link = sub.getByRole("link", { name, exact: true });
+      await link.focus();
+      await expect(link).toBeFocused();
+    }
+  }
+  await page.getByRole("navigation", { name: "Tools pages", exact: true }).getByRole("link", { name: "Embedding map", exact: true }).click();
   await expect(page).toHaveURL(/\/visualize$/);
-  await expect(open).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("link", { name: "Embedding map", exact: true })).toHaveAttribute("aria-current", "page");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test("reading theme survives navigation and reload and can be changed from the keyboard", async ({ page }) => {
   await page.goto("/ask");
   await setReadingTheme(page, "light");
-  await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Sources", exact: true }).click();
+  await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Library", exact: true }).click();
   await expect(page).toHaveURL(/\/sources$/);
   await page.reload();
   await expect(page.getByRole("button", { name: "Switch to dark theme", exact: true })).toBeVisible();

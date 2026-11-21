@@ -1,6 +1,6 @@
 # Evidence Desk: implementation plan
 
-Status: **approved direction, not yet built** (decided 21 November 2026).
+Status: **Phases 0–1 implemented** on branch `moh0405/evidence-desk` (direction decided 21 November 2026). Phases 2–7 not started.
 Prototype: [`design-options/`](design-options/README.md), concept A (`?concept=a&state=answer`).
 Background: [`HANDOFF.md`](../../HANDOFF.md).
 
@@ -68,6 +68,8 @@ Each phase ends with passing checks and is its own PR. Phases 1–2 deliver the 
 
 **Done when:** tokens and primitives exist, both themes pass contrast checks, no page changes yet.
 
+*Built:* tokens in `app/globals.css` (dark desk, warm paper, light theme), Manrope/Plex Mono via `next/font/local` (`app/fonts/`), Georgia for passages; shared `.eyebrow`, `.paper`, `.cite-chip` classes. Primary buttons now use dark text on the lighter accent (`--color-accent-fg`).
+
 ### Phase 1: Evidence Desk shell and Ask page (the redesign)
 - **Shell (`components/app-shell.tsx`):** top bar with Lectern mark, primary nav **Ask / Library / Practice / Tools**, command search (Ctrl/Cmd+K), theme toggle. Existing routes stay reachable: Library = Sources; Practice = Study + LeetCode; Tools = Tutor, Math, Visualize, Agent, Analytics.
 - **Left rail:** "Your library" (server textbook index + browser-local documents) and recent questions from history/session.
@@ -80,6 +82,11 @@ Each phase ends with passing checks and is its own PR. Phases 1–2 deliver the 
 - **Never** show the prototype's illustrative collision content; the empty state is real suggestions from `/suggestions`.
 
 **Done when:** Ask matches the refined prototype at 1440/768/390/320 in both themes with real streamed data; cancel, retry, busy (429) and citation warnings work; demo mode works with browser-local documents; e2e and visual suites updated.
+
+*Built, with two differences from the outline above:*
+- Below 1180px the columns stack (answer, then source margin, then library) instead of opening the margin as a sheet. This matches the prototype's phone layout and keeps every passage reachable without a dialog.
+- The Understanding step uses what already exists (study notes and export, links to flashcards and the Socratic tutor) rather than a stub. Phase 4 replaces it.
+- Code: `components/app-shell.tsx`, `lib/sections.ts`, `features/ask/{ask-view,turn-card,source-margin,trace-line,citations}.tsx?`, `features/ask/ask.module.css`.
 
 ### Phase 2: Guided mode (hints before the answer)
 - Composer toggle: **Answer** (default) / **Guided**.

@@ -44,17 +44,19 @@ export function CommandPalette() {
     router.push(href);
   };
 
-  const row = "flex cursor-pointer items-center justify-between rounded-md px-3 py-2 text-sm aria-selected:bg-accent/25";
+  const row = "flex cursor-pointer items-center justify-between rounded-md px-3 py-2 text-sm aria-selected:bg-accent/15 aria-selected:text-fg";
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
         className="workspace-jump"
+        aria-label="Find a page or tool"
+        aria-keyshortcuts="Control+K Meta+K"
       >
-        <Search className="h-3.5 w-3.5" />
-        <span className="flex-1 text-left">Jump to…</span>
-        <kbd className="rounded border border-border px-1.5 font-mono">⌘ / Ctrl K</kbd>
+        <Search aria-hidden="true" className="h-3.5 w-3.5" />
+        <span className="flex-1 text-left">Find a page or tool</span>
+        <kbd aria-hidden="true" className="rounded border border-border px-1.5 font-mono">⌘ / Ctrl K</kbd>
       </button>
       <Command.Dialog
         open={open}

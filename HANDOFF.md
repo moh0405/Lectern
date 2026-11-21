@@ -4,7 +4,7 @@ Last saved: **9 November 2026**. This file distinguishes the live product from t
 
 ## Current user direction
 
-**Update, 21 November 2026:** the user chose **A: Evidence Desk** and asked for a full implementation plan, including ideas borrowed from the attempt-first tutor Askretes. The plan is [docs/ui-refresh/EVIDENCE_DESK_PLAN.md](docs/ui-refresh/EVIDENCE_DESK_PLAN.md). Implementation has not started; begin with its Phase 0–1. The notes below describe the state before this decision.
+**Update, 21 November 2026:** the user chose **A: Evidence Desk** and asked for a full implementation plan, including ideas borrowed from the attempt-first tutor Askretes. The plan is [docs/ui-refresh/EVIDENCE_DESK_PLAN.md](docs/ui-refresh/EVIDENCE_DESK_PLAN.md). Phases 0–1 (design foundations, new shell, Evidence Desk Ask page) are implemented on `moh0405/evidence-desk`; the next phase is 2 (Guided hints). The notes below describe the state before this decision.
 
 The user rejected the recently deployed Lectern layout. Their screenshot shows a narrow, centered application, small controls, a large form and substantial unused space. They want the project to look distinctive, use the available width properly, and see proposed designs before another implementation.
 
