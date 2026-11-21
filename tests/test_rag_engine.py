@@ -46,6 +46,20 @@ def test_semantic_retrieval_ranks_relevant_chunk_first(engine):
     assert results[0]["score"] >= results[1]["score"]
 
 
+def test_hashing_embedder_is_not_reported_as_semantic_search(engine):
+    """The hashing embedder is lexical (auto mode uses BM25 with it), so the API must not call it semantic."""
+    engine.retrieve_context("hash table", k=1)
+    engine.warm()
+    assert engine.semantic_ready and not engine.semantic_search
+
+    real = HashingEmbedder(dim=EMB.dim)
+    real.name = "sentence-transformers/all-MiniLM-L6-v2"  # stands in for a real semantic model
+    engine._embedder = real
+    assert engine.semantic_search
+    engine.retrieval_mode = "bm25"
+    assert not engine.semantic_search
+
+
 def test_keyword_retrieval_ranks_relevant_chunk_first(keyword_engine):
     results = keyword_engine.retrieve_context("what is a linked list", k=3)
     assert results[0]["doc"] == "ds.pdf" and results[0]["page"] == 3

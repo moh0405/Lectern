@@ -127,6 +127,14 @@ class RAGEngine:
     def semantic_ready(self) -> bool:
         return self.use_embeddings and self._embedder is not None and not self._embedder_failed and bool(len(self.store))
 
+    @property
+    def semantic_search(self) -> bool:
+        """True when searches really rank by meaning: an embedder is loaded, it is not the (lexical) hashing
+        embedder, and the retrieval mode uses embeddings. This is what the API reports as `semantic_search`."""
+        if not self.semantic_ready or self.retrieval_mode in {"keyword", "bm25"}:
+            return False
+        return not (self._embedder is not None and self._embedder.name.startswith("hashing"))
+
     # ------------------------------------------------------------------
     # Corpus access
     # ------------------------------------------------------------------

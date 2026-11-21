@@ -260,7 +260,7 @@ def test_both_secrets_are_loaded_and_the_api_key_turns_on_authentication(monkeyp
     monkeypatch.setattr(settings, "s3_bucket", "b")
     monkeypatch.setattr(settings, "store_dir", tmp_path / "s")
     monkeypatch.setattr(settings, "study_db", tmp_path / "d.db")
-    monkeypatch.setattr(app_mod, "make_engine", lambda: type("E", (), {"warm": lambda self: None, "semantic_ready": False, "store": []})())
+    monkeypatch.setattr(app_mod, "make_engine", lambda: type("E", (), {"warm": lambda self: None, "semantic_ready": False, "semantic_search": False, "store": []})())
     with TestClient(app_mod.create_app()) as client:
         assert client.get("/api/v1/stats").status_code == 401
         assert client.get("/api/v1/stats", headers={"X-API-Key": "wrong"}).status_code == 401

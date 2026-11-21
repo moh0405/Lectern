@@ -1148,7 +1148,7 @@ export interface components {
             chunks: number;
             /**
              * Semantic Search
-             * @description True when the embedder matching the index is loaded
+             * @description True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder
              */
             semantic_search: boolean;
             /**
