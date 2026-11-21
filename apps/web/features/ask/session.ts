@@ -73,6 +73,7 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
       ];
     case "resume":
       return update(turns, action.id, (t) => ({ ...t, status: "streaming", error: undefined, agent: action.agent ?? t.agent,
+        ...(action.evidence ? { answer: "", chunks: [], citations: undefined, uncited: undefined, cached: undefined, prompt: undefined, steps: [], model: undefined, llmCalls: undefined, rewritten: undefined } : {}),
         guided: t.guided ? { ...t.guided, evidenceStarted: t.guided.evidenceStarted || action.evidence } : undefined }));
     case "hints":
       return update(turns, action.id, (t) => ({ ...t, status: "done", guided: t.guided ? { ...t.guided, hints: action.hints, revealed: Math.min(1, action.hints.length) } : undefined }));

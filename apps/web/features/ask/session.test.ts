@@ -126,3 +126,12 @@ describe("guided turns", () => {
     expect(turns[0]!.guided).toMatchObject({ hints, evidenceStarted: true, params: { k: 2, temperature: 0.4 } });
   });
 });
+
+it("evidence retry clears a partial answer but preserves Guided hints and original settings", () => {
+  const partial: Turn = { id: "retry", question: "why heaps", answer: "unfinished", chunks: [chunk], status: "stopped", citations: [], cached: true,
+    guided: { params: { question: "why heaps", k: 2, temperature: 0.4 }, hints: ["one", "two"], revealed: 2, evidenceStarted: true } };
+  const [retried] = reducer([partial], { type: "resume", id: "retry", evidence: true });
+  expect(retried?.guided).toEqual(partial.guided);
+  expect(retried).toMatchObject({ id: "retry", answer: "", chunks: [], status: "streaming" });
+  expect(retried?.cached).toBeUndefined();
+});

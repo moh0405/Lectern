@@ -379,3 +379,19 @@ def test_socratic_context_has_ask_validation(indexed):
     for context in invalid:
         for route in ("ask", "socratic"):
             assert indexed.post(f"/api/v1/{route}", json={"question": "why treaps", "context": context}).status_code == 422
+
+
+@pytest.mark.parametrize("hints, expected", [
+    ({"hint3": "third", "hint1": "first", "hint2": "second", "hint10": "tenth"}, ["first", "second", "third", "tenth"]),
+    ([{"hint1": " first "}, {"hint2": "second"}], ["first", "second"]),
+    (["", "  ", None, 3, False, " keep ", {"answer": "must not become a hint"}], ["keep"]),
+    (None, []),
+    (42, []),
+    (" one hint ", ["one hint"]),
+])
+def test_socratic_normalizes_model_hint_shapes(indexed, fake_gemini, hints, expected):
+    fake_gemini.handler = lambda prompt, json_mode: json.dumps({"questions": [], "hints": hints})
+    response = indexed.post("/api/v1/socratic", json={"question": "why use a heap"})
+    assert response.status_code == 200
+    assert response.json()["hints"] == expected
+    assert "Do NOT reveal the final answer" in fake_gemini.calls[-1]

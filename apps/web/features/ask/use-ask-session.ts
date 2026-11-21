@@ -99,7 +99,8 @@ export function useAskSession() {
   const ask = useCallback(async (p: AskParams, existing?: Turn, evidence = false) => {
     const id = existing?.id ?? newId();
     if (existing && !evidence && (existing.guided?.hints !== undefined || controllers.current.has(id))) return;
-    if (evidence && (existing?.guided?.evidenceStarted || evidenceRuns.current.has(id))) return;
+    if (existing && [...controllers.current.keys()].some((key) => key !== id)) return;
+    if (evidence && (evidenceRuns.current.has(id) || (existing?.guided?.evidenceStarted && existing.status !== "error" && existing.status !== "stopped"))) return;
     if (evidence) evidenceRuns.current.add(id);
     controllers.current.get(id)?.abort();
     const controller = new AbortController();
@@ -195,7 +196,10 @@ export function useAskSession() {
           message: errorMessage(err),
         });
     } finally {
-      if (controllers.current.get(id) === controller) controllers.current.delete(id);
+      if (controllers.current.get(id) === controller) {
+        controllers.current.delete(id);
+        evidenceRuns.current.delete(id);
+      }
     }
   }, []);
 

@@ -489,7 +489,7 @@ export function AskView() {
                     focusAfterRemove.current = true;
                     announce("Question removed");
                   }}
-                  onFresh={() => active.guided && !active.guided.evidenceStarted ? void retryHints(active) : askAgain(active)}
+                  onFresh={() => active.guided ? active.guided.evidenceStarted ? void showEvidence(active) : void retryHints(active) : askAgain(active)}
                   onNextHint={() => nextHint(active.id)}
                   onEvidence={() => void showEvidence(active)}
                   onSearchShared={
