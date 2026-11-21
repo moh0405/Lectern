@@ -22,13 +22,13 @@ test("add a card, review it, and it leaves the due queue", async ({ page }) => {
   await review.getByRole("button", { name: "Show answer" }).click();
   await expect(review.getByTestId("card-back")).toContainText("Last in, first out");
 
-  await review.getByRole("button", { name: "Good", exact: true }).click();
+  await review.getByRole("button", { name: /^Good\b/ }).click();
   await expect(review.getByText("All caught up")).toBeVisible();
   await expect(review).toContainText("Next review tomorrow");
 
   const deck = page.getByRole("region", { name: "Deck" });
   await expect(deck).toContainText("What does LIFO stand for?");
-  await expect(deck).toContainText("interval 1d");
+  await expect(deck).toContainText("Interval 1 day");
 });
 
 test("the model writes cards from indexed material; they can be exported and deleted", async ({ page, request }) => {
@@ -48,6 +48,8 @@ test("the model writes cards from indexed material; they can be exported and del
     expect(file.suggestedFilename()).toBe("flashcards.csv");
 
     await page.getByRole("button", { name: /Delete card: What is a heap used for/ }).click();
+    await expect(deck).toContainText("What is a heap used for?"); // nothing is deleted until confirmed
+    await page.getByRole("button", { name: "Confirm delete" }).click();
     await expect(deck).not.toContainText("What is a heap used for?");
   } finally {
     await removeFixture(request, "heaps.pdf");

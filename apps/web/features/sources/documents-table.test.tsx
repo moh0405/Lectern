@@ -49,6 +49,22 @@ describe("DocumentsTable", () => {
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledTimes(2));
     expect(mocks.remove).toHaveBeenLastCalledWith("/api/v1/sources", { params: { query: { key: "dsa.pdf" } } });
   });
+  it("announces a deletion and moves focus to the next source", async () => {
+    const other = { ...document, source_key: "graphs.pdf", docs: ["graphs.pdf"] };
+    mocks.get.mockResolvedValueOnce({ data: { documents: [document, other] } }).mockResolvedValue({ data: { documents: [other] } });
+    renderTable(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete dsa.pdf" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    expect(await screen.findByText("Deleted dsa.pdf and its indexed passages.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete graphs.pdf" })).toHaveFocus());
+  });
+  it("focuses the heading after deleting the last source", async () => {
+    mocks.get.mockResolvedValueOnce({ data: { documents: [document] } }).mockResolvedValue({ data: { documents: [] } });
+    renderTable(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete dsa.pdf" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Indexed sources" })).toHaveFocus());
+  });
   it("filters locally and can recover from no results", async () => {
     renderTable(true);
     await screen.findByText("dsa.pdf");

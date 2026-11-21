@@ -105,7 +105,11 @@ class StudyStore:
                      difficulty: str = "", now: Optional[float] = None) -> Dict[str, Any]:
         now = time.time() if now is None else now
         old = self.get_progress(pid)
-        attempts = (old["attempts"] if old else 0) + (1 if status in ("attempted", "solved") and (not old or old["status"] != status) else 0)
+        # Back to "to do" starts the problem over; otherwise each move into attempted or solved counts once.
+        if status == "todo":
+            attempts = 0
+        else:
+            attempts = (old["attempts"] if old else 0) + (1 if not old or old["status"] != status else 0)
         solved_at = ((old or {}).get("solved_at") or now) if status == "solved" else None
         self._run(
             "INSERT INTO lc_progress (pid, title, status, notes, attempts, topics, difficulty, updated_at, solved_at)"

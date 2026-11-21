@@ -73,7 +73,7 @@ def test_topic_stats_counts_attempts_and_solves():
 
 
 def test_plan_puts_weak_topics_first_easiest_first_and_skips_solved():
-    progress = {"1": {"status": "solved"}, "3": {"status": "attempted"}}
+    progress = {"1": {"status": "solved"}, "3": {"status": "attempted"}, "4": {"status": "attempted"}}
     plan = build_plan(progress, BANK, size=4)
     assert plan["weak_topics"] == ["Dynamic Programming"]
     assert [i["pid"] for i in plan["items"][:3]] == ["3", "4", "5"]  # 3 is attempted but not solved: still offered; easiest first
@@ -86,6 +86,34 @@ def test_plan_with_no_history_suggests_easy_starting_points():
     assert plan["weak_topics"] == [] and len(plan["items"]) == 3
     assert {i["difficulty"] for i in plan["items"]} == {"Easy"}
     assert plan["items"][0]["reason"] == "Good place to start"
+
+
+def test_one_attempt_is_not_enough_to_call_a_topic_weak():
+    plan = build_plan({"3": {"status": "attempted"}}, BANK, size=4)
+    assert plan["weak_topics"] == []
+    assert build_plan({"3": {"status": "attempted"}}, BANK, size=4, min_evidence=1)["weak_topics"] == ["Dynamic Programming"]
+
+
+def test_plan_never_suggests_sql_or_topic_less_problems():
+    bank = BANK + [
+        {"pid": "175", "title": "Combine Two Tables", "difficulty": "Easy", "topics": [], "description": "SQL Schema", "likes": 9999},
+        {"pid": "1050", "title": "Actors and Directors", "difficulty": "Easy", "topics": ["Database"], "likes": 9999},
+        {"pid": "193", "title": "Valid Phone Numbers", "difficulty": "Easy", "topics": ["Shell"], "likes": 9999},
+    ]
+    pids = {i["pid"] for i in build_plan({}, bank, size=10)["items"]}
+    assert pids and not pids & {"175", "1050", "193"}
+
+
+def test_cold_start_prefers_well_known_problems_across_topics():
+    bank = [
+        {"pid": "a1", "title": "A1", "difficulty": "Easy", "topics": ["Array"], "likes": 900},
+        {"pid": "a2", "title": "A2", "difficulty": "Easy", "topics": ["Array"], "likes": 800},
+        {"pid": "a3", "title": "A3", "difficulty": "Easy", "topics": ["Array"], "likes": 700},
+        {"pid": "s1", "title": "S1", "difficulty": "Easy", "topics": ["String"], "likes": 10},
+        {"pid": "h1", "title": "H1", "difficulty": "Hard", "topics": ["Graph"], "likes": 99999},
+    ]
+    assert [i["pid"] for i in build_plan({}, bank, size=3)["items"]] == ["a1", "a2", "s1"]
+    assert [i["pid"] for i in build_plan({}, bank, size=5)["items"]] == ["a1", "a2", "s1", "h1", "a3"]
 
 
 # ------------------------------------------------------------------ store
@@ -120,7 +148,9 @@ def test_progress_upsert_keeps_notes_and_counts_attempts(store):
     assert row["attempts"] == 2 and row["solved_at"] == 5.0
     again = store.set_progress("1", "Two Sum", "solved", now=9.0)
     assert again["solved_at"] == 5.0 and again["attempts"] == 2  # re-marking does not move the date or inflate attempts
-    assert store.set_progress("1", "Two Sum", "todo", now=10.0)["solved_at"] is None
+    reset = store.set_progress("1", "Two Sum", "todo", now=10.0)
+    assert reset["solved_at"] is None and reset["attempts"] == 0  # back to "to do" starts over
+    assert store.set_progress("1", "Two Sum", "attempted", now=11.0)["attempts"] == 1
     assert store.clear_progress("1") and store.list_progress() == []
 
 

@@ -28,7 +28,7 @@ test("the filter state survives a reload and topics narrow the results", async (
   await page.goto("/leetcode?d=Hard&t=Tree");
   await expect(page.getByRole("button", { name: "Hard", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Tree", exact: true })).toHaveAttribute("aria-pressed", "true");
-  const results = page.getByRole("region", { name: "Results" }).getByRole("button");
+  const results = page.getByRole("region", { name: "Results" }).locator('button[id^="lc-result-"]');
   await expect(results.first()).toBeVisible();
   for (const row of await results.all()) {
     await expect(row).toContainText("Tree");
@@ -64,12 +64,15 @@ test("mark a problem solved, keep notes, and see it in the list and the summary"
 
 test("the study plan focuses on topics you struggle with", async ({ page, request }) => {
   try {
+    // Two attempted-but-unsolved Array problems: one attempt alone is not enough to call a topic weak.
     await request.put("http://127.0.0.1:8100/api/v1/leetcode/progress/1", { data: { status: "attempted" } });
+    await request.put("http://127.0.0.1:8100/api/v1/leetcode/progress/217", { data: { status: "attempted" } });
     await page.goto("/leetcode");
-    const plan = page.getByText("Your study plan").locator("..").locator("..");
+    const plan = page.getByTestId("study-plan");
     await expect(plan).toContainText("Weak topics");
     await expect(plan).toContainText("Weak topic:");
   } finally {
     await request.delete("http://127.0.0.1:8100/api/v1/leetcode/progress/1");
+    await request.delete("http://127.0.0.1:8100/api/v1/leetcode/progress/217");
   }
 });

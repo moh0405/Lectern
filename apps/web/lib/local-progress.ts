@@ -82,7 +82,8 @@ export function saveLocalProgress(problem: ProblemMeta, update: { status: LocalS
     ...problem,
     status: update.status,
     notes: update.notes ?? old?.notes ?? "",
-    attempts: (old?.attempts ?? 0) + (update.status !== "todo" && update.status !== old?.status ? 1 : 0),
+    // Back to "to do" starts the problem over, as on the server.
+    attempts: update.status === "todo" ? 0 : (old?.attempts ?? 0) + (update.status !== old?.status ? 1 : 0),
     solved_at: update.status === "solved" ? (old?.solved_at ?? now) : null,
     updated_at: now,
   };

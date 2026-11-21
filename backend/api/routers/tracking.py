@@ -143,7 +143,8 @@ def clear_progress(pid: str, store: StudyStore = Depends(get_study)):
 def study_plan(size: int = Query(10, ge=1, le=30), store: StudyStore = Depends(get_study), handler: LeetCodeHandler = Depends(get_leetcode)):
     progress = {r["pid"]: r for r in store.list_progress()}
     bank = [{"pid": p.pid, "title": p.title, "difficulty": (p.difficulty or "").strip().title(),
-             "topics": [t.strip().title() for t in p.topics or []]} for p in handler._problems]
+             "topics": [t.strip().title() for t in p.topics or []], "likes": p.likes or 0,
+             "description": (p.description or "")[:40]} for p in handler._problems]
     return StudyPlan(**build_plan(progress, bank, size=size))
 
 

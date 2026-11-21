@@ -20,6 +20,12 @@ describe("local progress", () => {
     expect(summary).toMatchObject({ solved: 1, attempted: 0, solved_by_difficulty: { Easy: 1 } });
   });
 
+  it("starts attempts over when a problem goes back to to do", () => {
+    saveLocalProgress(two, { status: "attempted" });
+    expect(saveLocalProgress(two, { status: "todo" }).attempts).toBe(0);
+    expect(saveLocalProgress(two, { status: "attempted" }).attempts).toBe(1);
+  });
+
   it("keeps notes when only the status changes", () => {
     saveLocalProgress(two, { status: "attempted", notes: "use a hash map" });
     saveLocalProgress(two, { status: "solved" });
