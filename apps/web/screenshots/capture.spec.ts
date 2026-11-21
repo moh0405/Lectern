@@ -42,16 +42,16 @@ test("capture the app", async ({ page, request }) => {
   await page.waitForTimeout(500);
   await shot(page, "sources");
 
-  // 3. Tutor tools: concept map
-  await page.goto("/tutor");
+  // 3. Concept map
+  await page.goto("/concept-map");
   await page.getByLabel("Topic").fill("Hash tables");
   await page.getByRole("button", { name: "Generate map" }).click();
   await expect(page.getByTestId("concept-graph").locator(".react-flow__node").first()).toBeVisible();
   await page.waitForTimeout(800);
   await shot(page, "concept-map");
 
-  // 4. Socratic tutor with one hint revealed
-  await page.goto("/tutor?tool=socratic");
+  // 4. Work it out (Socratic) with one hint revealed
+  await page.goto("/work-it-out");
   await page.getByLabel("What are you trying to work out?").fill("Why do hash tables need a collision strategy?");
   await page.getByRole("button", { name: "Guide me" }).click();
   await expect(page.getByText("What does a hash function turn a key into")).toBeVisible();

@@ -5,7 +5,7 @@ test.beforeAll(async ({ request }) => indexFixture(request));
 test.afterAll(async ({ request }) => removeFixture(request));
 
 test("concept map renders a graph, highlights neighbours and offers exports", async ({ page }) => {
-  await page.goto("/tutor");
+  await page.goto("/concept-map");
   await page.getByLabel("Topic").fill("Linked lists");
   await page.getByRole("button", { name: "Generate map" }).click();
 
@@ -33,8 +33,8 @@ test("concept map renders a graph, highlights neighbours and offers exports", as
   expect((await download).suggestedFilename()).toBe("linked-lists.dot");
 });
 
-test("socratic tutor reveals hints one at a time and never the answer up front", async ({ page }) => {
-  await page.goto("/tutor?tool=socratic");
+test("work it out reveals hints one at a time and never the answer up front", async ({ page }) => {
+  await page.goto("/work-it-out");
   await page.getByLabel("What are you trying to work out?").fill("Why is binary search O(log n)?");
   await page.getByRole("button", { name: "Guide me" }).click();
 
@@ -49,7 +49,7 @@ test("socratic tutor reveals hints one at a time and never the answer up front",
 });
 
 test("compare sources shows agreements, a combined explanation and citations", async ({ page }) => {
-  await page.goto("/tutor?tool=synthesis");
+  await page.goto("/compare");
   await page.getByLabel(/Topic to compare/).fill("Heaps");
   await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByText("both define it")).toBeVisible();
@@ -59,7 +59,7 @@ test("compare sources shows agreements, a combined explanation and citations", a
 });
 
 test("adaptive explanation uses the chosen level and your sources", async ({ page }) => {
-  await page.goto("/tutor?tool=adaptive");
+  await page.goto("/explain");
   await page.getByLabel("Question").fill("What is a binary heap?");
   await page.getByLabel("Explain it at").selectOption("ELI5");
   await page.getByRole("button", { name: "Explain" }).click();
@@ -71,28 +71,69 @@ test("adaptive explanation uses the chosen level and your sources", async ({ pag
   await expect(passages.getByTestId("relevance").first()).toContainText("relevance"); // neutral, not a red badge
 });
 
-test("tabs are keyboard-reachable and reflected in the URL", async ({ page }) => {
-  await page.goto("/tutor");
-  await expect(page.getByRole("tab", { name: "Concept map" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("tab", { name: "Compare sources" }).click();
-  await expect(page).toHaveURL(/tool=synthesis/);
-  await expect(page.getByRole("tab", { name: "Compare sources" })).toHaveAttribute("aria-selected", "true");
+test("old tutor addresses redirect to each tool's own page", async ({ page }) => {
+  const cases = [
+    ["/tutor", "/concept-map", "Concept map"],
+    ["/tutor?tool=map", "/concept-map", "Concept map"],
+    ["/work-it-out", "/work-it-out", "Work it out"],
+    ["/compare", "/compare", "Compare sources"],
+    ["/explain", "/explain", "Explain at my level"],
+  ] as const;
+  for (const [from, to, h1] of cases) {
+    await page.goto(from);
+    expect(new URL(page.url()).pathname, from).toBe(to);
+    await expect(page.getByRole("heading", { level: 1, name: h1, exact: true })).toBeVisible();
+    await expect(page).toHaveTitle(`${h1} · Lectern`);
+    await expect(page.getByRole("tab")).toHaveCount(0); // the old inner tab row is gone
+  }
+});
 
-  // roving tabindex: one tab stop, arrows move between tabs and update the URL
-  await expect(page.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
-  await page.getByRole("tab", { name: "Compare sources" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Explain at my level" })).toBeFocused();
-  await expect(page).toHaveURL(/tool=adaptive/);
-  await page.keyboard.press("Home");
-  await expect(page.getByRole("tab", { name: "Concept map" })).toBeFocused();
-  await expect(page).not.toHaveURL(/tool=/);
-  await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("tab", { name: "Explain at my level" })).toHaveAttribute("aria-selected", "true");
+test("a redirect keeps the other query parameters", async ({ page }) => {
+  await page.goto("/tutor?tool=synthesis&topic=Heaps");
+  expect(new URL(page.url()).pathname).toBe("/compare");
+  await expect(page.getByLabel(/Topic to compare/)).toHaveValue("Heaps");
+});
+
+test("Ask's Go further links open each tool prefilled, without running it", async ({ page }) => {
+  const question = "What is a binary heap used for?";
+  const toolCalls: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && /\/api\/v1\/(concept-map|synthesis|socratic)$/.test(r.url())) toolCalls.push(r.url());
+  });
+  const links = [
+    ["Concept map of this topic", /\/concept-map\?topic=/, "Topic"],
+    ["Compare your sources", /\/compare\?topic=/, /Topic to compare/],
+    ["Work it out with hints", /\/work-it-out\?question=/, "What are you trying to work out?"],
+  ] as const;
+  await page.goto("/ask");
+  await page.getByLabel("Your question", { exact: true }).fill(question);
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const further = page.getByTestId("go-further");
+  await expect(further).toBeVisible({ timeout: 15_000 });
+  for (const [name, url, label] of links) {
+    await further.getByRole("link", { name }).click();
+    await expect(page).toHaveURL(url);
+    await expect(page.getByLabel(label)).toHaveValue(question);
+    await page.goBack();
+    await expect(page.getByTestId("go-further")).toBeVisible({ timeout: 15_000 });
+  }
+  expect(toolCalls).toEqual([]);
+});
+
+test("/ask?q= prefills the composer and does not send it", async ({ page }) => {
+  let asked = false;
+  page.on("request", (r) => {
+    if (r.method() === "POST" && /\/api\/v1\/ask/.test(r.url())) asked = true;
+  });
+  await page.goto("/ask?q=What%20is%20a%20heap%3F");
+  const box = page.getByLabel("Your question", { exact: true });
+  await expect(box).toHaveValue("What is a heap?");
+  await expect(box).toBeFocused();
+  expect(asked).toBe(false);
 });
 
 test("an idle tool says what you will get and which documents it reads", async ({ page }) => {
-  await page.goto("/tutor");
+  await page.goto("/concept-map");
   const idle = page.getByTestId("idle-preview");
   await expect(idle).toContainText("What you'll get");
   await expect(idle.getByTestId("library-line")).toContainText("heaps.pdf");
@@ -101,7 +142,7 @@ test("an idle tool says what you will get and which documents it reads", async (
 });
 
 test("socratic hints say whether they came from your material", async ({ page }) => {
-  await page.goto("/tutor?tool=socratic");
+  await page.goto("/work-it-out");
   await page.getByLabel("What are you trying to work out?").fill("Why use a binary heap?");
   await page.getByRole("button", { name: "Guide me" }).click();
   await expect(page.getByTestId("socratic-source")).toContainText(/Based on \d+ passages? from your material/);

@@ -26,7 +26,8 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 - **Agentic mode (optional, LangGraph):** for harder questions the Ask page can run a small workflow that rewrites the search query, asks the model whether the retrieved passages are enough (searching once more if not), writes the answer, and re-checks its citations (rewriting once if it cited sources it was never given). The steps are shown with the answer. It is slower and uses up to 6 model calls per question; its benefit has not been measured (see Status and limits).
 - **Answers only from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **verified** against the retrieved passages and flagged if the document or page was never retrieved.
 - **Retrieves with hybrid search**: embeddings (meaning) + BM25 (exact terms), merged by reciprocal rank fusion. Measured, not assumed.
-- **Tutors**: concept maps, a Socratic tutor that gives hints not answers, cross-source synthesis, level-adaptive explanations, symbolic math.
+- **Study tools**: concept maps, source comparison, *Work it out* (Socratic hints, never the answer), *Explain at my level*, symbolic math. A finished answer links straight into them.
+- **Four sections**: **Ask**; **Library** (Sources, Map, Insights); **Practice** (Flashcards, LeetCode, Work it out, Explain at my level); **Tools** (Concept map, Compare sources, Agent, Math).
 - **LeetCode mentor**: 1,825 searchable problems with AI-written study guides, progress tracking (todo / attempted / solved, with notes) and a study plan built from your weak topics.
 - **Flashcards with spaced repetition**: SM-2 scheduling, cards written from your material by the model or saved from any answer, exported to Anki (CSV or `.apkg`).
 - **Remembers your work**: Ask history is saved on the server and comes back even if you clear the browser.
@@ -39,7 +40,7 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 | ![Embedding map](docs/images/embedding-map.png) | ![LeetCode](docs/images/leetcode.png) |
 | 3D map of the real embeddings (PCA) | LeetCode search and study guide |
 
-More: [Flashcards](docs/images/flashcards.png) · [Socratic tutor](docs/images/socratic.png) · [Math](docs/images/math.png) · [Analytics](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
+More: [Flashcards](docs/images/flashcards.png) · [Work it out](docs/images/socratic.png) · [Math](docs/images/math.png) · [Insights](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
 
 ---
 

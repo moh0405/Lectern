@@ -45,7 +45,7 @@ Plus `eval/` (retrieval evaluation), `tests/` (Python tests), `scripts/` (CLI to
 
 | Folder | Contents |
 |---|---|
-| `app/` | One tiny file per route; each renders a view from `features/` |
+| `app/` | One tiny file per route; each renders a view from `features/`. Sections: Ask (`/ask`); Library (`/sources`, `/visualize` "Map", `/analytics` "Insights"); Practice (`/study`, `/leetcode`, `/work-it-out`, `/explain`); Tools (`/concept-map`, `/compare`, `/agent`, `/math`). The old `/tutor?tool=…` addresses redirect (`next.config.ts`) |
 | `features/` | One folder per feature: `ask`, `sources`, `leetcode`, `study` (flashcards), `tutor`, `math`, `visualize`, `analytics` |
 | `components/` | The shell (sidebar, status), command palette, Markdown renderer, UI primitives |
 | `lib/` | API helpers, URL-state hook, formatting, CSV and download helpers |
@@ -212,7 +212,7 @@ Full route list: see the README or [API reference](API.md).
 - **Routing:** Next.js App Router. Each `app/<route>/page.tsx` is a few lines that render a client view from `features/`.
 - **Server state** (anything that lives on the server: documents, stats, jobs, analytics) goes through **TanStack Query**: caching, de-duplication, retries (not on 4xx), polling for jobs.
 - **Streaming** is a small state machine: a pure *reducer* (`features/ask/session.ts`) turns events (`start`, `meta`, `token`, `done`, `error`, `stop`) into state, and a hook (`use-ask-session.ts`) feeds it from the SSE stream. Because the reducer is pure it is easy to unit-test.
-- **URL as state** for filters and selections (LeetCode, tutor tabs), so a view can be shared and survives a reload.
+- **URL as state** for filters and selections (LeetCode), so a view can be shared and survives a reload. Links can also prefill a field (`/ask?q=`, `/concept-map?topic=`, `/compare?topic=`, `/work-it-out?question=`, `/explain?question=`); a prefill never runs a model call.
 - **Persistence:** finished Ask turns are saved on the server (`/history`) and restored in a fresh browser; a half-streamed answer is never saved. In the public demo, where the shared database is off, LeetCode progress and flashcards are kept in the visitor's own `localStorage` instead (`lib/local-progress.ts`, `lib/local-cards.ts`; the card scheduler mirrors `backend/srs.py`).
 - **Markdown from the model is untrusted:** `react-markdown` does not render raw HTML, and exported HTML goes through a sanitizer on the server.
 

@@ -8,9 +8,9 @@ Run the API and the web app first (see the README), with some real study materia
 ## Flow
 1. **Sources** (30 s): drop a PDF and paste a YouTube link. Point out the live indexing job and that re-adding the same file is skipped (incremental).
 2. **Ask** (60 s): ask a question about what you just added. Let the answer stream; open *Sources* to show the highlighted passages and relevance scores; click a YouTube citation to jump to the timestamp. Switch the style to *ELI5* and ask again.
-3. **Tutor tools** (30 s): generate a *Concept map* for the topic, click a node. Try the *Socratic tutor* and reveal a hint.
+3. **Go further** (30 s): from the answer, open *Concept map of this topic*, generate it and click a node. Then open *Work it out with hints* and reveal a hint.
 4. **LeetCode** (30 s): filter Medium + Tree, open a problem, generate a study guide.
-5. **Analytics** (10 s): the questions you just asked and which sources answered.
+5. **Insights** (10 s): the questions you just asked and which sources answered.
 
 ## Technical points to land
 - RAG over mixed sources: chunking, embeddings (MiniLM), exact cosine search, grounded prompts with citations.

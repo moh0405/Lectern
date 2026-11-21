@@ -16,7 +16,7 @@ The model used by default, **`all-MiniLM-L6-v2`** (sentence-transformers), maps 
 
 No single number means anything you could name ("dimension 2 = animals"). Meaning is spread across all 384; only the **geometry** (distances and angles between vectors) is meaningful.
 
-You can picture it in 2D: every sentence is a dot, and dots about similar topics cluster. The **Embedding map** page in the app does this for real, projecting the 384 dimensions down to 3 with PCA so you can rotate your own documents in 3D (`backend/projection.py`).
+You can picture it in 2D: every sentence is a dot, and dots about similar topics cluster. The **Map** page (Library) in the app does this for real, projecting the 384 dimensions down to 3 with PCA so you can rotate your own documents in 3D (`backend/projection.py`).
 
 ## How similarity is measured
 

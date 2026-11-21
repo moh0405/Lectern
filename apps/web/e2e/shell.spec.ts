@@ -15,7 +15,7 @@ test("command palette jumps between pages from the keyboard", async ({ page }) =
   await page.keyboard.press("Control+K");
   await page.getByPlaceholder(/Go to a page/).fill("socratic");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/tutor\?tool=socratic/);
+  await expect(page).toHaveURL(/\/work-it-out$/);
 });
 
 test("command palette returns focus to its button, finds synonyms and offers actions", async ({ page }) => {
@@ -42,7 +42,10 @@ test("command palette returns focus to its button, finds synonyms and offers act
   await input.fill("what is a heap");
   await expect(dialog.getByRole("option", { name: "Ask: what is a heap" })).toBeVisible();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/ask\?q=what%20is%20a%20heap$/);
+  // The question waits in the composer, unsent, and leaves the address so a reload does not bring it back.
+  await expect(page.getByLabel("Your question", { exact: true })).toHaveValue("what is a heap");
+  await expect(page.getByLabel("Your question", { exact: true })).toBeFocused();
+  await expect(page).toHaveURL(/\/ask$/);
 });
 
 test("navigation marks the current page and works on a phone-sized screen", async ({ page }) => {
@@ -55,7 +58,7 @@ test("navigation marks the current page and works on a phone-sized screen", asyn
   await expect(page.getByRole("heading", { name: "Sources", exact: true })).toBeVisible();
   // Practice and Tools group several pages; each section lists its own pages
   await nav.getByRole("link", { name: "Tools" }).click();
-  await expect(page).toHaveURL(/\/tutor$/);
+  await expect(page).toHaveURL(/\/concept-map$/);
   await page.getByRole("navigation", { name: "Tools pages" }).getByRole("link", { name: "Math" }).click();
   await expect(page).toHaveURL(/\/math$/);
   await expect(nav.getByRole("link", { name: "Tools" })).toHaveClass(/active/);
@@ -67,7 +70,7 @@ test("navigation marks the current page and works on a phone-sized screen", asyn
 test("the section bar keeps the current page in view on a narrow phone", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/analytics");
-  const current = page.getByRole("navigation", { name: "Tools pages" }).getByRole("link", { name: "Analytics" });
+  const current = page.getByRole("navigation", { name: "Library pages" }).getByRole("link", { name: "Insights" });
   await expect(current).toHaveAttribute("aria-current", "page");
   await expect.poll(() => current.evaluate((e) => { const b = e.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth; })).toBe(true);
 });
