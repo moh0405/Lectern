@@ -105,6 +105,9 @@ def test_concept_map_non_json_model_output_is_502(indexed, fake_gemini):
 def test_socratic_returns_questions_and_hints(indexed, fake_gemini):
     body = indexed.post("/api/v1/socratic", json={"question": "why use a heap", "depth": 1}).json()
     assert body["questions"][0] == "What is a node?" and len(body["hints"]) == 3
+    assert body["chunks"] and body["chunks"][0]["doc"]  # the passages the hints were based on
+    general = indexed.post("/api/v1/socratic", json={"question": "why use a heap", "k": 0}).json()
+    assert general["chunks"] == []
 
 
 def test_socratic_offline_fallback_flags_warning(indexed, fake_gemini):
@@ -134,6 +137,8 @@ def test_math_endpoint(api):
     bad = api.post("/api/v1/math", json={"input": "__import__('os').system('id')"})
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "math_error"
     assert api.post("/api/v1/math", json={"input": "x" * 300}).status_code == 422
+    unbalanced = api.post("/api/v1/math", json={"input": "x^2 + (3"}).json()["error"]
+    assert unbalanced["message"].startswith("Unbalanced parentheses") and unbalanced["details"] == {"position": 6}
 
 
 # ----------------------------------------------------------------- LeetCode

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutGraph, toDot } from "./graph-layout";
+import { connectionText, edgesOf, layoutGraph, nodeAriaLabel, toDot } from "./graph-layout";
 
 const nodes = [
   { id: "a", label: "Array" },
@@ -25,6 +25,17 @@ describe("layoutGraph", () => {
   it("handles an empty graph and edges to unknown nodes", () => {
     expect(layoutGraph([], [])).toEqual([]);
     expect(() => layoutGraph(nodes, [{ from: "x", to: "y" }])).not.toThrow();
+  });
+});
+
+describe("text alternatives", () => {
+  it("names connections with labels and counts them for screen readers", () => {
+    expect(connectionText(edges[0]!, nodes)).toBe("Array → used by → Two Sum");
+    expect(connectionText(edges[1]!, nodes)).toBe("Hash Table → related to → Two Sum");
+    expect(edgesOf("c", edges)).toHaveLength(3);
+    expect(nodeAriaLabel(nodes[0]!, edges)).toBe("Array, 1 connection. Press Enter to show it.");
+    expect(nodeAriaLabel(nodes[2]!, edges)).toBe("Two Sum, 3 connections. Press Enter to show them.");
+    expect(nodeAriaLabel({ id: "z", label: "Alone" }, edges)).toBe("Alone, no connections.");
   });
 });
 

@@ -37,6 +37,25 @@ export function toReport(s: AnalyticsSummary): string {
   ].join("\n");
 }
 
+/** "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago", then a short date. `ts` and `now` are in seconds. */
+export function relativeTime(ts: number, now = Date.now() / 1000): string {
+  const s = Math.max(0, Math.round(now - ts));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)} h ago`;
+  const days = Math.floor(s / 86_400);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(ts * 1000).toLocaleDateString("en", { day: "numeric", month: "short", year: days > 300 ? "numeric" : undefined });
+}
+
+/** Fastest, slowest and latest of a series that runs oldest to newest. */
+export function seriesRange(values: number[]): { min: number; max: number; latest: number } | null {
+  const latest = values[values.length - 1];
+  if (latest === undefined) return null;
+  return { min: Math.min(...values), max: Math.max(...values), latest };
+}
+
 /** Points for a tiny inline sparkline: latencies oldest to newest scaled into a width x height box. */
 export function sparkline(values: number[], width = 120, height = 28): string {
   if (values.length < 2) return "";

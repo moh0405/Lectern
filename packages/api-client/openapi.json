@@ -2189,6 +2189,14 @@
       },
       "Socratic": {
         "properties": {
+          "chunks": {
+            "description": "The passages the questions and hints were based on; empty means general guidance",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
           "hints": {
             "items": {
               "type": "string"

@@ -26,6 +26,9 @@ export function groupByDoc(points: Point[]): Map<string, Point[]> {
   return groups;
 }
 
+/** Theme tokens used for documents, in order (cycled when there are more documents). */
+export const TRACE_TOKENS = ["--color-accent-2", "--color-good", "--color-warn", "--color-bad", "--color-fg", "--color-muted"] as const;
+
 export function Scatter3D({ points, onSelect }: { points: Point[]; onSelect: (p: Point) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,11 +56,15 @@ export function Scatter3D({ points, onSelect }: { points: Point[]; onSelect: (p:
         customdata: pts.map((p) => p.index),
         text: pts.map((p) => `${p.text.slice(0, 120)}${p.text.length > 120 ? "…" : ""}`),
         hovertemplate: `<b>${doc.replace(/[<>&]/g, "")}</b><br>%{text}<extra></extra>`,
-        marker: { size: 4, opacity: 0.85 },
+        marker: { size: 4, opacity: 0.85 } as { size: number; opacity: number; color?: string },
       }));
       const draw = () => {
         const style = getComputedStyle(document.documentElement);
         const color = (name: string) => style.getPropertyValue(name).trim();
+        // Colour each document from the theme (Plotly's default blue/orange ignore light and dark).
+        traces.forEach((t, i) => {
+          t.marker = { ...t.marker, color: color(TRACE_TOKENS[i % TRACE_TOKENS.length] ?? "--color-accent-2") || undefined };
+        });
         const axis = { showgrid: true, gridcolor: color("--color-border"), zeroline: false, showticklabels: false, title: { text: "" }, backgroundcolor: "rgba(0,0,0,0)" };
         return Plotly.react(el, traces, {
           uirevision: "lectern-embedding-view",

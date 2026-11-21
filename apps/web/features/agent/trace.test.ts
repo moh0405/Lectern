@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { idle, runReducer, type RunState } from "./trace";
+import { idle, runReducer, stepLabel, type RunState } from "./trace";
 
 const ev = (event: string, data: object) => ({ type: "event", event: { event, data } }) as never;
 const apply = (...actions: unknown[]) => actions.reduce<RunState>((s, a) => runReducer(s, a as never), idle);
@@ -67,5 +67,22 @@ describe("runReducer", () => {
 
   it("a result with no matching call is ignored", () => {
     expect(apply(start, ev("tool_result", { name: "solve_math", summary: "?", error: false })).trace).toEqual([]);
+  });
+});
+
+describe("stepLabel", () => {
+  it("describes each tool call in plain language", () => {
+    expect(stepLabel("search_documents", { query: "binary heap" })).toBe("Searched your material for “binary heap”");
+    expect(stepLabel("search_documents", { query: "binary heap" }, true)).toBe("Searching your material for “binary heap”");
+    expect(stepLabel("list_documents", {})).toBe("Listed the documents in your library");
+    expect(stepLabel("read_page", { document: "heaps.pdf", page: 3 })).toBe("Read heaps.pdf, page 3");
+    expect(stepLabel("solve_math", { expression: "integrate x^2" })).toBe("Worked out “integrate x^2”");
+    expect(stepLabel("find_leetcode_problem", { query: "hash table", difficulty: "Easy" })).toBe("Looked for an easy LeetCode problem about “hash table”");
+    expect(stepLabel("find_leetcode_problem", { query: "graphs", difficulty: "Medium" })).toBe("Looked for a medium LeetCode problem about “graphs”");
+    expect(stepLabel("find_leetcode_problem", {})).toBe("Looked for a LeetCode problem");
+    expect(stepLabel("brand_new_tool", {})).toBe("Used brand new tool");
+  });
+  it("shortens very long arguments", () => {
+    expect(stepLabel("search_documents", { query: "x".repeat(200) }).length).toBeLessThan(110);
   });
 });

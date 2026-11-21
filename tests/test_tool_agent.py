@@ -77,7 +77,7 @@ def test_several_tools_in_one_task(indexed, fake_gemini):
     events = run(indexed)
     results = [d for n, d in events if n == "tool_result"]
     assert [r["name"] for r in results] == ["list_documents", "search_documents", "find_leetcode_problem"]
-    assert "1 documents" in results[0]["summary"] and "problems" in results[2]["summary"]
+    assert results[0]["summary"] == "1 document" and "problem" in results[2]["summary"]
     assert events[-1][1]["tool_calls"] == 3 and events[-1][1]["steps"] == 3
 
 
@@ -282,3 +282,14 @@ def test_tool_results_leave_out_the_page_key_for_sources_without_pages():
 
     assert "page" not in _passage({"doc": "hashing.md", "page": None, "text": "t"})
     assert _passage({"doc": "a.pdf", "page": 3, "text": "t"})["page"] == 3
+
+
+def test_trace_summaries_use_the_right_plural():
+    from backend.tools import summarize
+
+    one = {"count": 1, "passages": [{"doc": "graphs.pdf"}]}
+    assert summarize("search_documents", one) == "1 passage from graphs.pdf"
+    assert summarize("search_documents", {"count": 3, "passages": []}) == "3 passages"
+    assert summarize("search_documents", {"count": 0, "passages": []}) == "0 passages"
+    assert summarize("list_documents", {"count": 1}) == "1 document"
+    assert summarize("find_leetcode_problem", {"count": 2}) == "2 problems"

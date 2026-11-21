@@ -49,7 +49,14 @@ COMMANDS = {"simplify", "differentiate", "derivative", "integrate", "solve", "ex
 
 
 class MathInputError(ValueError):
-    """The input is not a valid or permitted math expression."""
+    """The input is not a valid or permitted math expression.
+
+    `position` is the 0-based character index of the problem in the text that was checked, when known.
+    """
+
+    def __init__(self, message: str, position: Optional[int] = None):
+        super().__init__(message)
+        self.position = position
 
 
 def _is_variable(name: str) -> bool:
@@ -64,14 +71,97 @@ def validate(text: str) -> str:
     if len(text) > MAX_INPUT_CHARS:
         raise MathInputError(f"Expression is too long (max {MAX_INPUT_CHARS} characters)")
     if not _ALLOWED_CHARS.match(text):
-        raise MathInputError("Only numbers, letters, + - * / ^ ( ) , = and spaces are allowed")
-    if re.search(r"\.[A-Za-z_]|[A-Za-z_]\.", text):
-        raise MathInputError("Attribute access is not allowed")
-    for name in _IDENT.findall(text):
+        bad = next((i for i, ch in enumerate(text) if not _ALLOWED_CHARS.match(ch)), None)
+        shown = f" ('{text[bad]}')" if bad is not None else ""
+        raise MathInputError(f"Only numbers, letters, + - * / ^ ( ) , = and spaces are allowed{shown}", bad)
+    attr = re.search(r"\.[A-Za-z_]|[A-Za-z_]\.", text)
+    if attr:
+        raise MathInputError("Attribute access is not allowed", attr.start())
+    for m in _IDENT.finditer(text):
+        name = m.group(0)
         if name in FUNCTIONS or name in CONSTANTS or _is_variable(name):
             continue
-        raise MathInputError(f"'{name}' is not an allowed name")
+        if name.lower() in COMMANDS:
+            raise MathInputError(f"'{name}' is a command, so it goes first, as in '{name.lower()} x^2'", m.start())
+        raise MathInputError(f"'{name}' is not a function or variable this tool knows", m.start())
     return text
+
+
+_BINARY = "*/^"
+_ANY_OP = "+-*/^"
+
+
+def check_structure(text: str, offset: int = 0) -> None:
+    """Find the common typing mistakes SymPy would only report as an opaque syntax error.
+
+    Positions in the raised MathInputError are `offset` + the index in `text`.
+    """
+    stack: List[int] = []
+    prev = ""  # previous non-space character
+    prev_i = -1
+    for i, ch in enumerate(text):
+        if ch.isspace():
+            continue
+        at = offset + i
+        if ch == "(":
+            stack.append(at)
+        elif ch == ")":
+            if not stack:
+                raise MathInputError("Unbalanced parentheses: this ')' has no matching '('", at)
+            opened = stack.pop()
+            if prev == "(":
+                raise MathInputError("Empty parentheses: put an expression inside", opened)
+        if ch in _BINARY:
+            doubled_star = ch == "*" and prev == "*" and prev_i == i - 1
+            if not doubled_star and prev in _ANY_OP and prev:
+                raise MathInputError(f"Two operators in a row ('{prev}{ch}'): something is missing between them", at)
+            if not doubled_star and (prev == "" or prev in "(,="):
+                raise MathInputError(f"'{ch}' needs something before it", at)
+        if ch in ",=" and (prev == "" or prev in "(,=" or prev in _ANY_OP):
+            raise MathInputError(f"Something is missing before '{ch}'", at)
+        if ch == ")" and prev in _ANY_OP + ",=":
+            raise MathInputError(f"Something is missing after '{prev}'", offset + prev_i)
+        prev, prev_i = ch, i
+    if prev and prev in _ANY_OP + ",=":
+        raise MathInputError(f"The expression ends with '{prev}': something is missing after it", offset + prev_i)
+    if stack:
+        raise MathInputError("Unbalanced parentheses: this '(' is never closed", stack[-1])
+
+
+_COMMAND_RE = re.compile(r"^(" + "|".join(sorted(COMMANDS, key=len, reverse=True)) + r")(?![A-Za-z0-9])", re.IGNORECASE)
+_VAR_SPLIT = re.compile(r"\s+(?:wrt|for|with respect to)\s+")
+
+
+def precheck(user_input: str) -> None:
+    """Check the whole request (command, expression, variable) before any parsing.
+
+    Raises MathInputError whose position indexes the stripped input, so a UI can point at it.
+    """
+    s = (user_input or "").strip()
+    if not s:
+        raise MathInputError("Empty expression")
+    if len(s) > MAX_INPUT_CHARS:
+        raise MathInputError(f"Expression is too long (max {MAX_INPUT_CHARS} characters)")
+    cmd, body = _split_command(s)
+    start = len(s) - len(body) if body else len(s)
+    if cmd != "expr" and not body:
+        raise MathInputError(f"Add an expression after '{cmd}', as in '{cmd} x^2'", len(s))
+    m = _VAR_SPLIT.search(body) if cmd != "expr" else None
+    parts = [(body[: m.start()], start), (body[m.end():], start + m.end())] if m else [(body, start)]
+    expr_text, expr_at = parts[0]
+    for text, at in parts:
+        try:
+            validate(text)
+        except MathInputError as e:
+            if e.position is not None:
+                lead = len(text) - len(text.lstrip())
+                e.position += at + lead
+            raise
+    if "=" in expr_text and cmd != "solve":
+        raise MathInputError("'=' is only used with solve, as in 'solve x^2 = 4'", expr_at + expr_text.index("="))
+    if expr_text.count("=") > 1:
+        raise MathInputError("An equation has one '='", expr_at + expr_text.index("=", expr_text.index("=") + 1))
+    check_structure(expr_text, expr_at)
 
 
 def _local_dict() -> Dict[str, Any]:
@@ -107,15 +197,24 @@ def parse(text: str):
             evaluate=True,
         )
     except Exception as e:
-        raise MathInputError(f"Could not parse expression: {e}") from e
+        # SymPy's messages describe its own tokenizer ("unexpected EOF", "<string>, line 1"), not the user's text.
+        raise MathInputError("Couldn't read this expression. Check for a missing operator or parenthesis.") from e
 
 
 def _split_command(user_input: str) -> Tuple[str, str]:
+    """("integrate", "x^2") for "integrate x^2" and also for "integrate(x^2)"; ("expr", text) otherwise."""
     s = user_input.strip()
-    first = s.split(None, 1)[0].lower() if s else ""
-    if first in COMMANDS:
-        return first, s[len(first):].strip()
+    m = _COMMAND_RE.match(s)
+    if m:
+        return m.group(1).lower(), s[m.end():].strip()
     return "expr", s
+
+
+def _error(e: MathInputError) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"ok": False, "error": str(e), "steps": ["Could not parse expression."]}
+    if e.position is not None:
+        out["position"] = e.position
+    return out
 
 
 def _compute(user_input: str) -> Dict[str, Any]:
@@ -123,6 +222,7 @@ def _compute(user_input: str) -> Dict[str, Any]:
     if sp is None:
         return {"ok": False, "error": "sympy not installed", "steps": ["Install sympy for full math features."]}
     try:
+        precheck(user_input)
         cmd, body = _split_command(user_input)
         var = sp.Symbol("x")
         if cmd in {"differentiate", "derivative", "integrate", "simplify", "expand", "factor"}:
@@ -165,9 +265,9 @@ def _compute(user_input: str) -> Dict[str, Any]:
         expr = parse(body)
         return {"ok": True, "kind": "expr", "latex": sp.latex(expr), "steps": ["Parsed expression", "Rendered LaTeX"]}
     except MathInputError as e:
-        return {"ok": False, "error": str(e), "steps": ["Could not parse expression."]}
-    except Exception as e:
-        return {"ok": False, "error": f"Could not compute: {e}", "steps": ["Computation failed."]}
+        return _error(e)
+    except Exception:
+        return {"ok": False, "error": "Couldn't compute this. Try a simpler or differently written expression.", "steps": ["Computation failed."]}
 
 
 # ----------------------------------------------------------------------
@@ -220,11 +320,9 @@ def solve_request(user_input: str, timeout: float = TIMEOUT_SECONDS) -> Dict[str
         return _compute(user_input)
     # Cheap checks first, in-process, so obviously bad input never reaches the worker.
     try:
-        cmd, body = _split_command(user_input)
-        for part in re.split(r"\s+(?:wrt|for|with respect to)\s+", body, maxsplit=1):
-            validate(part)
+        precheck(user_input)
     except MathInputError as e:
-        return {"ok": False, "error": str(e), "steps": ["Could not parse expression."]}
+        return _error(e)
     global _use_subprocess
     if _use_subprocess:
         return _compute_in_subprocess(user_input, timeout)

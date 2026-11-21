@@ -1,15 +1,17 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
 import { GitCompare } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { FallbackNotice, LlmError } from "@/components/llm-error";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
-import { Notice, Spinner } from "@/components/ui/feedback";
+import { Notice } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
+import { IdlePreview } from "./library";
+import { matchPassage, passageId, PassageList } from "./passages";
+import { Announce, BusyIcon, PendingPanel, useToolRequest } from "./pending";
 
 function Bullets({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
@@ -30,9 +32,12 @@ function Bullets({ title, items, empty }: { title: string; items: string[]; empt
 
 export function Synthesis() {
   const [topic, setTopic] = useState("");
-  const run = useMutation({
-    mutationFn: async (t: string) => unwrap(await api.http.POST("/api/v1/synthesis", { body: { topic: t } })),
-  });
+  const [target, setTarget] = useState<{ index: number; nonce: number } | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const { run, cancel, cancelled, error } = useToolRequest(
+    async (t: string, signal: AbortSignal) => unwrap(await api.http.POST("/api/v1/synthesis", { body: { topic: t }, signal })),
+    { onMutate: () => setTarget(null) },
+  );
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (topic.trim().length >= 2) run.mutate(topic.trim());
@@ -45,18 +50,34 @@ export function Synthesis() {
         <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <Label htmlFor="syn-topic">Topic to compare across your documents</Label>
-            <Input id="syn-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Linked lists vs arrays" maxLength={200} />
+            <Input ref={input} id="syn-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Linked lists vs arrays" maxLength={200} />
           </div>
           <Button type="submit" disabled={run.isPending || topic.trim().length < 2}>
-            {run.isPending ? <Spinner /> : <GitCompare className="h-4 w-4" />}
-            Compare
+            {run.isPending ? <BusyIcon /> : <GitCompare className="h-4 w-4" aria-hidden />}
+            {run.isPending ? "Comparing…" : "Compare"}
           </Button>
         </form>
       </Card>
-      {run.isError ? <LlmError error={run.error} /> : null}
+      <PendingPanel running={run.isPending} label="Reading each document on this topic…" onCancel={cancel} />
+      <Announce>{cancelled ? "Cancelled." : d ? "Comparison ready." : ""}</Announce>
+      {!d && !run.isPending && !error ? (
+        <IdlePreview
+          items={[
+            "Where your documents agree, and where they differ.",
+            "One combined explanation, with who said what linked to the passage it came from.",
+            "A warning for any citation that does not match the passages compared.",
+          ]}
+          onPick={(t) => {
+            setTopic(t);
+            input.current?.focus();
+          }}
+        />
+      ) : null}
+      {error ? <LlmError error={error} /> : null}
       <FallbackNotice warning={d?.warning} />
       {d?.grounding_note ? <Notice>{d.grounding_note}</Notice> : null}
       {d ? (
+        <div className="space-y-4" aria-busy={run.isPending}>
         <Card className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <Bullets title="Where the sources agree" items={d.similarities} empty="No clear agreement found." />
@@ -76,20 +97,40 @@ export function Synthesis() {
             <div>
               <h2 className="mb-2 text-sm font-semibold text-muted">Who said what</h2>
               <ul className="space-y-1 text-sm">
-                {d.citations.map((c, i) => (
+                {d.citations.map((c, i) => {
+                  const at = c.doc ? matchPassage(c.doc, d.chunks ?? []) : -1;
+                  return (
                   <li key={i}>
-                    {c.doc ? <span className="font-mono text-xs text-accent-2">{c.doc}</span> : null} {c.point}
+                    {c.doc && at >= 0 ? (
+                      <a
+                        href={`#${passageId("syn", at)}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setTarget((t) => ({ index: at, nonce: (t?.nonce ?? 0) + 1 }));
+                        }}
+                        className="font-mono text-xs text-accent-2 underline underline-offset-2"
+                        aria-label={`${c.doc}: show passage ${at + 1}`}
+                      >
+                        {c.doc}
+                      </a>
+                    ) : c.doc ? (
+                      <span className="font-mono text-xs text-accent-2">{c.doc}</span>
+                    ) : null}{" "}
+                    {c.point}
                     {c.status && c.status !== "ok" ? (
                       <span className="ml-2 text-xs text-warn">
                         ({c.status === "page_not_retrieved" ? "page not among the passages compared" : "not among the passages compared"})
                       </span>
                     ) : null}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           ) : null}
         </Card>
+        <PassageList chunks={d.chunks ?? []} prefix="syn" query={topic} target={target} />
+        </div>
       ) : null}
     </div>
   );

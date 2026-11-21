@@ -195,6 +195,9 @@ class Socratic(BaseModel):
     hints: List[str]
     model: Optional[str] = None
     warning: Optional[str] = None
+    chunks: List[Chunk] = Field(
+        default_factory=list, description="The passages the questions and hints were based on; empty means general guidance"
+    )
 
 
 class SynthesisRequest(BaseModel):

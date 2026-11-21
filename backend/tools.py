@@ -223,22 +223,31 @@ def run_tool(tools: List[Tool], ctx: ToolContext, name: str, args: Dict[str, Any
         return {"error": f"{name} failed ({type(e).__name__})."}
 
 
+def _count(n: Any, word: str) -> str:
+    """'1 passage', '3 passages', '0 passages'."""
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        n = 0
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def summarize(name: str, result: Dict[str, Any]) -> str:
     """One line for a trace display."""
     if "error" in result:
         return str(result["error"])[:160]
     if name == "search_documents":
         docs = sorted({p.get("doc") for p in result.get("passages", []) if p.get("doc")})
-        return f"{result.get('count', 0)} passages" + (f" from {', '.join(docs)}" if docs else "")
+        return _count(result.get("count", 0), "passage") + (f" from {', '.join(docs)}" if docs else "")
     if name == "list_documents":
-        return f"{result.get('count', 0)} documents"
+        return _count(result.get("count", 0), "document")
     if name == "read_page":
         where = f"page {result.get('page')}" if result.get("page") else "start"
         return f"{result.get('doc')} {where}, {len(result.get('text', ''))} characters"
     if name == "solve_math":
         return str(result.get("result") or result.get("latex") or "done")[:160]
     if name == "find_leetcode_problem":
-        return f"{result.get('count', 0)} problems"
+        return _count(result.get("count", 0), "problem")
     if name == "save_flashcard":
         return "saved"
     return "done"
