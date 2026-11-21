@@ -9,14 +9,15 @@ except Exception:
 
 from .embeddings import embed_texts  # noqa: F401  (re-exported for existing callers)
 
-# Lazy import of modular sources to work both as package and script
-try:
-    from backend.sources import YouTubeSource, WebSource, GitHubSource, AudioSource  # type: ignore
-except Exception:
+
+def _source_class(name: str) -> Any:
+    """A source handler class, or None if its dependencies are missing. Imported on first use because the scraping
+    libraries are slow to load and server startup has a hard time limit on AWS Lambda."""
     try:
-        from .sources import YouTubeSource, WebSource, GitHubSource, AudioSource  # type: ignore
+        from . import sources
     except Exception:
-        YouTubeSource = WebSource = GitHubSource = AudioSource = None  # type: ignore
+        return None
+    return getattr(sources, name, None)
 
 
 def read_pdf(path: str) -> List[Tuple[int, str]]:
@@ -92,24 +93,28 @@ def build_chunks_from_input(input_value: str) -> List[Dict[str, Any]]:
     if src == "pdf":
         return build_chunks_from_pdf(input_value)
     if src == "youtube":
-        if YouTubeSource is None:
+        handler_class = _source_class("YouTubeSource")
+        if handler_class is None:
             raise RuntimeError("youtube-transcript-api not installed or import failed.")
-        handler = YouTubeSource()
+        handler = handler_class()
         return handler.extract(input_value)
     if src == "web":
-        if WebSource is None:
+        handler_class = _source_class("WebSource")
+        if handler_class is None:
             raise RuntimeError("web scraping modules not installed (requests/bs4/readability).")
-        handler = WebSource()
+        handler = handler_class()
         return handler.extract(input_value)
     if src == "github":
-        if GitHubSource is None:
+        handler_class = _source_class("GitHubSource")
+        if handler_class is None:
             raise RuntimeError("gitpython or requests not installed for GitHub source.")
-        handler = GitHubSource()
+        handler = handler_class()
         return handler.extract(input_value)
     if src == "audio":
-        if AudioSource is None:
+        handler_class = _source_class("AudioSource")
+        if handler_class is None:
             raise RuntimeError("openai not installed for Audio source.")
-        handler = AudioSource()
+        handler = handler_class()
         return handler.extract(input_value)
     raise ValueError(f"Could not detect source type for input: {input_value}")
 

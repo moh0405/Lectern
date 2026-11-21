@@ -4,12 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const nav = vi.hoisted(() => ({ pathname: "/ask" }));
-const health = vi.hoisted(() => ({ status: 200 }));
+const health = vi.hoisted(() => ({ status: 200, starting: false }));
 vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname, useRouter: () => ({ push: vi.fn() }) }));
 vi.hoisted(() => {
   // The API client keeps a reference to fetch from import time, so stub it first.
   globalThis.fetch = (async () =>
-    health.status === 200
+    health.starting ? Response.json({ status: "starting", version: "1.0.0", semantic_search: null, chunks: null }) : health.status === 200
       ? Response.json({ status: "ok", version: "1.0.0", semantic_search: false, chunks: 2 })
       : Response.json({ error: { code: "rate_limited", message: "Rate limit exceeded" } }, { status: health.status })) as typeof fetch;
 });
@@ -29,6 +29,7 @@ function renderShell(demo = false) {
 beforeEach(() => {
   nav.pathname = "/ask";
   health.status = 200;
+  health.starting = false;
   delete document.documentElement.dataset.demoStrip;
   localStorage.clear();
 });
@@ -81,6 +82,15 @@ describe("AppShell", () => {
     renderShell();
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/Service busy/));
     expect(screen.getByText("Service busy · retrying shortly")).toBeInTheDocument();
+  });
+
+  it("shows a calm starting state, without an invented passage count", async () => {
+    health.starting = true;
+    renderShell();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/starting up/));
+    expect(screen.getByText("Starting up…")).toBeInTheDocument();
+    expect(screen.queryByText(/passage/)).toBeNull();
+    expect(screen.queryByText("Offline")).toBeNull();
   });
 
   it("shows no demo notice outside the demo", () => {

@@ -58,6 +58,20 @@ const MAX_CACHE_ENTRIES = 64;
 const MAX_CACHE_BYTES = 1024 * 1024;
 const MAX_ENTRY_BYTES = 256 * 1024;
 
+/** A cold API can drop the first connection. Only read-only metadata is retried, and only after a quick failure. */
+const RETRY_DELAYS_MS = [400, 1200];
+const RETRY_STATUSES = new Set([502, 503, 504]);
+const RETRY_WINDOW_MS = 10_000;
+
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) { resolve(); return; }
+    const done = () => { clearTimeout(timer); signal.removeEventListener("abort", done); resolve(); };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done, { once: true });
+  });
+}
+
 interface MetadataEntry {
   response: Response;
   expiresAt: number;
@@ -66,7 +80,8 @@ interface MetadataEntry {
 
 /** Read only a bounded clone; oversized responses still stream normally to their callers. */
 async function metadataCopy(response: Response): Promise<{ response: Response; bytes: number } | null> {
-  if (!response.ok) return null;
+  // `no-store` marks a passing state (the API is still starting), which must not be replayed to later visitors.
+  if (!response.ok || response.headers.get("cache-control")?.includes("no-store")) return null;
   const declaredSize = Number(response.headers.get("content-length"));
   if (declaredSize > MAX_ENTRY_BYTES) return null;
   if (!response.body) return { response: response.clone(), bytes: 0 };
@@ -113,7 +128,7 @@ function waitForMetadata(pending: Promise<Response>, signal: AbortSignal): Promi
 }
 
 /** A factory keeps test/deployment caches isolated. The exported forwarder below is process-local. */
-export function createForwarder({ now = Date.now }: { now?: () => number } = {}) {
+export function createForwarder({ now = Date.now, sleep = pause }: { now?: () => number; sleep?: (ms: number, signal: AbortSignal) => Promise<void> } = {}) {
   const cache = new Map<string, MetadataEntry>();
   const inflight = new Map<string, Promise<Response>>();
   let cacheBytes = 0;
@@ -150,7 +165,22 @@ export function createForwarder({ now = Date.now }: { now?: () => number } = {})
     const visitor = visitorIp(req);
     if (visitor) headers.set("x-visitor-ip", visitor);
 
+    const retryable = req.method === "GET" && (isHealth || METADATA_PATHS.has(path));
+
     async function requestUpstream(signal: AbortSignal): Promise<Response> {
+      const startedAt = now();
+      for (let attempt = 0; ; attempt++) {
+        const response = await attemptUpstream(signal);
+        const retry = retryable && RETRY_STATUSES.has(response.status) && attempt < RETRY_DELAYS_MS.length
+          && !signal.aborted && now() - startedAt < RETRY_WINDOW_MS;
+        if (!retry) return response;
+        await response.body?.cancel().catch(() => {});
+        await sleep(RETRY_DELAYS_MS[attempt]!, signal);
+        if (signal.aborted) return errorResponse(502, "upstream_unreachable", "Could not reach the API.");
+      }
+    }
+
+    async function attemptUpstream(signal: AbortSignal): Promise<Response> {
       const hasBody = req.method !== "GET" && req.method !== "HEAD";
       let upstream: Response;
       try {

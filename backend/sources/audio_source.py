@@ -6,11 +6,6 @@ import os
 
 from .base_source import BaseSource
 
-try:
-    from openai import OpenAI
-except Exception:
-    OpenAI = None
-
 
 class AudioSource(BaseSource):
     def __init__(self) -> None:
@@ -21,8 +16,10 @@ class AudioSource(BaseSource):
         return p.exists() and p.suffix.lower() in {".mp3", ".mp4", ".wav", ".m4a"}
 
     def _transcribe(self, file_path: str) -> Dict[str, Any]:
-        if OpenAI is None:
-            raise RuntimeError("openai not installed. Add it to requirements.")
+        try:
+            from openai import OpenAI  # imported here because it is slow to load and few requests need it
+        except Exception as e:
+            raise RuntimeError("openai not installed. Add it to requirements.") from e
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not set in environment.")

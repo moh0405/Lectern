@@ -21,14 +21,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, Iterator, List, Optional
-
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except Exception:  # SDK not installed
-    genai = None
-    genai_types = None
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 try:
     from dotenv import load_dotenv
@@ -38,6 +31,25 @@ except Exception:
     pass
 
 logger = logging.getLogger("ai-study-mentor.llm")
+
+
+def _genai_sdk() -> Tuple[Any, Any]:
+    """The SDK and its types, or (None, None) if it is not installed. Imported on first use: it is slow to load,
+    and server startup has a hard time limit on AWS Lambda."""
+    try:
+        from google import genai
+        from google.genai import types
+    except Exception:
+        return None, None
+    return genai, types
+
+
+def __getattr__(name: str) -> Any:
+    if name == "genai":
+        return _genai_sdk()[0]
+    if name == "genai_types":
+        return _genai_sdk()[1]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # gemini-3.8-flash was the default until it was found to answer "503 high demand" or time out most of the time
 # (a live Lambda sat on it for weeks while gemini-3.6-flash and the lite model answered in seconds).
@@ -154,6 +166,7 @@ class GeminiClient:
     ):
         """`client` lets tests (or callers) inject a pre-built SDK client."""
         if client is None:
+            genai, genai_types = _genai_sdk()
             if genai is None:
                 raise RuntimeError("google-genai is not installed. Please run: pip install google-genai")
             key = api_key or os.getenv("GEMINI_API_KEY")
@@ -235,6 +248,7 @@ class GeminiClient:
         kwargs: Dict[str, Any] = {"temperature": temp}
         if json_mode:
             kwargs["response_mime_type"] = "application/json"
+        genai_types = _genai_sdk()[1]
         return genai_types.GenerateContentConfig(**kwargs) if genai_types is not None else kwargs
 
     @staticmethod
