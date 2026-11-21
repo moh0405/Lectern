@@ -38,7 +38,19 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
   expect(askBody!.context!.length).toBeGreaterThan(0);
   expect(askBody!.context!.every((c) => c.doc === "graphs.pdf")).toBe(true);
 
-  // 4) nothing was uploaded, and nothing was refused
+  // 4) the passages are tagged as coming from this browser; saving a flashcard and writing notes stay in the browser too
+  await expect(page.getByText("Sources (").first()).toContainText("In this browser");
+  await page.getByRole("button", { name: "Save as flashcard" }).click();
+  await expect(page.getByRole("button", { name: "Saved as flashcard" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByText("Saved to this browser").first()).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("ai-study-mentor:cards:v1"))).toContain("How are graphs represented?");
+  await page.getByRole("button", { name: /Generate from this session/ }).click();
+  const notes = page.waitForEvent("download");
+  await page.getByRole("button", { name: "MD", exact: true }).click();
+  expect((await notes).suggestedFilename()).toBe("study-notes.md");
+  await expect(page.getByRole("button", { name: "PDF", exact: true })).toHaveCount(0); // server-only export
+
+  // nothing was uploaded, and nothing was refused
   expect(uploads).toEqual([]);
   expect(refused).toEqual([]);
 
@@ -48,7 +60,12 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
     await page.getByLabel("Your question").fill("zzzzqqqq xxyyzz");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText(/Nothing in your documents matches/)).toBeVisible();
+    // a neutral notice, not an error, with a way to search the shared textbooks instead
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Search the shared textbooks instead" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add material", exact: true }).first()).toBeVisible();
   }
+  expect(refused).toEqual([]);
 
   // 6) removing the document returns the page to the shared textbooks
   await page.goto("/sources");

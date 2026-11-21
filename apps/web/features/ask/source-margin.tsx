@@ -6,12 +6,19 @@ import { useState } from "react";
 import { pageLabel } from "@/lib/format";
 import { closestSentence, excerpt, twoDigits, type CiteRef } from "./citations";
 import type { Turn } from "./session";
-import type { Selection } from "./turn-card";
+import type { Selection } from "./citation-chip";
 import styles from "./ask.module.css";
 
-const PROBLEM: Record<string, string> = {
+export const PROBLEM: Record<string, string> = {
   unknown_source: "The answer names a source that was not among the passages Lectern retrieved, so there is nothing to show. It may be invented.",
   page_not_retrieved: "The document was retrieved, but not the page the answer cites, so that page cannot be shown here.",
+};
+
+const BAND_EMPTY: Record<Turn["status"], string> = {
+  streaming: "Finding passages in your material…",
+  done: "No passages for this question",
+  error: "The question didn't reach your sources",
+  stopped: "Stopped before any passages came back",
 };
 
 function Intro() {
@@ -40,8 +47,11 @@ function Intro() {
   );
 }
 
-/** The highlighted passage, opening on the sentence that best matches what cited it. */
-function Passage({ text, sentence, reason }: { text: string; sentence: string; reason: string }) {
+/**
+ * The highlighted passage, opening on the sentence that best matches what cited it. `anchor` marks the highlight
+ * as the end of the trace line; only the source margin sets it.
+ */
+export function Passage({ text, sentence, reason, anchor = true, className }: { text: string; sentence: string; reason: string; anchor?: boolean; className?: string }) {
   const [expanded, setExpanded] = useState(false);
   const focus = closestSentence(text, sentence);
   const cut = expanded ? { text, offset: 0, clippedStart: false, clippedEnd: false } : excerpt(text, focus);
@@ -51,12 +61,12 @@ function Passage({ text, sentence, reason }: { text: string; sentence: string; r
   const visible = focus !== null && start < end;
   return (
     <>
-      <blockquote className={`${styles.passageQuote} paper-serif`} data-margin-anchor={visible ? undefined : "true"}>
+      <blockquote className={`${styles.passageQuote} paper-serif ${className ?? ""}`} data-margin-anchor={anchor && !visible ? "true" : undefined}>
         {cut.clippedStart ? "… " : null}
         {visible ? (
           <>
             {cut.text.slice(0, start)}
-            <mark data-margin-anchor="true">{cut.text.slice(start, end)}</mark>
+            <mark data-margin-anchor={anchor ? "true" : undefined}>{cut.text.slice(start, end)}</mark>
             {cut.text.slice(end)}
           </>
         ) : (
@@ -75,7 +85,15 @@ function Passage({ text, sentence, reason }: { text: string; sentence: string; r
   );
 }
 
-export function SourceMargin({ turn, refs, selection, onSelect }: { turn?: Turn; refs: CiteRef[]; selection: Selection; onSelect: (s: Selection) => void }) {
+/** Honest copy for a turn that has no passage to show, by what happened to it. */
+export function noPassageText(turn: Turn): string {
+  if (turn.status === "streaming") return "Finding the passages that answer your question…";
+  if (turn.status === "error") return "This question didn't reach your sources. Try again.";
+  if (turn.status === "stopped") return "You stopped this question before any passages came back. Ask it again to see them.";
+  return "No passages in your material matched this question, so there is nothing to show here.";
+}
+
+export function SourceMargin({ turn, refs, selection, onSelect, scope }: { turn?: Turn; refs: CiteRef[]; selection: Selection; onSelect: (s: Selection) => void; /** Where the passages came from, in the public demo ("In this browser" or "Shared library"). */ scope?: string }) {
   if (!turn) {
     return (
       <>
@@ -106,8 +124,11 @@ export function SourceMargin({ turn, refs, selection, onSelect }: { turn?: Turn;
           {chunk && index !== null ? twoDigits(index + 1) : ref && ref.status !== "ok" ? "?" : "–"}
         </span>
         <div className="min-w-0">
-          <p className="eyebrow">{ref ? "Citation in focus" : chunk ? "Passage in focus" : "Sources"}</p>
-          <p className={styles.bandText}>{where || (turn.status === "streaming" ? "Finding passages in your material…" : "No passages for this question")}</p>
+          <p className="eyebrow">
+            {ref ? "Citation in focus" : chunk ? "Passage in focus" : "Sources"}
+            {scope ? ` · ${scope}` : ""}
+          </p>
+          <p className={styles.bandText}>{where || BAND_EMPTY[turn.status]}</p>
         </div>
       </div>
 
@@ -168,10 +189,8 @@ export function SourceMargin({ turn, refs, selection, onSelect }: { turn?: Turn;
               </a>
             ) : null}
           </section>
-        ) : turn.status === "streaming" ? (
-          <p className={`${styles.marginLead} paper-serif`}>Finding the passages that answer your question…</p>
         ) : (
-          <p className={`${styles.marginLead} paper-serif`}>No passages were retrieved for this question, so there is nothing to show here.</p>
+          <p className={`${styles.marginLead} paper-serif`}>{noPassageText(turn)}</p>
         )}
         <p className={styles.marginNote}>
           Passages are the exact text Lectern retrieved for this question. Citations are checked against them before they are linked.

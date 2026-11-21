@@ -236,11 +236,17 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .paper .eyebrow { color: var(--color-paper-muted); }
 .paper-serif { font-family: var(--font-serif); }
 .paper mark { background: var(--color-paper-mark); color: var(--color-paper-fg); border-radius: 2px; padding: 2px 1px; }
-.cite-chip { display: inline-flex; align-items: center; gap: 3px; margin: 0 2px; padding: 1px 6px; vertical-align: 0.12em; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--color-accent-2) 40%, transparent); background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent-2); font: 400 11px/1.6 var(--font-mono), monospace; text-decoration: none; cursor: pointer; transition: background-color .15s, border-color .15s; }
-.cite-chip:hover, .cite-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 34%, transparent); border-color: var(--color-accent-2); }
-.cite-chip svg { width: 10px; height: 10px; }
+/* Citation chips. Every state keeps text at 4.5:1 or more in both themes; the selected chip is a solid accent fill. */
+.cite-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 24px; margin: 0 2px; padding: 0 7px; vertical-align: 0.08em; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--color-accent-2) 45%, transparent); background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent-2); font: 400 12px/1 var(--font-mono), monospace; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+.cite-chip:hover { background: color-mix(in srgb, var(--color-accent) 22%, transparent); border-color: var(--color-accent-2); }
+.cite-chip[aria-pressed="true"] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-fg); }
+.cite-chip svg { flex-shrink: 0; width: 11px; height: 11px; }
+.cite-chip-label { overflow: hidden; max-width: 22ch; text-overflow: ellipsis; }
 .cite-chip.unlisted { color: var(--color-muted); border-color: var(--color-border); background: transparent; }
-.cite-chip.unverified {color: var(--color-warn); border-color: color-mix(in srgb, var(--color-warn) 55%, transparent); background: color-mix(in srgb, var(--color-warn) 12%, transparent); }
+.cite-chip.unlisted[aria-pressed="true"] { color: var(--color-fg); border-color: var(--color-muted); background: var(--color-surface-2); }
+.cite-chip.unverified { color: color-mix(in srgb, var(--color-warn) 82%, var(--color-fg)); border-color: color-mix(in srgb, var(--color-warn) 55%, transparent); background: color-mix(in srgb, var(--color-warn) 7%, transparent); }
+.cite-chip.unverified[aria-pressed="true"] { border-color: var(--color-warn); box-shadow: inset 0 0 0 1px var(--color-warn); background: color-mix(in srgb, var(--color-warn) 9%, transparent); }
+@media (pointer: coarse) { .cite-chip { min-height: 28px; padding: 0 9px; } }
 
 @media (max-width: 1100px) {
   .desk-header { padding: 0 20px; column-gap: 14px; }
