@@ -26,7 +26,7 @@ test("concept map renders a graph, highlights neighbours and offers exports", as
   await expect(page.getByTestId("concept-neighbours")).toContainText(/^Node/);
   await page.getByRole("button", { name: "List view" }).click();
   await expect(page.getByTestId("concept-list")).toContainText("Linked list → has → Node");
-  await page.getByRole("button", { name: "Map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "DOT" }).click();
