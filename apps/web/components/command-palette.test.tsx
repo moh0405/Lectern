@@ -50,7 +50,7 @@ describe("CommandPalette", () => {
     render(<Shell />);
     await userEvent.type(await openWithKeys(), "leetc");
     expect(screen.getByText("LeetCode")).toBeInTheDocument();
-    expect(screen.queryByText("Analytics")).toBeNull();
+    expect(screen.queryByText("Insights")).toBeNull();
     await userEvent.keyboard("{Enter}");
     expect(push).toHaveBeenCalledWith("/leetcode");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -64,10 +64,46 @@ describe("CommandPalette", () => {
     expect(push).toHaveBeenLastCalledWith("/math");
     await userEvent.type(await openWithKeys(), "socratic");
     await userEvent.keyboard("{Enter}");
-    expect(push).toHaveBeenLastCalledWith("/tutor?tool=socratic");
+    expect(push).toHaveBeenLastCalledWith("/work-it-out");
     await userEvent.type(await openWithKeys(), "eli5");
     await userEvent.keyboard("{Enter}");
-    expect(push).toHaveBeenLastCalledWith("/tutor?tool=adaptive");
+    expect(push).toHaveBeenLastCalledWith("/explain");
+  });
+
+  it("finds each regrouped page by its old name and by synonyms", async () => {
+    render(<Shell />);
+    const cases: [string, string][] = [
+      ["hints", "/work-it-out"],
+      ["tutor", "/work-it-out"],
+      ["level", "/explain"],
+      ["embedding", "/visualize"],
+      ["vectors", "/visualize"],
+      ["3d", "/visualize"],
+      ["analytics", "/analytics"],
+      ["stats", "/analytics"],
+      ["usage", "/analytics"],
+      ["insights", "/analytics"],
+      ["synthesis", "/compare"],
+      ["compare", "/compare"],
+      ["graph", "/concept-map"],
+      ["concept", "/concept-map"],
+      ["agent", "/agent"],
+    ];
+    for (const [typed, href] of cases) {
+      await userEvent.type(await openWithKeys(), typed);
+      await userEvent.keyboard("{Enter}");
+      expect(push, typed).toHaveBeenLastCalledWith(href);
+    }
+  });
+
+  it("lists the regrouped pages under their new sections", async () => {
+    render(<Shell />);
+    await openWithKeys();
+    const group = (name: string) => within(screen.getByRole("dialog")).getByText(name, { selector: "[cmdk-group-heading]" }).parentElement as HTMLElement;
+    const labels = (name: string) => within(group(name)).getAllByRole("option").map((o) => o.textContent);
+    expect(labels("Library")).toEqual(expect.arrayContaining(["Library (Sources)", "Map (embeddings)", "Insights"]));
+    expect(labels("Practice")).toEqual(expect.arrayContaining(["Flashcards", "LeetCode", "Work it out", "Explain at my level"]));
+    expect(labels("Tools").slice(0, 4)).toEqual(["Concept map", "Compare sources", "Agent", "Math"]);
   });
 
   it("groups everything under the four sections and names Sources as the Library", async () => {
@@ -125,7 +161,7 @@ describe("scoreItem", () => {
   it("needs every typed word to start a word of the label or a keyword", () => {
     expect(scoreItem({ label: "Compare sources", keywords: ["synthesis"] }, "practice")).toBe(0);
     expect(scoreItem({ label: "Flashcards", keywords: ["practice"] }, "prac")).toBeGreaterThan(0);
-    expect(scoreItem({ label: "Math" }, "math")).toBeGreaterThan(scoreItem({ label: "Tutor tools", keywords: ["math"] }, "math"));
+    expect(scoreItem({ label: "Math" }, "math")).toBeGreaterThan(scoreItem({ label: "Concept map", keywords: ["math"] }, "math"));
     expect(scoreItem({ label: "Math" }, "")).toBe(1);
   });
 });

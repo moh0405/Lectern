@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
 import { Notice } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
+import { useInitialParam } from "@/lib/use-url-params";
 import { downloadBlob } from "@/lib/download";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -22,8 +23,8 @@ import { useLiveTheme } from "./use-live-theme";
 
 type View = "map" | "list";
 
-export function ConceptMap() {
-  const [topic, setTopic] = useState("");
+export function ConceptMap({ initial = "" }: { initial?: string }) {
+  const [topic, setTopic] = useState(initial);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<View>("map");
   const theme = useLiveTheme();
@@ -276,4 +277,9 @@ function ConceptList({
       })}
     </ul>
   );
+}
+
+/** The tool on its own page, its field prefilled from `?topic=` (the "Go further" links on Ask use this). */
+export function ConceptMapFromUrl() {
+  return <ConceptMap initial={useInitialParam("topic", 200)} />;
 }

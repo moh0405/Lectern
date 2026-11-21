@@ -4,20 +4,8 @@ import { ApiError } from "@/lib/api";
 import { errorPosition } from "@/features/math/math-view";
 import { topicSuggestions } from "./library";
 import { matchPassage, PassageList, passageWhere } from "./passages";
-import { nextTabIndex } from "./tutor-view";
 
 const chunk = (doc: string, page: number | null, text = "A heap is a complete binary tree.") => ({ doc, page, text, score: 0.29 });
-
-describe("nextTabIndex (ARIA tabs keyboard pattern)", () => {
-  it("moves with arrows, wraps, and jumps with Home/End", () => {
-    expect(nextTabIndex("ArrowRight", 0, 4)).toBe(1);
-    expect(nextTabIndex("ArrowRight", 3, 4)).toBe(0);
-    expect(nextTabIndex("ArrowLeft", 0, 4)).toBe(3);
-    expect(nextTabIndex("Home", 2, 4)).toBe(0);
-    expect(nextTabIndex("End", 0, 4)).toBe(3);
-    expect(nextTabIndex("Enter", 1, 4)).toBeNull();
-  });
-});
 
 describe("matchPassage", () => {
   const chunks = [chunk("heaps.pdf", 1), chunk("graphs.pdf", 2), chunk("heaps.pdf", 3)];

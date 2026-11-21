@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/feedback";
@@ -45,6 +46,34 @@ const STEPS = [
   { id: "understanding", label: "Understanding" },
 ] as const;
 type Step = (typeof STEPS)[number]["id"];
+
+/** Links from a finished answer into the study tools, carrying the question so the tool opens ready to run. */
+export function goFurtherLinks(question: string): { href: string; label: string }[] {
+  const q = question.trim();
+  const topic = encodeURIComponent(q.slice(0, 200)); // the topic fields take up to 200 characters
+  const full = encodeURIComponent(q);
+  return [
+    { href: `/concept-map?topic=${topic}`, label: "Concept map of this topic" },
+    { href: `/compare?topic=${topic}`, label: "Compare your sources" },
+    { href: `/work-it-out?question=${full}`, label: "Work it out with hints" },
+  ];
+}
+
+/**
+ * Put `?q=` into the composer (the command palette's "Ask: …" and the Insights rows link here), then drop it
+ * from the address so a reload does not bring it back. It never sends the question.
+ */
+function QueryPrefill({ onPrefill }: { onPrefill: (q: string) => void }) {
+  const q = useSearchParams()?.get("q")?.trim().slice(0, MAX_QUESTION) ?? "";
+  useEffect(() => {
+    if (!q) return;
+    onPrefill(q);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [q, onPrefill]);
+  return null;
+}
 
 /** Open the first citation that has a passage; otherwise the best retrieved passage. */
 function defaultSelection(turn: Turn | undefined, refs: CiteRef[]): Selection {
@@ -320,6 +349,16 @@ export function AskView() {
     el.style.height = `${Math.min(el.scrollHeight + 2, 220)}px`;
   }, [question]);
 
+  const prefill = useCallback((q: string) => {
+    setQuestion(q);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(q.length, q.length);
+    });
+  }, []);
+
   const offline = stats.isError;
   const limit = retrievalOnly ? MAX_SEARCH : MAX_QUESTION;
   const length = question.trim().length;
@@ -470,10 +509,23 @@ export function AskView() {
                     <Link href="/study">
                       Review your flashcards <ArrowUpRight aria-hidden="true" />
                     </Link>
-                    <Link href="/tutor?tool=socratic">
-                      Work through it with guiding questions <ArrowUpRight aria-hidden="true" />
-                    </Link>
                   </div>
+                  {active && active.chunks.length > 0 ? (
+                    <div className={styles.goFurther} data-testid="go-further">
+                      <h3 id="go-further-title" className="eyebrow">
+                        Go further
+                      </h3>
+                      <ul aria-labelledby="go-further-title">
+                        {goFurtherLinks(active.question).map((l) => (
+                          <li key={l.href}>
+                            <Link href={l.href}>
+                              {l.label} <ArrowUpRight aria-hidden="true" />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
               {/* Notes cover the whole session, so they stay available whichever question is on the desk. */}
@@ -675,6 +727,10 @@ export function AskView() {
       </aside>
 
       <TraceLine enabled={Boolean(active) && trace && traceable && !narrow} version={`${active?.id}:${selection.ref}:${selection.chunk}`} />
+
+      <Suspense fallback={null}>
+        <QueryPrefill onPrefill={prefill} />
+      </Suspense>
 
       {/* One status region for the whole desk; the streaming answer itself is not a live region. */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
