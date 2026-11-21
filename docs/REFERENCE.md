@@ -147,7 +147,7 @@ Lectern/
 ├── backend/
 │   ├── api/                    # FastAPI app: app.py, settings, errors, deps, jobs, schemas, routers/
 │   ├── safe_math.py            # Whitelisted SymPy parser + worker process with timeout
-│   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes, synthesis
+│   ├── rag_engine.py           # RAGEngine: load store, retrieve, prompt modes, Gemini answers, suggestions, notes
 │   ├── embeddings.py           # Sentence-transformers and dependency-free hashing embedders
 │   ├── lexical.py              # BM25 keyword ranking and reciprocal rank fusion
 │   ├── chunking.py             # Structure-aware chunking (sentences, headings, code, boilerplate)
@@ -542,10 +542,9 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 - `retrieve_context(query, k)`: in `auto` mode, hybrid search (vector search and BM25, merged with reciprocal rank fusion) when the index has semantic embeddings, BM25 alone otherwise. Each result's `score` is its cosine similarity (or normalized BM25), and carries its page range. Details: `backend/lexical.py`, `backend/chunking.py`, `backend/rerank.py`, `backend/citations.py`.
 - `RAGEngine.shared()`: one engine per store directory, used by the API. `add_sources()` / `remove_source()` update the live index and persist it.
 - `generate_prompt(question, chunks, mode)`: builds the mode-specific prompt.
-- `answer_with_gemini(...)`: retrieve → prompt → Gemini. `generate_answer(...)` synthesizes from caller-supplied context.
-- `generate_query_suggestions(...)`: proposes study questions from the corpus (static fallback list on failure).
+- `answer_with_gemini(...)`: retrieve → prompt → Gemini.
+- `generate_query_suggestions(...)`: proposes study questions from `sample_passages()`, a deterministic sample taken round-robin across documents (static fallback list on failure).
 - `summarize_chat(history)`: turns the last 20 Q&A turns into Markdown study notes (heuristic fallback).
-- `multi_source_synthesis(question)`: top chunks per document, then Gemini compares and cites.
 
 ### `GeminiClient` (`backend/llm_config.py`)
 1. Reads `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_TEMPERATURE`.
@@ -553,9 +552,9 @@ Source type is detected in `document_processor._detect_source` (and `source_mana
 3. `generate`: tries the chosen model, then the default. Transient errors (429, 5xx, timeouts) are retried up to 3 times with backoff; auth errors fail fast. `json_mode=True` requests a JSON response. `stream()` yields text deltas, retrying only before the first one.
 
 ### Advanced AI (`backend/advanced_ai.py`)
-- `build_concept_map` and `concept_map_to_dot`: JSON graph from Gemini; falls back to a keyword-frequency chain.
+- `build_concept_map` and `concept_map_to_dot`: JSON graph from Gemini, grounded in the passages retrieved for the topic (returned as `chunks`; `grounding_note` when nothing matched and a cross-document sample was used); falls back to a keyword-frequency chain.
 - `socratic_tutor`: questions and hints as JSON; canned questions as fallback.
-- `multi_document_synthesis`: similarities, conflicts, synthesis and citations as JSON.
+- `multi_document_synthesis`: similarities, conflicts, synthesis and citations as JSON, from each document's passages most relevant to the topic (labelled with document and page); every citation is checked with `backend/citations.py` (`checked_citations`, `unverified_citations`).
 - `adaptive_explain`: five `ELI_LEVELS` plus a 3-question quiz.
 - `math_solve`: SymPy-backed `simplify`, `differentiate`/`derivative`, `integrate`, `solve ... for ...`, or plain LaTeX rendering.
 

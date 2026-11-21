@@ -43,9 +43,9 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 
 | Method | Path | Body |
 |---|---|---|
-| POST | `/api/v1/concept-map` | `{topic, temperature}` → `{nodes, edges, dot, model, warning}` |
+| POST | `/api/v1/concept-map` | `{topic, temperature}` → `{nodes, edges, dot, model, warning, chunks, grounding_note}` (built from the passages retrieved for the topic) |
 | POST | `/api/v1/socratic` | `{question, depth, k, temperature}` → `{questions, hints, ...}` |
-| POST | `/api/v1/synthesis` | `{topic, k_per_doc, temperature}` → `{similarities, conflicts, synthesis, citations}` |
+| POST | `/api/v1/synthesis` | `{topic, k_per_doc, temperature}` → `{similarities, conflicts, synthesis, citations, chunks, checked_citations, unverified_citations, grounding_note}` (each document's passages most relevant to the topic; citations checked against them) |
 | POST | `/api/v1/adaptive` | `{question, level, temperature}` → explanation at a level with a mini quiz |
 | POST | `/api/v1/math` | `{input}` → `{kind, latex, steps}` |
 

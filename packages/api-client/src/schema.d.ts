@@ -991,12 +991,22 @@ export interface components {
         /** ConceptMap */
         ConceptMap: {
             /**
+             * Chunks
+             * @description The passages the map was built from (retrieved for the topic)
+             */
+            chunks?: components["schemas"]["Chunk"][];
+            /**
              * Dot
              * @description Graphviz DOT source
              */
             dot: string;
             /** Edges */
             edges: components["schemas"]["ConceptEdge"][];
+            /**
+             * Grounding Note
+             * @description Set when no passages matched the topic, so a general sample of the material was used instead
+             */
+            grounding_note?: string | null;
             /** Model */
             model?: string | null;
             /** Nodes */
@@ -1728,16 +1738,37 @@ export interface components {
         };
         /** Synthesis */
         Synthesis: {
+            /**
+             * Checked Citations
+             * @description Every citation in the result (inline and structured), checked against `chunks`
+             */
+            checked_citations?: components["schemas"]["CitationCheck"][];
+            /**
+             * Chunks
+             * @description The passages compared: each document's most relevant to the topic
+             */
+            chunks?: components["schemas"]["Chunk"][];
             /** Citations */
             citations: components["schemas"]["SynthesisCitation"][];
             /** Conflicts */
             conflicts: string[];
+            /**
+             * Grounding Note
+             * @description Set when no passages matched the topic, so a general sample of the material was used instead
+             */
+            grounding_note?: string | null;
             /** Model */
             model?: string | null;
             /** Similarities */
             similarities: string[];
             /** Synthesis */
             synthesis: string;
+            /**
+             * Unverified Citations
+             * @description How many of `checked_citations` are not among the passages given
+             * @default 0
+             */
+            unverified_citations?: number;
             /** Warning */
             warning?: string | null;
         };
@@ -1747,6 +1778,11 @@ export interface components {
             doc: string;
             /** Point */
             point: string;
+            /**
+             * Status
+             * @description How `doc` checks against the passages the model was given (see CitationCheck); unset when no document is named
+             */
+            status?: ("ok" | "page_not_retrieved" | "unknown_source") | null;
         };
         /** SynthesisRequest */
         SynthesisRequest: {

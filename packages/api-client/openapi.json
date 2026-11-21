@@ -822,6 +822,14 @@
       },
       "ConceptMap": {
         "properties": {
+          "chunks": {
+            "description": "The passages the map was built from (retrieved for the topic)",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
           "dot": {
             "description": "Graphviz DOT source",
             "title": "Dot",
@@ -833,6 +841,18 @@
             },
             "title": "Edges",
             "type": "array"
+          },
+          "grounding_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when no passages matched the topic, so a general sample of the material was used instead",
+            "title": "Grounding Note"
           },
           "model": {
             "anyOf": [
@@ -2711,6 +2731,22 @@
       },
       "Synthesis": {
         "properties": {
+          "checked_citations": {
+            "description": "Every citation in the result (inline and structured), checked against `chunks`",
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Checked Citations",
+            "type": "array"
+          },
+          "chunks": {
+            "description": "The passages compared: each document's most relevant to the topic",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
           "citations": {
             "items": {
               "$ref": "#/components/schemas/SynthesisCitation"
@@ -2724,6 +2760,18 @@
             },
             "title": "Conflicts",
             "type": "array"
+          },
+          "grounding_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when no passages matched the topic, so a general sample of the material was used instead",
+            "title": "Grounding Note"
           },
           "model": {
             "anyOf": [
@@ -2746,6 +2794,12 @@
           "synthesis": {
             "title": "Synthesis",
             "type": "string"
+          },
+          "unverified_citations": {
+            "default": 0,
+            "description": "How many of `checked_citations` are not among the passages given",
+            "title": "Unverified Citations",
+            "type": "integer"
           },
           "warning": {
             "anyOf": [
@@ -2777,6 +2831,23 @@
           "point": {
             "title": "Point",
             "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "page_not_retrieved",
+                  "unknown_source"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How `doc` checks against the passages the model was given (see CitationCheck); unset when no document is named",
+            "title": "Status"
           }
         },
         "required": [

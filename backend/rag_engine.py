@@ -321,23 +321,6 @@ class RAGEngine:
         context = self.format_context(chunks)
         return template.format(context=context, question=question)
 
-    def generate_answer(self, question: str, context: str, model: str | None = None, temperature: float = 0.2, mode: str | None = "technical") -> Dict[str, Any]:
-        """Synthesize ONE coherent answer from provided context using Gemini.
-
-        - Uses tutor-style prompt with explicit instructions
-        - Does not perform retrieval; callers provide `context`
-        - Returns {"ok": bool, "answer": str, "model": str?, "error": str?}
-        """
-        template = self._prompt_for_mode(mode)
-        prompt = template.format(context=context, question=question)
-        try:
-            from .llm_providers import create_llm
-            client = create_llm(model=model, temperature=temperature)
-            res = client.generate(prompt, temperature=temperature)
-            return {"ok": bool(res.get("ok", True)), "answer": res.get("answer", ""), "model": res.get("model"), "prompt": prompt}
-        except Exception as e:
-            return {"ok": False, "answer": "", "error": str(e), "model": model, "prompt": prompt}
-
     def answer_question(self, question: str, k: int = 3, mode: str | None = None) -> Dict[str, Any]:
         chunks = self.retrieve_context(question, k=k)
         prompt = self.generate_prompt(question, chunks, mode=mode)
@@ -363,19 +346,38 @@ class RAGEngine:
     # -----------------------------------------------------
     # Extras for hackathon killer features
     # -----------------------------------------------------
-    def _collect_context_snippet(self, max_chars: int = 4000) -> str:
-        items = self._docstore_iter()
-        texts: List[str] = []
+    def sample_passages(self, max_chars: int = 4000, per_passage: int = 600) -> List[Dict[str, Any]]:
+        """A deterministic sample of the corpus spread across documents, for prompts that are about the material as a
+        whole rather than one query (study-question suggestions, or a fallback when retrieval finds nothing).
+
+        Takes passages round-robin, one per document per round in each document's own order, each cut to
+        `per_passage` characters, until `max_chars` is used. So the first document cannot crowd out the others.
+        Returns retrieval-shaped dicts (see `_result`) with score 0.
+        """
+        by_doc: Dict[str, List[Dict[str, Any]]] = {}
+        for item in self._docstore_iter():
+            if (item.get("text") or "").strip():
+                by_doc.setdefault(str(item.get("doc") or ""), []).append(item)
+        queues = list(by_doc.values())
+        picked: List[Dict[str, Any]] = []
         size = 0
-        for it in items:
-            t = (it.get("text") or "").strip()
-            if not t:
-                continue
-            if size + len(t) > max_chars:
+        for round_no in range(max((len(q) for q in queues), default=0)):
+            added = False
+            for queue in queues:
+                if round_no >= len(queue):
+                    continue
+                text = queue[round_no]["text"].strip()[:per_passage]
+                if size + len(text) > max_chars:
+                    continue
+                picked.append({**self._result(queue[round_no], 0.0), "text": text})
+                size += len(text)
+                added = True
+            if not added:
                 break
-            texts.append(t)
-            size += len(t)
-        return "\n\n".join(texts)
+        return picked
+
+    def _collect_context_snippet(self, max_chars: int = 4000) -> str:
+        return "\n\n".join(p["text"] for p in self.sample_passages(max_chars=max_chars))
 
     @staticmethod
     def parse_questions(text: str, limit: int) -> List[str]:
@@ -462,48 +464,6 @@ class RAGEngine:
             "- Contrast BFS vs DFS on weighted graphs\n",
         ]
         return {"ok": True, "markdown": "\n".join(md)}
-
-    def multi_source_synthesis(self, question: str, k_per_doc: int = 2, model: str | None = None, temperature: float = 0.2) -> Dict[str, Any]:
-        """Compare answers across sources and highlight agreements/conflicts.
-
-        Retrieves top chunks per document and asks Gemini to synthesize.
-        Returns {'ok': bool, 'answer': str, 'citations': List[Dict], 'error': str?}
-        """
-        items = self._docstore_iter()
-        # Group by doc
-        by_doc: Dict[str, List[Dict[str, Any]]] = {}
-        import re as _re
-        q_tokens = set(_re.findall(r"\b\w+\b", question.lower()))
-        for it in items:
-            doc = it.get("doc") or ""
-            if not doc:
-                continue
-            # simple overlap score
-            t_tokens = set(_re.findall(r"\b\w+\b", (it.get("text") or "").lower()))
-            inter = len(q_tokens & t_tokens)
-            by_doc.setdefault(doc, []).append({"score": inter, **it})
-        # pick top k per doc
-        chosen: List[Dict[str, Any]] = []
-        for doc, arr in by_doc.items():
-            arr.sort(key=lambda x: x.get("score", 0), reverse=True)
-            chosen.extend(arr[:k_per_doc])
-        # build context
-        context = self.format_context([{"text": c.get("text",""), "doc": c.get("doc",""), "page": c.get("page")} for c in chosen])
-        synth_prompt = (
-            "Synthesize an answer to the question by comparing information across sources.\n\n"
-            "Context (multi-source):\n{context}\n\nQuestion: {question}\n\n"
-            "Instructions:\n- Note where sources agree\n- Highlight conflicting claims\n- Provide citations like [doc (page N)] after statements\n- Be concise\n\nAnswer:"
-        ).format(context=context, question=question)
-        try:
-            from .llm_providers import create_llm
-            client = create_llm(model=model, temperature=temperature)
-            res = client.generate(synth_prompt, temperature=temperature)
-            ans = res.get("answer") or ""
-            # naive citations list
-            cites = [{"doc": c.get("doc"), "page": c.get("page")} for c in chosen]
-            return {"ok": True, "answer": ans, "citations": cites}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import { FallbackNotice, LlmError } from "@/components/llm-error";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/feedback";
+import { Notice, Spinner } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { layoutGraph, NODE_H, NODE_W } from "./graph-layout";
@@ -90,6 +90,7 @@ export function ConceptMap() {
 
       {map.isError ? <LlmError error={map.error} /> : null}
       <FallbackNotice warning={map.data?.warning} />
+      {map.data?.grounding_note ? <Notice>{map.data.grounding_note}</Notice> : null}
 
       {map.data ? (
         <Card className="p-3">
