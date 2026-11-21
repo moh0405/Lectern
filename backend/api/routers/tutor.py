@@ -14,6 +14,7 @@ from ..errors import ERROR_RESPONSES, ApiError
 from ..schemas import (
     Adaptive,
     AdaptiveRequest,
+    CitationCheck,
     Chunk,
     ConceptEdge,
     ConceptMap,
@@ -52,7 +53,8 @@ async def concept_map(req: TopicRequest, engine: RAGEngine = Depends(get_engine)
         if isinstance(e, dict) and str(e.get("from")) in seen and str(e.get("to")) in seen
     ]
     dot = advanced_ai.concept_map_to_dot([n.model_dump() for n in nodes], [e.model_dump(by_alias=True) for e in edges])
-    return ConceptMap(nodes=nodes, edges=edges, dot=dot, model=res.get("model"), warning=res.get("warning"))
+    return ConceptMap(nodes=nodes, edges=edges, dot=dot, model=res.get("model"), warning=res.get("warning"),
+                      chunks=[Chunk(**c) for c in res.get("chunks") or []], grounding_note=res.get("grounding_note"))
 
 
 @router.post("/socratic", response_model=Socratic, summary="Guiding questions and a hint ladder, without the answer")
@@ -73,7 +75,7 @@ async def synthesis(req: SynthesisRequest, engine: RAGEngine = Depends(get_engin
     cites: List[SynthesisCitation] = []
     for c in res.get("citations") or []:
         if isinstance(c, dict):
-            cites.append(SynthesisCitation(doc=str(c.get("doc", "")), point=str(c.get("point", ""))))
+            cites.append(SynthesisCitation(doc=str(c.get("doc", "")), point=str(c.get("point", "")), status=c.get("status")))
         else:
             cites.append(SynthesisCitation(doc="", point=str(c)))
     return Synthesis(
@@ -83,6 +85,10 @@ async def synthesis(req: SynthesisRequest, engine: RAGEngine = Depends(get_engin
         citations=cites,
         model=res.get("model"),
         warning=res.get("warning"),
+        chunks=[Chunk(**c) for c in res.get("chunks") or []],
+        checked_citations=[CitationCheck(**c) for c in res.get("checked_citations") or []],
+        unverified_citations=int(res.get("unverified_citations") or 0),
+        grounding_note=res.get("grounding_note"),
     )
 
 

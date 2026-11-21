@@ -116,7 +116,9 @@ def test_socratic_offline_fallback_flags_warning(indexed, fake_gemini):
 def test_synthesis_normalizes_citations(indexed, fake_gemini):
     body = indexed.post("/api/v1/synthesis", json={"topic": "heaps"}).json()
     assert body["synthesis"] == "Unified view."
-    assert body["citations"] == [{"doc": "a.pdf", "point": "defines it"}, {"doc": "", "point": "loose citation"}]
+    # "a.pdf" is not among the passages the model was given, so its citation is flagged
+    assert body["citations"] == [{"doc": "a.pdf", "point": "defines it", "status": "unknown_source"},
+                                 {"doc": "", "point": "loose citation", "status": None}]
 
 
 def test_adaptive_uses_level_and_context(indexed, fake_gemini):

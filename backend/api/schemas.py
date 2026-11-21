@@ -177,6 +177,10 @@ class ConceptMap(BaseModel):
     dot: str = Field(description="Graphviz DOT source")
     model: Optional[str] = None
     warning: Optional[str] = Field(None, description="Set when an offline fallback was used instead of the model")
+    chunks: List[Chunk] = Field(default_factory=list, description="The passages the map was built from (retrieved for the topic)")
+    grounding_note: Optional[str] = Field(
+        None, description="Set when no passages matched the topic, so a general sample of the material was used instead"
+    )
 
 
 class SocraticRequest(BaseModel):
@@ -202,6 +206,9 @@ class SynthesisRequest(BaseModel):
 class SynthesisCitation(BaseModel):
     doc: str
     point: str
+    status: Optional[Literal["ok", "page_not_retrieved", "unknown_source"]] = Field(
+        None, description="How `doc` checks against the passages the model was given (see CitationCheck); unset when no document is named"
+    )
 
 
 class Synthesis(BaseModel):
@@ -211,6 +218,14 @@ class Synthesis(BaseModel):
     citations: List[SynthesisCitation]
     model: Optional[str] = None
     warning: Optional[str] = None
+    chunks: List[Chunk] = Field(default_factory=list, description="The passages compared: each document's most relevant to the topic")
+    checked_citations: List[CitationCheck] = Field(
+        default_factory=list, description="Every citation in the result (inline and structured), checked against `chunks`"
+    )
+    unverified_citations: int = Field(0, description="How many of `checked_citations` are not among the passages given")
+    grounding_note: Optional[str] = Field(
+        None, description="Set when no passages matched the topic, so a general sample of the material was used instead"
+    )
 
 
 class AdaptiveRequest(BaseModel):

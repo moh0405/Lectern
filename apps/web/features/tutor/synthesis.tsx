@@ -8,7 +8,7 @@ import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/feedback";
+import { Notice, Spinner } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
 
 function Bullets({ title, items, empty }: { title: string; items: string[]; empty: string }) {
@@ -55,6 +55,7 @@ export function Synthesis() {
       </Card>
       {run.isError ? <LlmError error={run.error} /> : null}
       <FallbackNotice warning={d?.warning} />
+      {d?.grounding_note ? <Notice>{d.grounding_note}</Notice> : null}
       {d ? (
         <Card className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
@@ -65,6 +66,12 @@ export function Synthesis() {
             <h2 className="mb-2 text-sm font-semibold text-muted">Combined explanation</h2>
             <Markdown>{d.synthesis}</Markdown>
           </div>
+          {d.unverified_citations ? (
+            <Notice>
+              {d.unverified_citations === 1 ? "1 citation does" : `${d.unverified_citations} citations do`} not match the
+              passages retrieved for this topic. Check those claims against your documents.
+            </Notice>
+          ) : null}
           {d.citations.length ? (
             <div>
               <h2 className="mb-2 text-sm font-semibold text-muted">Who said what</h2>
@@ -72,6 +79,11 @@ export function Synthesis() {
                 {d.citations.map((c, i) => (
                   <li key={i}>
                     {c.doc ? <span className="font-mono text-xs text-accent-2">{c.doc}</span> : null} {c.point}
+                    {c.status && c.status !== "ok" ? (
+                      <span className="ml-2 text-xs text-warn">
+                        ({c.status === "page_not_retrieved" ? "page not among the passages compared" : "not among the passages compared"})
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
