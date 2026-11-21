@@ -15,6 +15,13 @@ test("plots indexed passages by document, warns that the test index is not seman
     await expect(page.getByText(/hashing.*embedder/)).toBeVisible(); // honest about what the picture means
     await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible();
     await expect(page.getByText("graphs.pdf").first()).toBeVisible();
+    await expect(page.getByLabel("Passages")).toHaveCount(0); // a small index needs no size picker
+    await expect(page.getByTestId("few-points")).toBeVisible();
+
+    // the keyboard-friendly passage list mirrors the map
+    const list = page.getByTestId("passage-index");
+    await list.getByRole("button").first().click();
+    await expect(page.getByTestId("selected-passage")).toBeVisible();
 
     // the WebGL plot itself (headless Chromium software-renders WebGL)
     const plot = page.getByTestId("scatter3d");

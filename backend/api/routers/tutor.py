@@ -64,7 +64,7 @@ async def socratic(req: SocraticRequest, engine: RAGEngine = Depends(get_engine)
         await run_in_threadpool(advanced_ai.socratic_tutor, req.question, chunks, req.depth, req.temperature)
     )
     return Socratic(questions=_strs(res.get("questions")), hints=_strs(res.get("hints")),
-                    model=res.get("model"), warning=res.get("warning"))
+                    model=res.get("model"), warning=res.get("warning"), chunks=[Chunk(**c) for c in chunks or []])
 
 
 @router.post("/synthesis", response_model=Synthesis, summary="Compare how each document explains a topic")
@@ -108,5 +108,7 @@ async def adaptive(req: AdaptiveRequest, engine: RAGEngine = Depends(get_engine)
 async def math(req: MathRequest):
     res: Dict[str, Any] = await run_in_threadpool(advanced_ai.math_solve, req.input)
     if not res.get("ok"):
-        raise ApiError(422, str(res.get("error") or "Could not compute"), code="math_error")
+        position = res.get("position")
+        details = {"position": position} if isinstance(position, int) else None
+        raise ApiError(422, str(res.get("error") or "Could not compute"), code="math_error", details=details)
     return MathResult(kind=res["kind"], latex=res["latex"], steps=_strs(res.get("steps")))

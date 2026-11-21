@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvCell, sparkline, toCsv, toReport, type AnalyticsEvent, type AnalyticsSummary } from "./report";
+import { csvCell, relativeTime, seriesRange, sparkline, toCsv, toReport, type AnalyticsEvent, type AnalyticsSummary } from "./report";
 
 const event = (over: Partial<AnalyticsEvent> = {}): AnalyticsEvent => ({
   id: 1, ts: 1_700_000_000, question: "what is a heap", avg_score: 0.5, latency_ms: 120, tokens_prompt: 40,
@@ -53,5 +53,25 @@ describe("sparkline", () => {
       expect(y).toBeLessThanOrEqual(20);
     }
     expect(pts[1]![1]).toBeLessThan(pts[0]![1]); // higher value, higher on screen (smaller y)
+  });
+});
+
+describe("relativeTime", () => {
+  const now = 1_700_000_000;
+  it("says how long ago, coarsely", () => {
+    expect(relativeTime(now - 5, now)).toBe("just now");
+    expect(relativeTime(now - 300, now)).toBe("5 min ago");
+    expect(relativeTime(now - 3 * 3600, now)).toBe("3 h ago");
+    expect(relativeTime(now - 30 * 3600, now)).toBe("yesterday");
+    expect(relativeTime(now - 4 * 86_400, now)).toBe("4 days ago");
+    expect(relativeTime(now - 20 * 86_400, now)).toMatch(/Oct/);
+    expect(relativeTime(now + 100, now)).toBe("just now"); // clock skew
+  });
+});
+
+describe("seriesRange", () => {
+  it("finds fastest, slowest and latest", () => {
+    expect(seriesRange([30, 10, 50, 20])).toEqual({ min: 10, max: 50, latest: 20 });
+    expect(seriesRange([])).toBeNull();
   });
 });

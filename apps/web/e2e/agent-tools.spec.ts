@@ -12,25 +12,32 @@ test("the agent chooses a tool, you see the call and its result, then a cited an
   await page.getByRole("button", { name: "Run agent" }).click();
 
   const step = page.getByTestId("tool-step").first();
-  await expect(step).toContainText("search_documents", { timeout: 30_000 });
-  await expect(step).toContainText("binary heap"); // the arguments the model chose
-  await expect(step).toContainText(/passages from heaps\.pdf/); // what the tool returned
+  await expect(step).toContainText(/Searched your material for “.*binary heap.*”/, { timeout: 30_000 }); // in words, with the arguments the model chose
+  await expect(step).toContainText(/\d+ passages? from heaps\.pdf/); // what the tool returned
+  await step.getByText("Details").click();
+  await expect(step).toContainText("search_documents"); // the raw call stays available
 
   const answer = page.getByRole("region", { name: "Answer" });
   await expect(answer).toContainText("From your material", { timeout: 30_000 });
   await expect(answer).toContainText("[heaps.pdf (page 1)]");
   await expect(page.getByTestId("run-cost")).toContainText("1 tool call · 2 model calls");
-  await page.getByText(/Passages the tools returned/).click();
-  await expect(page.getByText(/heaps\.pdf · p\.1/)).toBeVisible();
+  const passages = page.getByTestId("agent-passages");
+  await expect(passages.getByRole("heading", { name: /Passages the tools returned/ })).toBeVisible();
+  await expect(passages.getByTestId("passage").first()).toContainText("heaps.pdf · page 1");
   await expect(page.getByRole("status").filter({ hasText: /This answer cites .* the tools never returned/ })).toHaveCount(0); // no citation warning
 });
 
-test("it is in the navigation and the example prompts run the agent", async ({ page }) => {
+test("it is in the navigation and an example prompt fills the task", async ({ page }) => {
   await page.goto("/ask");
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Tools" }).click();
   await page.getByRole("navigation", { name: "Tools pages" }).getByRole("link", { name: "Agent" }).click();
   await expect(page).toHaveURL(/\/agent$/);
-  await page.getByRole("button", { name: /Explain how hash tables handle collisions/ }).click();
+  await page.getByRole("button", { name: /Use example: Explain how hash tables handle collisions/ }).click();
+  // an example only fills the task (running costs model calls) and moves focus to Run agent
+  await expect(page.getByLabel("Task")).toHaveValue(/Explain how hash tables handle collisions/);
+  await expect(page.getByTestId("tool-step")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Run agent" })).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("tool-step").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("region", { name: "Answer" })).toBeVisible({ timeout: 30_000 });
 });

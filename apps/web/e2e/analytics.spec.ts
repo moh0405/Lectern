@@ -23,6 +23,15 @@ test("shows an empty state, then usage after questions, then can clear it", asyn
   await page.getByRole("button", { name: "CSV" }).click();
   expect((await csv).suggestedFilename()).toBe("analytics.csv");
 
+  await expect(page.getByRole("link", { name: "How fast is heap insert?" }).first()).toHaveAttribute("href", /\/ask\?q=How/);
+  await expect(page.getByRole("columnheader", { name: "Response time" })).toBeVisible();
+
+  // Cancel keeps everything and returns focus to Clear
+  await page.getByRole("button", { name: "Clear" }).click();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("button", { name: "Clear" })).toBeFocused();
+  await expect(page.getByRole("cell", { name: "How fast is heap insert?" })).toBeVisible();
+
   await page.getByRole("button", { name: "Clear" }).click();
   await page.getByRole("button", { name: "Confirm clear" }).click();
   await expect(page.getByText("No questions yet")).toBeVisible();

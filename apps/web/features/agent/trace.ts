@@ -25,6 +25,37 @@ export const idle: RunState = { status: "idle", task: "", trace: [], answer: "",
 
 export type RunAction = { type: "start"; task: string } | { type: "event"; event: AgentRunEvent } | { type: "stop" } | { type: "fail"; code: string; message: string } | { type: "reset" };
 
+const quote = (v: unknown, max = 80) => {
+  const s = String(v ?? "").replace(/\s+/g, " ").trim();
+  return `“${s.length > max ? `${s.slice(0, max - 1)}…` : s}”`;
+};
+
+/** A plain-language line for one tool call, e.g. "Searched your material for “binary heap”". */
+export function stepLabel(name: string, args: Record<string, unknown>, running = false): string {
+  const a = args ?? {};
+  const t = (done: string, doing: string) => (running ? doing : done);
+  switch (name) {
+    case "search_documents":
+      return a.query ? `${t("Searched", "Searching")} your material for ${quote(a.query)}` : t("Searched your material", "Searching your material");
+    case "list_documents":
+      return t("Listed the documents in your library", "Listing the documents in your library");
+    case "read_page": {
+      const where = [a.document ? String(a.document) : "", a.page ? `page ${String(a.page)}` : ""].filter(Boolean).join(", ");
+      return `${t("Read", "Reading")} ${where || "a page"}`;
+    }
+    case "solve_math":
+      return `${t("Worked out", "Working out")} ${a.expression ? quote(a.expression) : "some math"}`;
+    case "find_leetcode_problem": {
+      const level = a.difficulty ? `${String(a.difficulty).toLowerCase()} ` : "";
+      return `${t("Looked for", "Looking for")} ${level ? `an ${level}`.replace(/^an (?=[^aeiou])/, "a ") : "a "}LeetCode problem${a.query ? ` about ${quote(a.query)}` : ""}`;
+    }
+    case "save_flashcard":
+      return `${t("Saved", "Saving")} a flashcard${a.front ? `: ${quote(a.front)}` : ""}`;
+    default:
+      return `${t("Used", "Using")} ${name.replace(/_/g, " ")}`;
+  }
+}
+
 /** Fold the agent's event stream into what the page shows. Pure, so the page's behaviour is easy to test. */
 export function runReducer(state: RunState, action: RunAction): RunState {
   switch (action.type) {

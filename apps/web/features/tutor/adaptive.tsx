@@ -1,16 +1,16 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
 import { GraduationCap } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { ChunkCard } from "@/components/chunk-card";
+import { useRef, useState, type FormEvent } from "react";
 import { FallbackNotice, LlmError } from "@/components/llm-error";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label, Select, Textarea } from "@/components/ui/field";
-import { Badge, Spinner } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
+import { IdlePreview } from "./library";
+import { PassageList } from "./passages";
+import { Announce, BusyIcon, PendingPanel, useToolRequest } from "./pending";
 
 const LEVELS = [
   { value: "ELI5", label: "ELI5: like I'm five" },
@@ -23,16 +23,22 @@ type Level = (typeof LEVELS)[number]["value"];
 
 export function Adaptive() {
   const [question, setQuestion] = useState("");
+  const [asked, setAsked] = useState("");
   const [level, setLevel] = useState<Level>("Undergrad");
-  const run = useMutation({
-    mutationFn: async (vars: { q: string; level: Level }) =>
-      unwrap(await api.http.POST("/api/v1/adaptive", { body: { question: vars.q, level: vars.level } })),
-  });
+  const input = useRef<HTMLTextAreaElement>(null);
+  const { run, cancel, cancelled, error } = useToolRequest(
+    async (vars: { q: string; level: Level }, signal: AbortSignal) =>
+      unwrap(await api.http.POST("/api/v1/adaptive", { body: { question: vars.q, level: vars.level }, signal })),
+  );
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (question.trim().length >= 3) run.mutate({ q: question.trim(), level });
+    if (question.trim().length >= 3) {
+      setAsked(question.trim());
+      run.mutate({ q: question.trim(), level });
+    }
   };
   const d = run.data;
+  const levelLabel = (v: string) => LEVELS.find((l) => l.value === v)?.label ?? v;
 
   return (
     <div className="space-y-4">
@@ -40,7 +46,7 @@ export function Adaptive() {
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
             <Label htmlFor="ad-q">Question</Label>
-            <Textarea id="ad-q" value={question} onChange={(e) => setQuestion(e.target.value)} rows={3} maxLength={2000}
+            <Textarea ref={input} id="ad-q" value={question} onChange={(e) => setQuestion(e.target.value)} rows={3} maxLength={2000}
               placeholder="e.g. Explain dynamic programming." />
           </div>
           <div className="flex flex-wrap items-end gap-3">
@@ -55,32 +61,42 @@ export function Adaptive() {
               </Select>
             </div>
             <Button type="submit" disabled={run.isPending || question.trim().length < 3}>
-              {run.isPending ? <Spinner /> : <GraduationCap className="h-4 w-4" />}
-              Explain
+              {run.isPending ? <BusyIcon /> : <GraduationCap className="h-4 w-4" aria-hidden />}
+              {run.isPending ? "Explaining…" : "Explain"}
             </Button>
           </div>
         </form>
       </Card>
-      {run.isError ? <LlmError error={run.error} /> : null}
+      <PendingPanel running={run.isPending} onCancel={cancel} />
+      <Announce>{cancelled ? "Cancelled." : d ? "Explanation ready." : ""}</Announce>
+      {!d && !run.isPending && !error ? (
+        <IdlePreview
+          items={["An explanation pitched at the level you choose, from ELI5 to expert.", "The passages from your material it drew on."]}
+          pickLabel="Ask about a topic from your library"
+          onPick={(t) => {
+            setQuestion(`Explain ${t.toLowerCase()}.`);
+            input.current?.focus();
+          }}
+        />
+      ) : null}
+      {error ? <LlmError error={error} /> : null}
       <FallbackNotice warning={d?.warning} />
       {d ? (
-        <Card className="space-y-4">
-          <div className="flex gap-1.5">
-            <Badge>{d.level}</Badge>
-            {d.model ? <Badge>{d.model}</Badge> : null}
-          </div>
-          <Markdown>{d.answer}</Markdown>
-          {d.chunks.length ? (
-            <details>
-              <summary className="cursor-pointer text-sm text-muted hover:text-fg">Sources ({d.chunks.length})</summary>
-              <div className="mt-3 grid gap-2">
-                {d.chunks.map((c, i) => (
-                  <ChunkCard key={i} chunk={c} query={question} index={i} />
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </Card>
+        <div className="space-y-4" aria-busy={run.isPending}>
+          <Card className="space-y-3">
+            <Markdown>{d.answer}</Markdown>
+            <p className="border-t border-border pt-2 text-xs text-muted" data-testid="answer-meta">
+              Explained at <span className="text-fg">{levelLabel(d.level)}</span>
+              {d.model ? (
+                <>
+                  {" "}
+                  · <span className="font-mono">{d.model}</span>
+                </>
+              ) : null}
+            </p>
+          </Card>
+          <PassageList chunks={d.chunks} prefix="adaptive" query={asked} showRelevance />
+        </div>
       ) : null}
     </div>
   );

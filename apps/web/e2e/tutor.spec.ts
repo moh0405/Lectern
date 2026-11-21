@@ -12,10 +12,21 @@ test("concept map renders a graph, highlights neighbours and offers exports", as
   const graph = page.getByTestId("concept-graph");
   await expect(graph.locator(".react-flow__node")).toHaveCount(2); // duplicate id from the model was dropped
   await expect(graph.locator(".react-flow__edge")).toHaveCount(1); // edge to an unknown node was dropped
-  await expect(page.getByText("2 concepts · 1 links")).toBeVisible();
+  await expect(page.getByText("2 concepts · 1 link ·")).toBeVisible();
+  await expect(graph.locator(".react-flow__handle").first()).toHaveCSS("opacity", "0"); // read-only map: no connection handles
 
   await graph.getByText("Linked list", { exact: true }).click();
-  await expect(page.getByText("Linked list → has → Node")).toBeVisible();
+  await expect(page.getByTestId("concept-neighbours")).toContainText("Linked list → has → Node");
+
+  // keyboard: Enter on a focused node shows its neighbours; the list view is the text alternative
+  const nodeEl = graph.locator(".react-flow__node", { hasText: /^Node$/ });
+  await expect(nodeEl).toHaveAttribute("aria-label", /Node, 1 connection/);
+  await nodeEl.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("concept-neighbours")).toContainText(/^Node/);
+  await page.getByRole("button", { name: "List view" }).click();
+  await expect(page.getByTestId("concept-list")).toContainText("Linked list → has → Node");
+  await page.getByRole("button", { name: "Map" }).click();
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "DOT" }).click();
@@ -44,6 +55,7 @@ test("compare sources shows agreements, a combined explanation and citations", a
   await expect(page.getByText("both define it")).toBeVisible();
   await expect(page.getByText("Unified view.")).toBeVisible();
   await expect(page.getByText("a.pdf")).toBeVisible();
+  await expect(page.getByTestId("syn-passages")).toBeVisible(); // the passages compared
 });
 
 test("adaptive explanation uses the chosen level and your sources", async ({ page }) => {
@@ -52,9 +64,11 @@ test("adaptive explanation uses the chosen level and your sources", async ({ pag
   await page.getByLabel("Explain it at").selectOption("ELI5");
   await page.getByRole("button", { name: "Explain" }).click();
   await expect(page.getByText("From your material")).toBeVisible();
-  await expect(page.getByText("ELI5", { exact: true })).toBeVisible();
-  await page.getByText("Sources (").click();
-  await expect(page.getByRole("article").first()).toContainText("heaps.pdf");
+  await expect(page.getByTestId("answer-meta")).toContainText("ELI5");
+  const passages = page.getByTestId("adaptive-passages");
+  await expect(passages.getByRole("heading", { name: /Built from \d+ passages?/ })).toBeVisible();
+  await expect(passages.getByTestId("passage").first()).toContainText("heaps.pdf");
+  await expect(passages.getByTestId("relevance").first()).toContainText("relevance"); // neutral, not a red badge
 });
 
 test("tabs are keyboard-reachable and reflected in the URL", async ({ page }) => {
@@ -63,4 +77,33 @@ test("tabs are keyboard-reachable and reflected in the URL", async ({ page }) =>
   await page.getByRole("tab", { name: "Compare sources" }).click();
   await expect(page).toHaveURL(/tool=synthesis/);
   await expect(page.getByRole("tab", { name: "Compare sources" })).toHaveAttribute("aria-selected", "true");
+
+  // roving tabindex: one tab stop, arrows move between tabs and update the URL
+  await expect(page.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+  await page.getByRole("tab", { name: "Compare sources" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Explain at my level" })).toBeFocused();
+  await expect(page).toHaveURL(/tool=adaptive/);
+  await page.keyboard.press("Home");
+  await expect(page.getByRole("tab", { name: "Concept map" })).toBeFocused();
+  await expect(page).not.toHaveURL(/tool=/);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("tab", { name: "Explain at my level" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("an idle tool says what you will get and which documents it reads", async ({ page }) => {
+  await page.goto("/tutor");
+  const idle = page.getByTestId("idle-preview");
+  await expect(idle).toContainText("What you'll get");
+  await expect(idle.getByTestId("library-line")).toContainText("heaps.pdf");
+  await idle.getByRole("button", { name: "Heaps" }).click(); // a topic from the library fills the input
+  await expect(page.getByLabel("Topic")).toHaveValue("Heaps");
+});
+
+test("socratic hints say whether they came from your material", async ({ page }) => {
+  await page.goto("/tutor?tool=socratic");
+  await page.getByLabel("What are you trying to work out?").fill("Why use a binary heap?");
+  await page.getByRole("button", { name: "Guide me" }).click();
+  await expect(page.getByTestId("socratic-source")).toContainText(/Based on \d+ passages? from your material/);
+  await expect(page.getByTestId("socratic-passages")).toBeVisible();
 });

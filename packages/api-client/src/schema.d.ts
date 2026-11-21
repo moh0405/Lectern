@@ -1523,6 +1523,11 @@ export interface components {
         };
         /** Socratic */
         Socratic: {
+            /**
+             * Chunks
+             * @description The passages the questions and hints were based on; empty means general guidance
+             */
+            chunks?: components["schemas"]["Chunk"][];
             /** Hints */
             hints: string[];
             /** Model */

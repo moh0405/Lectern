@@ -78,3 +78,46 @@ def test_subprocess_fallback_when_the_pool_cannot_start(monkeypatch):
     assert m.solve_request("differentiate sin(x)")["ok"] is True
     slow = m._compute_in_subprocess("9**9**9**9", 1.0)
     assert slow["ok"] is False and "timed out" in slow["error"]
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "position"),
+    [
+        ("integrate(((", "Unbalanced parentheses", 11),
+        ("x^2 + (3", "never closed", 6),
+        ("x)", "no matching '('", 1),
+        ("2 +", "ends with '+'", 2),
+        ("x */ 2", "Two operators in a row", 3),
+        ("sin()", "Empty parentheses", 3),
+        ("x = 2", "only used with solve", 2),
+        ("solve x = 1 = 2", "one '='", 12),
+        ("x + integrate(x)", "is a command", 4),
+        ("integrate", "Add an expression after 'integrate'", 9),
+        ("differentiate foo(x)", "'foo' is not a function or variable", 14),
+        ("2 # 3", "('#')", 2),
+    ],
+)
+def test_parse_errors_are_friendly_and_point_at_the_problem(text, needle, position):
+    res = safe_math.solve_request(text)
+    assert res["ok"] is False
+    assert needle in res["error"]
+    assert res["position"] == position
+    # never SymPy's tokenizer internals
+    for leak in ("EOF", "<string>", "multi-line", "invalid syntax"):
+        assert leak not in res["error"]
+
+
+def test_allowed_function_called_with_bad_syntax_is_not_called_a_bad_name():
+    res = safe_math.solve_request("integrate(((")
+    assert "not an allowed name" not in res["error"] and "integrate" not in res["error"]
+
+
+@pytest.mark.parametrize("text", ["integrate(x^2)", "factorial(5)", "x**2", "2*-3", "(x+1)(x-1)", "solve x^2 = 4 for x"])
+def test_commands_without_a_space_and_tricky_operators_still_work(text):
+    assert safe_math.solve_request(text)["ok"], text
+
+
+def test_sympy_parse_failure_is_reported_without_internals():
+    with pytest.raises(safe_math.MathInputError) as e:
+        safe_math.parse("2 3 (")
+    assert "EOF" not in str(e.value) and "<string>" not in str(e.value)
