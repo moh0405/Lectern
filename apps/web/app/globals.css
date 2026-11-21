@@ -177,7 +177,9 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 /* Public demo notice: part of the sticky header, so it never covers content. */
 .demo-strip { grid-column: 1 / -1; grid-area: strip; display: flex; align-items: center; gap: 12px; min-height: 36px; margin: 0 -28px; padding: 0 12px 0 28px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg)); color: var(--color-fg); font-size: 12px; line-height: 1.5; }
 :root[data-demo-strip="dismissed"] .demo-strip { display: none; }
-.demo-strip-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 2px; padding-block: 7px; }
+.demo-strip-text { flex: 1; min-width: 0; padding-block: 7px; }
+.demo-strip-short { display: none; }
+.demo-strip-sep { margin-inline: 4px; }
 .demo-strip-label { font: 400 10px/1.5 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-accent-2); font-weight: 400; }
 .demo-strip-sep { color: var(--color-muted); }
 .demo-strip a { color: var(--color-accent-2); text-decoration: underline; text-underline-offset: 2px; }
@@ -185,12 +187,11 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .demo-strip-close { flex-shrink: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--color-muted); background: transparent; border: 1px solid transparent; cursor: pointer; }
 .demo-strip-close:hover { color: var(--color-fg); border-color: var(--color-border); }
 /* The Ask desk fills the viewport below a 72px header; with the strip showing, the header is 36px taller. */
-.lectern-app { --shell-header: 72px; }
-:root:not([data-demo-strip="dismissed"]) .lectern-app:has(.demo-strip) { --shell-header: 108px; }
+.lectern-app { --shell-header: 73px; }
+:root:not([data-demo-strip="dismissed"]) .lectern-app:has(.demo-strip) { --shell-header: 109px; } /* 36px strip + 72px row + 1px border */
 @media (min-width: 1180px) {
   .demo-strip { height: 36px; }
-  .demo-strip-text { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
-  .demo-strip-text > span:not(.demo-strip-sep) { overflow: hidden; text-overflow: ellipsis; }
+  .demo-strip-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   :root:not([data-demo-strip="dismissed"]) .lectern-app:has(.demo-strip) .desk-main > * { --desk-header: var(--shell-header); }
 }
 
@@ -204,8 +205,8 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .page-heading-title { font-size: clamp(29px, 3vw, 40px); line-height: 1.15; font-weight: 600; letter-spacing: -0.05em; }
 .page-heading-description { font-size: 14px; line-height: 1.8; color: var(--color-muted); margin-top: 10px; max-width: 64ch; }
 .page-heading-eyebrow { margin-bottom: 12px; }
-.page-heading-title:focus { outline: none; }
-.page-heading-title:focus-visible { outline: 2px solid var(--color-accent-2); outline-offset: 4px; border-radius: 4px; }
+/* A heading focused by script (error page) is not a control: no focus ring. */
+.page-heading-title[tabindex="-1"]:focus, .page-heading-title[tabindex="-1"]:focus-visible { outline: none; }
 
 /* 404 and error pages: the page heading, clear actions and the four sections. */
 .status-page { max-width: 760px; }
@@ -253,6 +254,8 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
   .desk-header { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "strip strip" "brand actions" "nav nav"; row-gap: 0; padding: 10px 16px 0; min-height: 0; }
   .desk-brand { font-size: 20px; }
   .demo-strip { margin: -10px -16px 6px; padding: 0 4px 0 16px; font-size: 11.5px; }
+  .demo-strip-long { display: none; }
+  .demo-strip-short { display: inline; }
   .desk-brand-mark { width: 36px; height: 36px; }
   .desk-actions { gap: 8px; }
   .desk-nav { height: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 6px -16px 0; border-top: 1px solid var(--color-border); }

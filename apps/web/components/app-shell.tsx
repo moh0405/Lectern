@@ -100,11 +100,12 @@ function DemoStrip() {
   return <div className="demo-strip" role="region" aria-label="About this demo">
     <p className="demo-strip-text">
       <strong className="demo-strip-label">Public demo</strong>
-      <span className="demo-strip-sep" aria-hidden="true">·</span>
-      <span>Ask the shared CS textbooks, or add your own PDF (it stays in your browser)</span>
-      <span className="demo-strip-sep" aria-hidden="true">·</span>
+      <span className="demo-strip-sep" aria-hidden="true"> · </span>
+      <span className="demo-strip-long">Ask the shared CS textbooks, or add your own PDF (it stays in your browser)</span>
+      <span className="demo-strip-short">Your own PDFs stay in your browser</span>
+      <span className="demo-strip-sep" aria-hidden="true"> · </span>
       <a href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">How it works</a>
-      <span className="demo-strip-sep" aria-hidden="true">·</span>
+      <span className="demo-strip-sep" aria-hidden="true"> · </span>
       <a href={REPO_URL} target="_blank" rel="noreferrer">Source code</a>
     </p>
     <button type="button" className="demo-strip-close" aria-label="Hide the demo notice" title="Hide the demo notice" onClick={hide}><X aria-hidden="true" size={15} /></button>

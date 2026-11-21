@@ -16,6 +16,8 @@ export interface PaletteItem {
   keywords?: string[];
   icon?: LucideIcon;
   run: Run;
+  /** Added to a non-zero match score, to win ties (for example "add" prefers "Add material"). */
+  boost?: number;
 }
 
 /** Shortcuts into a page, listed under the section their page belongs to. */
@@ -81,7 +83,12 @@ function filterGroups(groups: Group[], search: string): Group[] {
   if (!search.trim()) return groups;
   return groups
     .map((g) => {
-      const scored = g.items.map((item, i) => ({ item, i, s: scoreItem(item, search) })).filter((x) => x.s > 0);
+      const scored = g.items
+        .map((item, i) => {
+          const s = scoreItem(item, search);
+          return { item, i, s: s > 0 ? s + (item.boost ?? 0) : 0 };
+        })
+        .filter((x) => x.s > 0);
       scored.sort((a, b) => b.s - a.s || a.i - b.i);
       return { heading: g.heading, items: scored.map((x) => x.item), best: scored[0]?.s ?? 0 };
     })
@@ -141,7 +148,7 @@ export function CommandPalette() {
   const actions: PaletteItem[] = useMemo(
     () => [
       { id: "action:theme", label: `Switch to ${next} theme`, keywords: ["theme", "dark", "light", "mode", "appearance", "colour", "color", "reading"], icon: next === "light" ? Sun : Moon, run: { action: "theme" } },
-      { id: "action:add", label: "Add material", hint: "Library", keywords: ["upload", "pdf", "file", "document", "source", "link", "import", "new"], icon: Plus, run: { href: "/sources" } },
+      { id: "action:add", label: "Add material", hint: "Library", keywords: ["upload", "pdf", "file", "document", "source", "link", "import", "new"], icon: Plus, run: { href: "/sources" }, boost: 0.05 },
     ],
     [next],
   );

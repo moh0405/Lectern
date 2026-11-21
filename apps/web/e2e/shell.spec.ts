@@ -97,7 +97,7 @@ test("a page that crashes on bad data recovers with Try again", async ({ page })
   await page.route("**/api/v1/documents*", (route) => (bad ? route.fulfill({ contentType: "application/json", body: '{"documents": 42}' }) : route.fallback()));
   await page.goto("/sources");
   const heading = page.getByRole("heading", { level: 1, name: "Something went wrong" });
-  if (!(await heading.isVisible().catch(() => false))) test.skip(true, "this page tolerates the malformed response");
+  await expect(heading).toBeVisible();
   await expect(heading).toBeFocused();
   bad = false;
   await page.getByRole("button", { name: "Try again" }).click();
