@@ -35,7 +35,7 @@ function measure(): Path | null {
 
 /**
  * A dotted line from the selected citation chip to its highlighted passage in the source margin.
- * Purely decorative (hidden from assistive technology); it follows scrolling and resizing.
+ * Purely decorative (hidden from assistive technology); it follows scrolling, resizing and layout changes.
  */
 export function TraceLine({ enabled, version }: { enabled: boolean; version: string }) {
   const [path, setPath] = useState<Path | null>(null);
@@ -51,7 +51,20 @@ export function TraceLine({ enabled, version }: { enabled: boolean; version: str
     const late = window.setTimeout(update, 250);
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
+    // Layout also moves without a scroll or resize, for example when the margin expands a passage's context:
+    // watch the answer column and the source margin (and what they hold) for size changes and new content.
+    const margin = document.querySelector('aside[aria-label="Source margin"]');
+    const watched = [document.querySelector("[data-desk-scroll]"), margin].filter((el): el is Element => el !== null);
+    const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    for (const el of watched) {
+      resized?.observe(el);
+      for (const child of Array.from(el.children)) resized?.observe(child);
+    }
+    const mutated = typeof MutationObserver === "undefined" || !margin ? null : new MutationObserver(update);
+    if (margin) mutated?.observe(margin, { childList: true, subtree: true, characterData: true });
     return () => {
+      resized?.disconnect();
+      mutated?.disconnect();
       cancelAnimationFrame(frame);
       window.clearTimeout(late);
       window.removeEventListener("scroll", update, true);

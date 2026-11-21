@@ -190,7 +190,8 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .cite-chip { display: inline-flex; align-items: center; gap: 3px; margin: 0 2px; padding: 1px 6px; vertical-align: 0.12em; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--color-accent-2) 40%, transparent); background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent-2); font: 400 11px/1.6 var(--font-mono), monospace; text-decoration: none; cursor: pointer; transition: background-color .15s, border-color .15s; }
 .cite-chip:hover, .cite-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 34%, transparent); border-color: var(--color-accent-2); }
 .cite-chip svg { width: 10px; height: 10px; }
-.cite-chip.unverified { color: var(--color-warn); border-color: color-mix(in srgb, var(--color-warn) 55%, transparent); background: color-mix(in srgb, var(--color-warn) 12%, transparent); }
+.cite-chip.unlisted { color: var(--color-muted); border-color: var(--color-border); background: transparent; }
+.cite-chip.unverified {color: var(--color-warn); border-color: color-mix(in srgb, var(--color-warn) 55%, transparent); background: color-mix(in srgb, var(--color-warn) 12%, transparent); }
 
 @media (max-width: 1100px) {
   .desk-header { padding: 0 20px; gap: 14px; }

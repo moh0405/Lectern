@@ -150,7 +150,9 @@ export function AskView() {
 
   // The desk shows one question at a time: the newest, unless an earlier one was picked from the session list.
   const active = turns.find((t) => t.id === activeId) ?? turns[0];
-  const refs = useMemo(() => (active?.status === "done" ? linkCitations(active.answer, active.citations, active.chunks).refs : []), [active]);
+  // Linked once here and shared with the answer (chips) and the source margin, so both use the same ids.
+  const linked = useMemo(() => (active?.status === "done" ? linkCitations(active.answer, active.citations, active.chunks) : null), [active]);
+  const refs = useMemo(() => linked?.refs ?? [], [linked]);
   const selection = picked && picked.turnId === active?.id ? picked.selection : defaultSelection(active, refs);
   const select = (s: Selection) => active && setPicked({ turnId: active.id, selection: s });
 
@@ -250,6 +252,7 @@ export function AskView() {
                   busy={busy}
                   selection={selection}
                   onSelect={select}
+                  linked={linked}
                   onStop={() => stop(active.id)}
                   onRemove={() => remove(active.id)}
                   onFresh={() => void ask({ question: active.question, mode: active.mode, k, temperature, model: model.trim() || undefined, noCache: true, local, agent: active.agent })}

@@ -7,14 +7,18 @@ import type { CitationCheck } from "./session";
  * The server has already checked every citation against the retrieved passages (`CitationCheck`). Here each
  * bracketed citation in the Markdown is replaced by a link to `#cite-<n>`, which the answer renders as a chip,
  * and each chip remembers which passage it points to and the sentence that cited it. Only citations the
- * server reported are linked, so ordinary brackets such as `nums[0]` are left alone.
+ * server reported are linked, so ordinary brackets such as `nums[0]` are left alone. A bracket is matched to the
+ * server's citations by exact label, after splitting it the way the server does (backend/citations.py).
  */
 
 export type CitationStatus = CitationCheck["status"];
 
 export interface CiteRef {
   id: number;
-  /** Index into the turn's chunks, or null when the citation has no retrieved passage to show. */
+  /**
+   * Index into the turn's chunks, or null when there is no passage to show: always for an unverified citation, and
+   * for a verified (`ok`) one whose passage cannot be found among the listed chunks.
+   */
   chunk: number | null;
   label: string;
   doc: string;
@@ -22,6 +26,11 @@ export interface CiteRef {
   status: CitationStatus;
   /** The answer text that made this citation, used to find the closest sentence in the passage. */
   sentence: string;
+}
+
+export interface LinkedAnswer {
+  markdown: string;
+  refs: CiteRef[];
 }
 
 export const CITE_PREFIX = "#cite-";
@@ -32,22 +41,128 @@ const BRACKET = /(?<![\w\])])\[([^[\]\n]{3,200})\](?!\()/g;
 const CODE = /(```[\s\S]*?```|`[^`\n]*`)/;
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-const stem = (s: string) => norm(s).replace(/\.[a-z0-9]{1,5}$/, "");
 
-function sameDoc(chunkDoc: string, citedDoc: string): boolean {
-  const a = norm(chunkDoc);
-  const b = norm(citedDoc);
-  // A citation may add a section after the document name: "notes.md > Hashing".
-  return a === b || stem(chunkDoc) === stem(citedDoc) || b.startsWith(a + " ") || b.startsWith(stem(chunkDoc) + " ");
+/** The keys a document name is known by: as written, and without its file extension (server `_doc_keys`). */
+function docKeys(name: string): string[] {
+  const base = norm(name);
+  const stem = base.replace(/\.[a-z0-9]{1,5}$/, "");
+  return stem === base ? [base] : [base, stem];
 }
 
-/** The retrieved passage a verified citation points to, or null if there is none to show. */
-export function chunkForCitation(c: Pick<CitationCheck, "doc" | "page" | "status">, chunks: Chunk[]): number | null {
+function sameKeys(a: string, b: string): boolean {
+  const keys = docKeys(a);
+  return docKeys(b).some((k) => keys.includes(k));
+}
+
+// Separators between a document and a section path, e.g. "notes.md > Hashing" (server `_SECTION_SEP`).
+const SECTION_SEP = /\s*(?:>|›|»|→|\/|\||::)\s*|\s+[-–—]\s+|:\s+/;
+
+/** The part of a citation before its first section separator, or null when there is none. */
+function documentPart(doc: string): string | null {
+  const m = SECTION_SEP.exec(doc);
+  if (!m) return null;
+  const head = doc.slice(0, m.index).trim();
+  return head || null;
+}
+
+// Page lists and page suffixes, parsed as the server does (`_PAGES`, `_PAGE_LIST`, `_PAGE`, `_WITH_PAGE_*`).
+const PAGES = String.raw`(?:pages?|pp?\.?)\s*\d+(?:\s*[,;&]\s*(?:(?:pages?|pp?\.?)\s*)?\d+)+`;
+const PAGE_LIST = new RegExp(String.raw`^(?<doc>.+?)\s*(?:\(\s*(?<p1>${PAGES})\s*\)|[,;:·–-]\s*(?<p2>${PAGES}))\s*$`, "i");
+const PAGE = String.raw`(?:pages?|pp?\.?)\s*(\d+)(?:\s*[-–]\s*(\d+))?`;
+const WITH_PAGE_PAREN = new RegExp(String.raw`^(.+?)\s*\(\s*${PAGE}\s*\)\s*$`, "i");
+const WITH_PAGE_COMMA = new RegExp(String.raw`^(.+?)\s*[,;:·–-]\s*${PAGE}\s*$`, "i");
+const PART_SPLIT = /(?<=\))\s*[,;]\s*|\s*;\s*/;
+
+/**
+ * The citation labels the server derives from one bracket's inner text (server `_split_multi`): one label per page
+ * for a page list, one per parenthesised citation, or one per retrieved document in a plain comma list.
+ */
+export function splitCitations(inner: string, chunkDocs: string[]): string[] {
+  const text = inner.trim();
+  const listed = PAGE_LIST.exec(text);
+  if (listed?.groups) {
+    const { doc, p1, p2 } = listed.groups;
+    return ((p1 ?? p2 ?? "").match(/\d+/g) ?? []).map((n) => `${doc} (page ${n})`);
+  }
+  const parts = text
+    .split(PART_SPLIT)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length > 1) return parts;
+  if (text.includes(",")) {
+    const pieces = text
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (pieces.length > 1 && pieces.every((p) => chunkDocs.some((d) => sameKeys(d, p)))) return pieces;
+  }
+  return [text];
+}
+
+/** The cited pages from a label such as "doc (pages 4-6)"; just the server's page when no range is written. */
+function citedPages(label: string | undefined, page: number | null | undefined): [number, number] | null {
+  const text = (label ?? "").trim();
+  for (const pattern of [WITH_PAGE_PAREN, WITH_PAGE_COMMA]) {
+    const m = pattern.exec(text);
+    if (!m) continue;
+    const lo = Number(m[2]);
+    const hi = m[3] ? Number(m[3]) : lo;
+    if (page != null && lo !== page) break; // the label disagrees with the server's page: trust the server
+    return hi >= lo && hi - lo < 50 ? [lo, hi] : [lo, lo];
+  }
+  return page == null ? null : [page, page];
+}
+
+const STOP = new Set("the and for are but not you all any can had her was one our out has have this that with from they will what when which their there than then them these those into each also only such some more most other its it's very just like about over under been were your how why who use used uses using does".split(" "));
+
+function words(s: string): Set<string> {
+  return new Set((s.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)));
+}
+
+function sharedWords(text: string, target: Set<string>): number {
+  let n = 0;
+  for (const w of words(text)) if (target.has(w)) n++;
+  return n;
+}
+
+/**
+ * The retrieved passage a verified citation points to, or null if there is none to show.
+ *
+ * The document must match exactly (ignoring case, spacing and the file extension, or after dropping a section path).
+ * With a page, only passages whose pages intersect the cited page or range qualify; if none does, there is no
+ * passage rather than a wrong one. Among several candidates, the one sharing most words with the citing sentence wins
+ * (the first, which is the most relevant, on a tie).
+ */
+export function chunkForCitation(c: Pick<CitationCheck, "doc" | "page" | "status"> & { label?: string }, chunks: Chunk[], sentence = ""): number | null {
   if (c.status !== "ok") return null;
-  const sameDocument = chunks.map((ch, i) => [ch, i] as const).filter(([ch]) => sameDoc(ch.doc, c.doc));
-  if (c.page == null) return sameDocument[0]?.[1] ?? null;
-  const onPage = sameDocument.find(([ch]) => ch.page != null && ch.page <= c.page! && c.page! <= (ch.end_page ?? ch.page));
-  return (onPage ?? sameDocument[0])?.[1] ?? null;
+  const indexed = chunks.map((ch, i) => [ch, i] as const);
+  let sameDocument = indexed.filter(([ch]) => sameKeys(ch.doc, c.doc));
+  if (!sameDocument.length) {
+    const head = documentPart(c.doc);
+    if (head) sameDocument = indexed.filter(([ch]) => sameKeys(ch.doc, head));
+  }
+  const range = citedPages(c.label, c.page);
+  const candidates = range
+    ? sameDocument.filter(([ch]) => {
+        if (ch.page == null) return false;
+        const end = ch.end_page != null && ch.end_page >= ch.page ? ch.end_page : ch.page;
+        return ch.page <= range[1] && range[0] <= end;
+      })
+    : sameDocument;
+  if (!candidates.length) return null;
+  const target = words(sentence);
+  let best = candidates[0]!;
+  if (target.size) {
+    let bestScore = sharedWords(best[0].text, target);
+    for (const cand of candidates.slice(1)) {
+      const score = sharedWords(cand[0].text, target);
+      if (score > bestScore) {
+        best = cand;
+        bestScore = score;
+      }
+    }
+  }
+  return best[1];
 }
 
 function stripMarkdown(s: string): string {
@@ -60,34 +175,33 @@ function citingSentence(before: string): string {
   return stripMarkdown(before.slice(Math.max(0, cut)).slice(-400));
 }
 
-function matching(inner: string, citations: CitationCheck[]): CitationCheck[] {
-  const text = norm(inner);
-  const exact = citations.filter((c) => norm(c.label) === text);
-  if (exact.length) return exact;
-  const seen = new Set<string>();
-  return citations.filter((c) => {
-    const hit = text.includes(norm(c.label)) || (c.doc.length > 2 && text.includes(norm(c.doc)));
-    const key = `${norm(c.doc)}|${c.page ?? ""}`;
-    if (!hit || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+/** The server-checked citations this bracket holds, matched by exact label only. */
+function matching(inner: string, byLabel: Map<string, CitationCheck>, chunkDocs: string[]): CitationCheck[] {
+  const found: CitationCheck[] = [];
+  for (const candidate of [...splitCitations(inner, chunkDocs), inner]) {
+    const c = byLabel.get(norm(candidate));
+    if (c && !found.includes(c)) found.push(c);
+  }
+  return found;
 }
 
-export function linkCitations(answer: string, citations: CitationCheck[] | undefined, chunks: Chunk[]): { markdown: string; refs: CiteRef[] } {
+export function linkCitations(answer: string, citations: CitationCheck[] | undefined, chunks: Chunk[]): LinkedAnswer {
   const refs: CiteRef[] = [];
   if (!citations?.length) return { markdown: answer, refs };
+  const byLabel = new Map<string, CitationCheck>();
+  for (const c of citations) if (!byLabel.has(norm(c.label))) byLabel.set(norm(c.label), c);
+  const chunkDocs = [...new Set(chunks.map((ch) => ch.doc))];
   const parts = answer.split(CODE);
   const markdown = parts
     .map((part, i) => {
       if (i % 2 === 1) return part; // code
       return part.replace(BRACKET, (whole: string, inner: string, offset: number) => {
-        const found = matching(inner, citations);
+        const found = matching(inner, byLabel, chunkDocs);
         if (!found.length) return whole;
         const sentence = citingSentence(part.slice(0, offset));
         return found
           .map((c) => {
-            const ref: CiteRef = { id: refs.length, chunk: chunkForCitation(c, chunks), label: c.label, doc: c.doc, page: c.page ?? null, status: c.status, sentence };
+            const ref: CiteRef = { id: refs.length, chunk: chunkForCitation(c, chunks, sentence), label: c.label, doc: c.doc, page: c.page ?? null, status: c.status, sentence };
             refs.push(ref);
             return `[${ref.id}](${CITE_PREFIX}${ref.id})`;
           })
@@ -96,12 +210,6 @@ export function linkCitations(answer: string, citations: CitationCheck[] | undef
     })
     .join("");
   return { markdown, refs };
-}
-
-const STOP = new Set("the and for are but not you all any can had her was one our out has have this that with from they will what when which their there than then them these those into each also only such some more most other its it's very just like about over under been were your how why who use used uses using does".split(" "));
-
-function words(s: string): Set<string> {
-  return new Set((s.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w)));
 }
 
 /** Where the passage best matches the citing sentence, as character offsets, or null when nothing overlaps enough. */

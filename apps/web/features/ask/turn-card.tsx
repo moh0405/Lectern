@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { pageLabel } from "@/lib/format";
-import { CITE_PREFIX, linkCitations, twoDigits, type CiteRef } from "./citations";
+import { CITE_PREFIX, linkCitations, twoDigits, type CiteRef, type LinkedAnswer } from "./citations";
 import { plainText } from "./flashcards";
 import type { Turn } from "./session";
 import styles from "./ask.module.css";
@@ -185,24 +185,33 @@ export interface Selection {
 }
 
 function CitationChip({ refInfo, active, onSelect }: { refInfo: CiteRef; active: boolean; onSelect: () => void }) {
-  const verified = refInfo.chunk !== null;
-  const label = verified
+  const linked = refInfo.chunk !== null;
+  // The server verified it, but its passage is not among the ones listed for this answer.
+  const unlisted = !linked && refInfo.status === "ok";
+  const label = linked
     ? `Citation ${refInfo.label}: show passage ${refInfo.chunk! + 1} in the source margin`
-    : `Unverified citation ${refInfo.label}: ${CITE_PROBLEM[refInfo.status] ?? "it could not be matched to a passage"}`;
+    : unlisted
+      ? `Verified citation ${refInfo.label}: its passage is not in the list of retrieved passages`
+      : `Unverified citation ${refInfo.label}: ${CITE_PROBLEM[refInfo.status] ?? "it could not be matched to a passage"}`;
   return (
     <button
       type="button"
-      className={verified ? "cite-chip" : "cite-chip unverified"}
+      className={linked ? "cite-chip" : unlisted ? "cite-chip unlisted" : "cite-chip unverified"}
       aria-pressed={active}
       aria-label={label}
       title={refInfo.label}
       data-cite-active={active ? "true" : undefined}
       onClick={onSelect}
     >
-      {verified ? (
+      {linked ? (
         <>
           {twoDigits(refInfo.chunk! + 1)}
           <ArrowUpRight aria-hidden="true" />
+        </>
+      ) : unlisted ? (
+        <>
+          <Check aria-hidden="true" />
+          not listed
         </>
       ) : (
         <>
@@ -221,6 +230,7 @@ export function TurnCard({
   busy = false,
   selection,
   onSelect,
+  linked: linkedProp,
 }: {
   turn: Turn;
   onStop: () => void;
@@ -230,14 +240,17 @@ export function TurnCard({
   /** On the Evidence Desk: which citation is open in the source margin, and how to open another. */
   selection?: Selection;
   onSelect?: (selection: Selection) => void;
+  /** The answer with its citations already linked (computed once by the desk); when absent, it is computed here. */
+  linked?: LinkedAnswer | null;
 }) {
   const streaming = turn.status === "streaming";
   const noKey = turn.error?.code === "llm_unavailable";
   // Citations become chips once the server has checked them (at the end of the stream).
-  const linked = useMemo(
-    () => (onSelect && turn.status === "done" ? linkCitations(turn.answer, turn.citations, turn.chunks) : null),
-    [onSelect, turn.status, turn.answer, turn.citations, turn.chunks],
+  const ownLinked = useMemo(
+    () => (linkedProp === undefined && onSelect && turn.status === "done" ? linkCitations(turn.answer, turn.citations, turn.chunks) : null),
+    [linkedProp, onSelect, turn.status, turn.answer, turn.citations, turn.chunks],
   );
+  const linked = linkedProp !== undefined ? linkedProp : ownLinked;
   const renderLink = useCallback(
     (href: string) => {
       if (!linked || !href.startsWith(CITE_PREFIX)) return undefined;

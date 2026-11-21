@@ -239,6 +239,26 @@ describe("citation chips on the Evidence Desk", () => {
     expect(onSelect).toHaveBeenCalledWith({ ref: 1, chunk: null });
   });
 
+  it("shows a verified citation whose passage is not listed as neutral, not unverified", async () => {
+    const onSelect = vi.fn();
+    const cites = [{ label: "heaps.pdf (page 9)", doc: "heaps.pdf", page: 9, status: "ok" as const }];
+    render(<TurnCard turn={turn({ answer: "Claim [heaps.pdf (page 9)].", chunks, citations: cites })} onStop={() => {}} onRemove={() => {}} selection={{ ref: null, chunk: null }} onSelect={onSelect} />);
+    const chip = screen.getByRole("button", { name: /Verified citation heaps\.pdf \(page 9\): its passage is not in the list/ });
+    expect(chip).toHaveClass("cite-chip", "unlisted");
+    expect(chip).not.toHaveClass("unverified");
+    expect(chip).toHaveTextContent("not listed");
+    expect(screen.queryByRole("button", { name: /Unverified citation/ })).toBeNull();
+    await userEvent.click(chip);
+    expect(onSelect).toHaveBeenCalledWith({ ref: 0, chunk: null });
+  });
+
+  it("uses citations linked by the desk when given", () => {
+    const linked = { markdown: "Linked [0](#cite-0).", refs: [{ id: 0, chunk: 0, label: "heaps.pdf (page 1)", doc: "heaps.pdf", page: 1, status: "ok" as const, sentence: "Linked" }] };
+    render(<TurnCard turn={turn({ answer, chunks, citations })} onStop={() => {}} onRemove={() => {}} selection={{ ref: null, chunk: null }} onSelect={() => {}} linked={linked} />);
+    expect(screen.getAllByRole("button", { name: /Citation heaps\.pdf \(page 1\)/ })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Unverified citation/ })).toBeNull();
+  });
+
   it("keeps the citation text as written outside the desk and while streaming", () => {
     render(<TurnCard turn={turn({ answer, chunks, citations, status: "streaming" })} onStop={() => {}} onRemove={() => {}} onSelect={() => {}} />);
     expect(screen.getByText(/\[heaps\.pdf \(page 1\)\]/)).toBeInTheDocument();

@@ -545,6 +545,11 @@
 }
 .marginWarning svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 3px; color: #7a5305; }
 .marginWarningTitle { font-weight: 600; }
+.marginNeutral {
+  border-left-color: color-mix(in srgb, var(--color-paper-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--color-paper-accent) 6%, var(--color-paper));
+}
+.marginNeutral svg { color: var(--color-paper-accent); }
 .marginNote {
   margin-top: 34px;
   padding: 14px 16px;

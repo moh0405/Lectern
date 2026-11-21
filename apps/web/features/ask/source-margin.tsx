@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, FileText, Minus, Plus } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, FileText, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { pageLabel } from "@/lib/format";
@@ -103,7 +103,7 @@ export function SourceMargin({ turn, refs, selection, onSelect }: { turn?: Turn;
     <>
       <div className={styles.marginBand}>
         <span className={`${styles.bandNumber} paper-serif`} aria-hidden="true">
-          {chunk && index !== null ? twoDigits(index + 1) : ref ? "?" : "–"}
+          {chunk && index !== null ? twoDigits(index + 1) : ref && ref.status !== "ok" ? "?" : "–"}
         </span>
         <div className="min-w-0">
           <p className="eyebrow">{ref ? "Citation in focus" : chunk ? "Passage in focus" : "Sources"}</p>
@@ -123,7 +123,16 @@ export function SourceMargin({ turn, refs, selection, onSelect }: { turn?: Turn;
       ) : null}
 
       <div className={styles.marginBody}>
-        {ref && !chunk ? (
+        {ref && !chunk && ref.status === "ok" ? (
+          <div className={`${styles.marginWarning} ${styles.marginNeutral}`} role="note">
+            <Check aria-hidden="true" />
+            <div>
+              <p className={styles.marginWarningTitle}>Verified, but its passage is not in the list</p>
+              <p className="font-mono text-xs">[{ref.label}]</p>
+              <p>The server confirmed this document{ref.page != null ? " and page" : ""} among the passages the answer was given, but none of the passages listed here matches it, so there is nothing to show.</p>
+            </div>
+          </div>
+        ) : ref && !chunk ? (
           <div className={styles.marginWarning} role="note">
             <AlertTriangle aria-hidden="true" />
             <div>
