@@ -102,10 +102,11 @@
 <text x="795.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">generated types, SSE reader,</text>
 <text x="795.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">ApiError with server codes</text>
 <rect x="960" y="720" width="600" height="150" rx="12" fill="#11172a" stroke="#6d5de8" stroke-width="1.5"/>
-<text x="1260.0" y="785.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Next.js app  (React 19, TypeScript strict, Tailwind)</text>
-<text x="1260.0" y="807.0" text-anchor="middle" font-size="13" fill="#95a0bd">Ask · Sources · LeetCode · Tutor tools · Math</text>
-<text x="1260.0" y="824.0" text-anchor="middle" font-size="13" fill="#95a0bd">Embedding map (3D) · Analytics · Ctrl/⌘+K palette</text>
-<text x="1260.0" y="841.0" text-anchor="middle" font-size="13" fill="#95a0bd">TanStack Query · React Flow · Plotly · KaTeX</text>
+<text x="1260.0" y="760.0" text-anchor="middle" font-size="17" font-weight="600" fill="#e6e9f2">Next.js app  (React 19, TypeScript strict, Tailwind)</text>
+<text x="1260.0" y="783.0" text-anchor="middle" font-size="13" fill="#95a0bd">Ask · Library (Sources, Map, Insights)</text>
+<text x="1260.0" y="800.0" text-anchor="middle" font-size="13" fill="#95a0bd">Practice (Flashcards, LeetCode, Work it out, Explain at my level)</text>
+<text x="1260.0" y="817.0" text-anchor="middle" font-size="13" fill="#95a0bd">Tools (Concept map, Compare sources, Agent, Math)</text>
+<text x="1260.0" y="841.0" text-anchor="middle" font-size="13" fill="#95a0bd">Ctrl/⌘+K palette · TanStack Query · React Flow · Plotly · KaTeX</text>
 <line x1="374" y1="795" x2="420" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
 <line x1="630" y1="795" x2="680" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
 <line x1="910" y1="795" x2="960" y2="795" stroke="#38bdf8" stroke-width="2" marker-end="url(#a)"/>
