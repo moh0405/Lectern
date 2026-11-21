@@ -166,6 +166,9 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 /* State is never colour alone: online is a filled dot, connecting a hollow ring, busy a clock, offline an unplugged cable. */
 .api-status-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--color-muted); background: transparent; }
 .api-status-dot.online { background: var(--color-good); border-color: var(--color-good); }
+.api-status-dot.starting { border-color: var(--color-warn); }
+@media (prefers-reduced-motion: no-preference) { .api-status-dot.starting { animation: api-status-pulse 1.4s ease-in-out infinite; } }
+@keyframes api-status-pulse { 50% { opacity: .35; } }
 .api-status-icon { flex-shrink: 0; width: 13px; height: 13px; }
 .api-status-icon.busy { color: var(--color-warn); }
 .api-status-icon.offline { color: var(--color-bad); }
@@ -262,6 +265,8 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
   .workspace-jump > span, .workspace-jump kbd { display: none; }
   /* The words stay available to screen readers; sighted users get the shape cue and the tooltip. */
   .api-status-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  /* A dot alone would not explain a wait, so this one passing state keeps its words. */
+  .api-status[data-state="starting"] .api-status-text { position: static; width: auto; height: auto; margin: 0; clip: auto; }
   .demo-strip { margin-inline: -20px; padding-left: 20px; }
 }
 @media (max-width: 767px) {

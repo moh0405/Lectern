@@ -99,6 +99,70 @@ describe("forward", () => {
   });
 });
 
+describe("cold-start retries", () => {
+  const noWait = () => Promise.resolve();
+  const healthy = () => Response.json({ status: "ok", chunks: 3 });
+
+  it("retries a metadata GET after a dropped connection, then succeeds", async () => {
+    const fetchMock = vi.fn<() => Promise<Response>>()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }))
+      .mockResolvedValue(healthy());
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await createForwarder({ sleep: noWait })(new Request("https://app.example/x"), ["health"], cfg);
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after two retries", async () => {
+    const fetchMock = vi.fn(async () => { throw new TypeError("fetch failed"); });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await createForwarder({ sleep: noWait })(new Request("https://app.example/x"), ["api", "v1", "stats"], cfg);
+    expect(res.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("never retries a POST or a model call", async () => {
+    for (const path of ["ask", "ask/stream", "math", "socratic"]) {
+      const fetchMock = vi.fn(async () => { throw new TypeError("fetch failed"); });
+      vi.stubGlobal("fetch", fetchMock);
+      const res = await createForwarder({ sleep: noWait })(new Request("https://app.example/x", { method: "POST", body: "{}" }), ["api", "v1", ...path.split("/")], cfg);
+      expect(res.status).toBe(502);
+      expect(fetchMock, path).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("does not retry a GET outside the metadata list, or a client error", async () => {
+    const search = vi.fn(async () => new Response("", { status: 503 }));
+    vi.stubGlobal("fetch", search);
+    await createForwarder({ sleep: noWait })(new Request("https://app.example/x"), ["api", "v1", "search"], cfg);
+    expect(search).toHaveBeenCalledTimes(1);
+    const limited = vi.fn(async () => new Response("", { status: 429 }));
+    vi.stubGlobal("fetch", limited);
+    await createForwarder({ sleep: noWait })(new Request("https://app.example/x"), ["health"], cfg);
+    expect(limited).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry once the attempt has used up the retry window", async () => {
+    let clock = 0;
+    const fetchMock = vi.fn(async () => { clock += 11_000; return new Response("", { status: 503 }); });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await createForwarder({ now: () => clock, sleep: noWait })(new Request("https://app.example/x"), ["health"], cfg);
+    expect(res.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a starting response for later visitors", async () => {
+    const fetchMock = vi.fn<() => Promise<Response>>()
+      .mockResolvedValueOnce(Response.json({ status: "starting", chunks: null }, { headers: { "cache-control": "no-store" } }))
+      .mockResolvedValue(healthy());
+    vi.stubGlobal("fetch", fetchMock);
+    const send = createForwarder({ sleep: noWait });
+    expect((await (await send(new Request("https://app.example/x"), ["health"], cfg)).json()).status).toBe("starting");
+    expect((await (await send(new Request("https://app.example/x"), ["health"], cfg)).json()).status).toBe("ok");
+  });
+});
+
 describe("visitor address", () => {
   it("takes the first forwarded address, else x-real-ip, else none", () => {
     expect(visitorIp(new Request("https://a/", { headers: { "x-forwarded-for": "9.9.9.9, 10.0.0.1" } }))).toBe("9.9.9.9");
@@ -141,9 +205,14 @@ describe("public metadata request sharing", () => {
   });
 
   it("does not retain 429, other upstream errors, or unreachable responses", async () => {
-    const send = createForwarder();
+    const send = createForwarder({ sleep: () => Promise.resolve() });
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response("busy", { status: 429, headers: { "retry-after": "4" } }))
+      // 5xx and dropped connections are retried twice before the failure is returned.
       .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockRejectedValueOnce(new TypeError("offline"))
       .mockRejectedValueOnce(new TypeError("offline"))
       .mockImplementation(async () => Response.json({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
@@ -155,7 +224,7 @@ describe("public metadata request sharing", () => {
     expect((await send(metadataRequest(), ["api", "v1", "stats"], cfg)).status).toBe(502);
     expect((await send(metadataRequest(), ["api", "v1", "stats"], cfg)).status).toBe(200);
     await send(metadataRequest(), ["api", "v1", "stats"], cfg);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(8);
   });
 
   it("never caches private/write-enabled requests, search or questions, and still blocks public history", async () => {

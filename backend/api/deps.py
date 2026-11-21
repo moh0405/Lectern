@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -24,12 +25,22 @@ def make_engine() -> RAGEngine:
     return RAGEngine(store_dir=str(settings.store_dir), input_dir=str(settings.upload_dir))
 
 
-def get_engine(request: Request) -> RAGEngine:
+_engine_lock = threading.Lock()
+
+
+def shared_engine(app: Any) -> RAGEngine:
     """The one engine for this process (created at startup, or lazily if startup did not run)."""
-    engine = getattr(request.app.state, "engine", None)
+    engine = getattr(app.state, "engine", None)
     if engine is None:
-        engine = request.app.state.engine = make_engine()
+        with _engine_lock:  # concurrent first requests must not each load the index
+            engine = getattr(app.state, "engine", None)
+            if engine is None:
+                engine = app.state.engine = make_engine()
     return engine
+
+
+def get_engine(request: Request) -> RAGEngine:
+    return shared_engine(request.app)
 
 
 def get_jobs(request: Request) -> JobManager:
@@ -109,8 +120,20 @@ def require_api_key(request: Request) -> None:
         raise ApiError(401, "Missing or invalid X-API-Key header")
 
 
-# Applied to every /api/v1 route.
-common_dependencies = [Depends(rate_limit), Depends(require_api_key)]
+async def wait_until_started(request: Request) -> None:
+    """Hold a request until deferred startup has finished. It runs before the key check because the key itself is
+    fetched during startup (an unset key would otherwise mean "open"), and before any database is touched because a
+    database created before the S3 restore would replace the saved one on the next upload."""
+    startup = getattr(request.app.state, "startup", None)
+    if startup is None or startup.ready:
+        return
+    if not await startup.wait(settings.startup_wait_s):
+        raise ApiError(503, "The study service is starting up. Try again in a few seconds.", code="starting",
+                       headers={"Retry-After": "3"})
+
+
+# Applied to every /api/v1 route. The order matters: see wait_until_started.
+common_dependencies = [Depends(wait_until_started), Depends(rate_limit), Depends(require_api_key)]
 
 
 QUOTA_MESSAGE = (

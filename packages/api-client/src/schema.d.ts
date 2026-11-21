@@ -647,7 +647,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Liveness and basic index status */
+        /**
+         * Liveness and basic index status
+         * @description During a cold start this answers `status: starting`, with `chunks` and `semantic_search` null.
+         */
         get: operations["health_health_get"];
         put?: never;
         post?: never;
@@ -1144,18 +1147,22 @@ export interface components {
         };
         /** Health */
         Health: {
-            /** Chunks */
-            chunks: number;
+            /**
+             * Chunks
+             * @description Passages in the index. Null while `status` is `starting`
+             */
+            chunks: number | null;
             /**
              * Semantic Search
-             * @description True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder
+             * @description True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder. Null while `status` is `starting`
              */
-            semantic_search: boolean;
+            semantic_search: boolean | null;
             /**
              * Status
-             * @constant
+             * @description `starting` while the index and embedding model are still loading after a cold start
+             * @enum {string}
              */
-            status: "ok";
+            status: "ok" | "starting";
             /** Version */
             version: string;
         };

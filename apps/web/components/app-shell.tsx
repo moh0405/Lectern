@@ -25,33 +25,39 @@ function ReadingTheme() {
   </button>;
 }
 
-type ApiState = "checking" | "online" | "busy" | "offline";
+type ApiState = "checking" | "starting" | "online" | "busy" | "offline";
 const ANNOUNCE: Record<Exclude<ApiState, "checking">, string> = {
+  starting: "The study service is starting up. This can take a few seconds.",
   online: "Connected to the study service again.",
   busy: "Service busy · retrying shortly.",
   offline: "Offline: the study service cannot be reached.",
 };
 
 function ApiStatus() {
-  const { data, isError, isPending, error } = useQuery({
+  const { data, isError, isPending, error, failureCount } = useQuery({
     queryKey: ["health"],
     queryFn: async () => unwrap(await api.http.GET("/health")),
-    refetchInterval: 30_000,
-    retry: false,
+    refetchInterval: (query) => query.state.data?.status === "starting" ? 2_000 : 30_000,
+    // A service waking up can fail a request or two; a 4xx such as "busy" is a real answer.
+    retry: (count, e) => !(e instanceof ApiError && e.status < 500) && count < 2,
+    retryDelay: (attempt) => 1_000 * 2 ** attempt,
   });
-  const state: ApiState = isPending ? "checking" : error instanceof ApiError && error.status === 429 ? "busy" : isError ? "offline" : "online";
+  const state: ApiState = error instanceof ApiError && error.status === 429 ? "busy"
+    : isError ? "offline"
+    : isPending ? (failureCount > 0 ? "starting" : "checking")
+    : data?.status === "starting" ? "starting" : "online";
   // Announce changes of state only (not every 30 s poll): busy or offline whenever they start, online only on recovery.
   const [seen, setSeen] = useState<{ state: ApiState; announce: string }>({ state: "checking", announce: "" });
   if (state !== "checking" && state !== seen.state) {
     setSeen({ state, announce: state === "online" ? (seen.state === "checking" ? "" : ANNOUNCE.online) : ANNOUNCE[state] });
   }
   const text = state === "online" && data
-    ? `${plural(data.chunks, "passage")} indexed · ${data.semantic_search ? "meaning search" : "keyword search"}`
-    : state === "busy" ? "Service busy · retrying shortly" : state === "offline" ? "Offline" : "Connecting…";
+    ? `${plural(data.chunks ?? 0, "passage")} indexed · ${data.semantic_search ? "meaning search" : "keyword search"}`
+    : state === "busy" ? "Service busy · retrying shortly" : state === "offline" ? "Offline" : state === "starting" ? "Starting up…" : "Connecting…";
   // Mid-width headers show this instead; the full text stays in the accessibility tree and the tooltip.
-  const short = state === "online" && data ? `${plural(data.chunks, "passage")} indexed` : state === "busy" ? "Service busy" : text;
+  const short = state === "online" && data ? `${plural(data.chunks ?? 0, "passage")} indexed` : state === "busy" ? "Service busy" : text;
   const Icon = state === "busy" ? Clock : state === "offline" ? Unplug : null;
-  return <div className="api-status" title={data ? `Lectern API v${data.version} · ${text}` : text} data-state={state}>
+  return <div className="api-status" title={state === "starting" ? "The study service is waking up. This usually takes a few seconds." : data ? `Lectern API v${data.version} · ${text}` : text} data-state={state}>
     {Icon ? <Icon aria-hidden="true" className={cn("api-status-icon", state)} strokeWidth={2.2} /> : <span aria-hidden="true" className={cn("api-status-dot", state)} />}
     <span className="api-status-text">{text}</span>
     {short !== text ? <span aria-hidden="true" className="api-status-short">{short}</span> : null}

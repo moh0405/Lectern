@@ -1208,16 +1208,35 @@
       "Health": {
         "properties": {
           "chunks": {
-            "title": "Chunks",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Passages in the index. Null while `status` is `starting`",
+            "title": "Chunks"
           },
           "semantic_search": {
-            "description": "True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder",
-            "title": "Semantic Search",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder. Null while `status` is `starting`",
+            "title": "Semantic Search"
           },
           "status": {
-            "const": "ok",
+            "description": "`starting` while the index and embedding model are still loading after a cold start",
+            "enum": [
+              "ok",
+              "starting"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -7577,6 +7596,7 @@
     },
     "/health": {
       "get": {
+        "description": "During a cold start this answers `status: starting`, with `chunks` and `semantic_search` null.",
         "operationId": "health_health_get",
         "responses": {
           "200": {

@@ -23,10 +23,10 @@ class Chunk(BaseModel):
 
 
 class Health(BaseModel):
-    status: Literal["ok"]
+    status: Literal["ok", "starting"] = Field(description="`starting` while the index and embedding model are still loading after a cold start")
     version: str
-    semantic_search: bool = Field(description="True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder")
-    chunks: int
+    semantic_search: Optional[bool] = Field(description="True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder. Null while `status` is `starting`")
+    chunks: Optional[int] = Field(description="Passages in the index. Null while `status` is `starting`")
 
 
 # ---------------------------------------------------------------- sources / documents

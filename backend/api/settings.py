@@ -38,6 +38,11 @@ class Settings:
     # per request: a public deployment must not let a model write to a shared database.
     agent_allow_writes: bool = field(default_factory=lambda: os.getenv("AGENT_ALLOW_WRITES") == "1")
 
+    # Deferred startup (always on AWS Lambda): how long a request waits for the index and model to finish loading.
+    startup_wait_s: float = field(default_factory=lambda: float(os.getenv("STARTUP_WAIT_S", "45")))
+    health_startup_wait_s: float = field(default_factory=lambda: float(os.getenv("HEALTH_STARTUP_WAIT_S", "25")))
+    defer_startup: bool = field(default_factory=lambda: os.getenv("DEFER_STARTUP") == "1")
+
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024

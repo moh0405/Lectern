@@ -212,6 +212,7 @@ def test_on_lambda_changes_are_saved_after_each_request_not_on_a_timer(tmp_path,
     app = app_mod.create_app()
     app.add_api_route("/touch", lambda: {"ok": 1}, methods=["GET", "POST"])
     with TestClient(app) as client:
+        app.state.startup.begin().result(5)  # on Lambda the state loads on the first real request
         client.get("/touch")
         assert pushed == []
         client.post("/touch")

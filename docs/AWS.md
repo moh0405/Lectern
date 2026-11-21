@@ -29,6 +29,7 @@ keep that state (S3), a place to store the program (ECR), somewhere to run it (A
 
 Lambda runs the code only while a request is being handled and charges per millisecond, so there is no idle server bill.
 The first request after a quiet period is slower (a "cold start") because a fresh copy has to start, restore the index from S3 and load the embedding model.
+Lambda allows only 10 seconds for init, so the server starts listening first and does that work during the first real request (`backend/api/startup.py`). Until it finishes, `/health` answers `status: "starting"` and the web app shows "Starting up…"; other API requests wait for it.
 
 ## The pieces, in plain terms
 
