@@ -25,7 +25,7 @@ class Chunk(BaseModel):
 class Health(BaseModel):
     status: Literal["ok"]
     version: str
-    semantic_search: bool = Field(description="True when the embedder matching the index is loaded")
+    semantic_search: bool = Field(description="True when search ranks by meaning (semantic embeddings); false for keyword search, including the lexical hashing embedder")
     chunks: int
 
 

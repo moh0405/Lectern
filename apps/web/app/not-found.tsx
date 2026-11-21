@@ -1,14 +1,23 @@
+import type { Metadata } from "next";
+import { PageHeader } from "@/components/page-header";
+import { SectionLinks, StatusPageHint } from "@/components/status-page";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
+
+export const metadata: Metadata = { title: "Page not found" };
 
 export default function NotFound() {
   return (
-    <Card className="mx-auto mt-10 max-w-lg space-y-3 text-center">
-      <h1 className="text-lg font-semibold">Page not found</h1>
-      <p className="text-sm text-muted">That address does not exist.</p>
-      <Link href="/ask" className="inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85">
-        Go to Ask
-      </Link>
-    </Card>
+    <div className="status-page">
+      <PageHeader
+        eyebrow="404"
+        title="Page not found"
+        description="That address doesn't match any page in Lectern. It may have moved, or the link may have a typo."
+      />
+      <div className="status-page-actions">
+        <Link href="/ask" className="status-page-button primary">Go to Ask</Link>
+      </div>
+      <SectionLinks />
+      <StatusPageHint />
+    </div>
   );
 }

@@ -92,7 +92,7 @@ def test_upload_index_search_delete_flow(indexed):
     docs = api.get("/api/v1/documents").json()["documents"]
     assert [d["source_key"] for d in docs] == ["heaps.pdf"] and docs[0]["chunks"] >= 1
     stats = api.get("/api/v1/stats").json()
-    assert stats["documents"] == 1 and stats["chunks"] >= 1 and stats["semantic_search"] is True
+    assert stats["documents"] == 1 and stats["chunks"] >= 1 and stats["semantic_search"] is False  # the test index uses the lexical hashing embedder
     hits = api.get("/api/v1/search", params={"query": "priority queue heap", "k": 2}).json()["chunks"]
     assert hits and hits[0]["doc"] == "heaps.pdf" and hits[0]["score"] > 0
 

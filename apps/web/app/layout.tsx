@@ -21,9 +21,24 @@ const plexMono = localFont({
   fallback: ["ui-monospace", "SFMono-Regular", "monospace"],
 });
 
+const DESCRIPTION = "A RAG tutor for Computer Science: ask your own material, get cited answers.";
+const SHARE_DESCRIPTION = "Ask your Computer Science material and get answers that cite the passage they came from.";
+
 export const metadata: Metadata = {
   title: { default: "Lectern", template: "%s · Lectern" },
-  description: "A RAG tutor for Computer Science: ask your own material, get cited answers.",
+  description: DESCRIPTION,
+  applicationName: "Lectern",
+  openGraph: {
+    type: "website",
+    siteName: "Lectern",
+    title: "Lectern: an AI tutor that shows its sources",
+    description: SHARE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lectern: an AI tutor that shows its sources",
+    description: SHARE_DESCRIPTION,
+  },
 };
 
 // The hosted app talks to the API through the key-holding proxy; unless the owner lifted the limits, it is the public demo.
@@ -32,7 +47,7 @@ const isDemo = () => Boolean(process.env.BACKEND_URL) && process.env.BACKEND_ALL
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${manrope.variable} ${plexMono.variable}`} suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("lectern-reading-theme")==="light")document.documentElement.dataset.theme="light"}catch{}` }} /></head>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var d=document.documentElement;if(localStorage.getItem("lectern-reading-theme")==="light")d.dataset.theme="light";if(localStorage.getItem("lectern-demo-strip-dismissed"))d.dataset.demoStrip="dismissed"}catch{}` }} /></head>
       <body className="font-sans antialiased">
         <Providers demo={isDemo()}>
           <AppShell>{children}</AppShell>

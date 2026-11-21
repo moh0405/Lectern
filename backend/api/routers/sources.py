@@ -156,7 +156,7 @@ def stats(engine: RAGEngine = Depends(get_engine)):
         min_page=min(pages) if pages else None,
         max_page=max(pages) if pages else None,
         embedder=engine.store.embedder_name,
-        semantic_search=engine.semantic_ready,
+        semantic_search=engine.semantic_search,
     )
 
 

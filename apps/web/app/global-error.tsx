@@ -1,15 +1,17 @@
 "use client";
 
 // Replaces the root layout when it fails, so it brings its own <html>, <body> and (inline) styles.
-export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+export default function GlobalError({ error, retry }: { error: unknown; retry: () => void }) {
+  const digest = error instanceof Error && "digest" in error ? String((error as { digest?: unknown }).digest ?? "") : "";
   return (
     <html lang="en">
-      <body style={{ background: "#0a0e1a", color: "#e6e9f2", fontFamily: "system-ui, sans-serif", display: "grid", placeItems: "center", minHeight: "100vh", margin: 0 }}>
-        <div role="alert" style={{ maxWidth: 420, textAlign: "center", padding: 24 }}>
-          <h1 style={{ fontSize: 20 }}>Lectern hit a problem</h1>
-          <p style={{ color: "#95a0bd", fontSize: 14 }}>The app could not load. Try again; if it keeps happening, check that the API is running.</p>
-          {error.digest ? <p style={{ fontFamily: "monospace", fontSize: 12, color: "#95a0bd" }}>Error id: {error.digest}</p> : null}
-          <button onClick={() => retry()} style={{ background: "#7c6cf0", color: "white", border: 0, borderRadius: 8, padding: "10px 16px", cursor: "pointer" }}>
+      <body style={{ background: "#10151b", color: "#e8edf3", fontFamily: "system-ui, sans-serif", display: "grid", placeItems: "center", minHeight: "100vh", margin: 0 }}>
+        <title>Something went wrong · Lectern</title>
+        <div role="alert" style={{ maxWidth: 440, textAlign: "center", padding: 24 }}>
+          <h1 style={{ fontSize: 28, letterSpacing: "-0.03em", margin: "0 0 12px" }}>Lectern hit a problem</h1>
+          <p style={{ color: "#a0acba", fontSize: 15, lineHeight: 1.6 }}>The app could not load. Try again in a moment; your sources and history are safe.</p>
+          {digest ? <p style={{ fontFamily: "monospace", fontSize: 12, color: "#a0acba" }}>Error id: {digest}</p> : null}
+          <button onClick={() => retry()} style={{ background: "#c0a7f4", color: "#251938", border: 0, borderRadius: 8, minHeight: 44, padding: "0 18px", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
             Try again
           </button>
         </div>

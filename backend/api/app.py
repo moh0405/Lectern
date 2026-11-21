@@ -100,7 +100,7 @@ def create_app() -> FastAPI:
     @app.get("/health", response_model=Health, tags=["meta"], summary="Liveness and basic index status")
     def health() -> Health:
         engine = getattr(app.state, "engine", None) or get_engine_lazy(app)
-        return Health(status="ok", version=__version__, semantic_search=engine.semantic_ready, chunks=len(engine.store))
+        return Health(status="ok", version=__version__, semantic_search=engine.semantic_search, chunks=len(engine.store))
 
     for r in (sources.router, ask.router, agent.router, tutor.router, leetcode.router, study.router, viz.router, tracking.router):
         app.include_router(r)
