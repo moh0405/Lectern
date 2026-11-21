@@ -28,12 +28,14 @@ export interface Turn {
   /** True when the first answer cited unknown sources and the workflow rewrote it. */
   rewritten?: boolean;
   llmCalls?: number;
+  /** Answered from documents kept in this browser (public demo), not the shared index. */
+  local?: boolean;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
 
 export type Action =
-  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean }
+  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean; local?: boolean }
   | { type: "step"; id: string; step: AgentStep }
   /** The agentic workflow discards the answer streamed so far; a corrected one follows. */
   | { type: "replace"; id: string }
@@ -55,7 +57,7 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
   switch (action.type) {
     case "start":
       return [
-        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", ...(action.agent ? { agent: true, steps: [] } : {}) },
+        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", ...(action.agent ? { agent: true, steps: [] } : {}), ...(action.local ? { local: true } : {}) },
         ...turns,
       ];
     case "step":

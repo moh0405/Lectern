@@ -55,13 +55,15 @@ test("upload a PDF, ask a question, get a streamed answer with a citation", asyn
   await page.reload();
   await expect(heading).toBeVisible();
   await expect(page.locator(".md-body").first().getByRole("button", { name: /^Citation heaps\.pdf/ })).toBeVisible();
-  await page.getByRole("button", { name: /Clear session/ }).click();
+  await page.getByRole("button", { name: "Clear history" }).click(); // asks before deleting the history
+  await expect(heading).toBeVisible();
+  await page.getByRole("group", { name: "Clear history?" }).getByRole("button", { name: "Confirm clear" }).click();
   await expect(heading).toHaveCount(0);
 });
 
 test("advanced options: pick a model, see the prompt, skip the model, export flashcards and notes", async ({ page }) => {
   await page.goto("/ask");
-  await page.getByText("Advanced").click();
+  await page.locator("summary", { hasText: "Advanced" }).click();
 
   // model list comes from the API (scripted here)
   const model = page.getByLabel("Model", { exact: true });
@@ -77,7 +79,8 @@ test("advanced options: pick a model, see the prompt, skip the model, export fla
   await page.locator("summary", { hasText: "Prompt sent to the model" }).click();
   await expect(page.locator("pre").first()).toContainText("What is a priority queue?");
 
-  // retrieval only: passages, no model call, no answer text
+  // retrieval only: passages, no model call, no answer text (Advanced closes when a question is sent; open it again)
+  await page.locator("summary", { hasText: "Advanced" }).click();
   await page.getByLabel("Only show matching passages (skip the model)").check();
   await page.getByLabel("Your question").fill("binary heap complete tree");
   await page.getByRole("button", { name: "Ask", exact: true }).click();

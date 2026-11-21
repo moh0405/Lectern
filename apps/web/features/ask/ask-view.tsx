@@ -1,9 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, BookOpen, FileText, Link2, MessageSquare, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/feedback";
@@ -12,12 +12,16 @@ import { useDemo } from "@/lib/demo";
 import { api, unwrap } from "@/lib/api";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { Selection } from "./citation-chip";
 import { linkCitations, type CiteRef } from "./citations";
+import { finishedMessage, groundingOf } from "./grounding";
+import { InlinePassage } from "./inline-passage";
 import { NotesPanel } from "./notes-panel";
 import type { Mode, Turn } from "./session";
 import { SourceMargin } from "./source-margin";
 import { TraceLine } from "./trace-line";
-import { TurnCard, type Selection } from "./turn-card";
+import { TurnCard } from "./turn-card";
+import { NARROW_QUERY, prefersReducedMotion, useMedia } from "./use-media";
 import { useAskSession } from "./use-ask-session";
 import styles from "./ask.module.css";
 
@@ -30,6 +34,10 @@ const MODES: { value: "" | Mode; label: string }[] = [
 ];
 
 const STARTERS = ["Explain dynamic programming", "What is a hash table?", "Difference between BFS and DFS", "How does quicksort work?"];
+
+/** The longest question the server accepts, and the shorter limit of a passage-only search. */
+const MAX_QUESTION = 2000;
+const MAX_SEARCH = 500;
 
 const STEPS = [
   { id: "question", label: "Question" },
@@ -45,19 +53,33 @@ function defaultSelection(turn: Turn | undefined, refs: CiteRef[]): Selection {
   return { ref: null, chunk: turn?.chunks.length ? 0 : null };
 }
 
+/** Height of what is stuck to the top of the window on narrow screens: the site header and the steps bar. */
+function stickyTop(): number {
+  const header = document.querySelector(".desk-header")?.getBoundingClientRect().height ?? 0;
+  const steps = document.querySelector("[data-steps-bar]")?.getBoundingClientRect().height ?? 0;
+  return header + steps;
+}
+
 function Library({ turns, activeId, onPick, onClear, demo }: { turns: Turn[]; activeId?: string; onPick: (id: string) => void; onClear: () => void; demo: boolean }) {
   const shared = useQuery({ queryKey: ["documents"], queryFn: async () => unwrap(await api.http.GET("/api/v1/documents")), staleTime: 60_000 });
   const mine = useLocalDocs();
+  const [confirming, setConfirming] = useState(false);
   const docs = [
     ...(mine.data ?? []).map((d) => ({ key: `mine-${d.id}`, name: d.name, note: `${plural(d.pages, "page")} · in this browser` })),
     ...(shared.data?.documents ?? []).map((d) => ({ key: d.source_key, name: d.docs[0] ?? d.source_key, note: `${plural(d.chunks, "passage")}${demo ? " · shared textbook" : ""}` })),
   ];
   const shown = docs.slice(0, 6);
+  useEffect(() => {
+    if (confirming) document.getElementById("ask-clear-confirm")?.focus();
+  }, [confirming]);
+  const cancel = () => {
+    setConfirming(false);
+    requestAnimationFrame(() => document.getElementById("ask-clear")?.focus());
+  };
   return (
     <aside className={styles.library} aria-label="Your library">
-      <div className={styles.libraryHead}>
-        <h2>Your library</h2>
-      </div>
+      {/* Not a heading: the page's h1 ("Ask") comes later in the reading order. */}
+      <p className={styles.libraryHead}>Your library</p>
       <Link href="/sources" className={styles.addMaterial}>
         <Plus aria-hidden="true" /> Add material
       </Link>
@@ -97,9 +119,43 @@ function Library({ turns, activeId, onPick, onClear, demo }: { turns: Turn[]; ac
               </li>
             ))}
           </ul>
-          <Button variant="ghost" size="sm" onClick={onClear} className={styles.clearSession}>
-            <Trash2 className="h-4 w-4" /> Clear session
-          </Button>
+          {confirming ? (
+            <div
+              className={styles.confirm}
+              role="group"
+              aria-label="Clear history?"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  cancel();
+                }
+              }}
+            >
+              <p>
+                Delete all {plural(turns.length, "question")} and {turns.length === 1 ? "its answer" : "their answers"} from this browser{demo ? "" : " and your saved history on the server"}? Flashcards and sources are kept.
+              </p>
+              <div className={styles.confirmActions}>
+                <Button
+                  id="ask-clear-confirm"
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setConfirming(false);
+                    onClear();
+                  }}
+                >
+                  Confirm clear
+                </Button>
+                <Button variant="ghost" size="sm" onClick={cancel}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button id="ask-clear" variant="ghost" size="sm" onClick={() => setConfirming(true)} className={styles.clearSession}>
+              <Trash2 className="h-4 w-4" aria-hidden="true" /> Clear history
+            </Button>
+          )}
         </>
       ) : null}
       <div className={styles.libraryFoot}>
@@ -123,9 +179,18 @@ export function AskView() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [picked, setPicked] = useState<{ turnId: string; selection: Selection } | null>(null);
+  const [inlineFor, setInlineFor] = useState<string | null>(null);
   const [trace, setTrace] = useState(true);
   const [step, setStep] = useState<Step>("question");
+  const [announcement, setAnnouncement] = useState("");
+  const [busyHint, setBusyHint] = useState(false);
+  const [reveal, setReveal] = useState(0);
+  const focusAfterRemove = useRef(false);
+  const deskRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const advancedRef = useRef<HTMLDetailsElement>(null);
+  const narrow = useMedia(NARROW_QUERY);
   // In the public demo a visitor can ask about documents kept in their own browser. Once they have added some, default to them.
   const demo = useDemo();
   const myDocs = useLocalDocs();
@@ -133,11 +198,12 @@ export function AskView() {
   const [pickedSource, setPickedSource] = useState<"shared" | "mine" | null>(null);
   const local = hasMine && (pickedSource ?? "mine") === "mine";
 
-  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")) });
+  // Retry a failed stats call quickly, so a slow or cold first response settles into the empty or offline state promptly.
+  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")), retryDelay: (n) => Math.min(300 * 2 ** n, 1200) });
   const models = useQuery({
     queryKey: ["models"],
     queryFn: async () => unwrap(await api.http.GET("/api/v1/models")),
-    enabled: advancedOpen,
+    enabled: advancedOpen && !demo,
     retry: false, // 503 without a server key: fall back to a free-text field
     staleTime: 10 * 60_000,
   });
@@ -148,24 +214,142 @@ export function AskView() {
     staleTime: 5 * 60_000,
   });
 
+  /** Say something once through the page's status region (cleared first, so a repeat is read again). */
+  const announce = useCallback((message: string) => {
+    setAnnouncement("");
+    window.setTimeout(() => setAnnouncement(message), 60);
+  }, []);
+
   // The desk shows one question at a time: the newest, unless an earlier one was picked from the session list.
   const active = turns.find((t) => t.id === activeId) ?? turns[0];
   // Linked once here and shared with the answer (chips) and the source margin, so both use the same ids.
   const linked = useMemo(() => (active?.status === "done" ? linkCitations(active.answer, active.citations, active.chunks) : null), [active]);
   const refs = useMemo(() => linked?.refs ?? [], [linked]);
   const selection = picked && picked.turnId === active?.id ? picked.selection : defaultSelection(active, refs);
-  const select = (s: Selection) => active && setPicked({ turnId: active.id, selection: s });
+  const inlineOpen = narrow && active !== undefined && inlineFor === active.id;
+  const scope = demo && active ? (active.local ? "In this browser" : "Shared library") : undefined;
+  const grounding = groundingOf(active);
+  const finished = active?.status === "done" && Boolean(active.answer);
+  const showSteps = finished;
+  const showUnderstanding = finished && grounding.kind !== "not-found";
+
+  const select = (s: Selection) => {
+    if (!active) return;
+    setPicked({ turnId: active.id, selection: s });
+    if (narrow) setInlineFor(active.id);
+    const ref = s.ref !== null ? refs[s.ref] : undefined;
+    const chunk = ref ? ref.chunk : s.chunk;
+    if (chunk !== null && chunk !== undefined) announce(`Passage ${chunk + 1} opened ${narrow ? "below the answer" : "in the source margin"}`);
+    else if (ref) announce(ref.status === "ok" ? "Citation opened: verified, but its passage is not listed" : "Citation opened: it could not be checked");
+  };
+  const closeInline = () => {
+    setInlineFor(null);
+    const chip = selection.ref !== null ? document.getElementById(`cite-chip-${selection.ref}`) : null;
+    requestAnimationFrame(() => (chip ?? document.querySelector<HTMLElement>("[data-turn-heading]"))?.focus());
+  };
+
+  // Announce when a question finishes: how many citations were checked, or that it stopped or failed.
+  const statuses = useRef(new Map<string, Turn["status"]>());
+  useEffect(() => {
+    const seen = statuses.current;
+    for (const t of turns) {
+      const before = seen.get(t.id);
+      if (before === "streaming" && t.status !== "streaming") announce(finishedMessage(t));
+      seen.set(t.id, t.status);
+    }
+  }, [turns, announce]);
+
+  // The site header is sticky; the steps bar sticks just below it on narrow screens.
+  useLayoutEffect(() => {
+    const header = document.querySelector(".desk-header");
+    const desk = deskRef.current;
+    if (!header || !desk) return;
+    const set = () => desk.style.setProperty("--ask-sticky-top", `${Math.round(header.getBoundingClientRect().height)}px`);
+    set();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(set);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
+  // Bring the new or picked question into view: the answer column on wide screens, the window when the columns stack.
+  useEffect(() => {
+    if (!reveal) return;
+    const frame = requestAnimationFrame(() => {
+      if (window.matchMedia?.(NARROW_QUERY).matches) {
+        const el = document.querySelector('[data-step="question"]');
+        if (el) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - stickyTop() - 8), behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      } else scrollRef.current?.scrollTo?.({ top: 0 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [reveal]);
+
+  // After Remove, focus the question now on the desk, or the page title when none is left.
+  useEffect(() => {
+    if (!focusAfterRemove.current) return;
+    focusAfterRemove.current = false;
+    (document.querySelector<HTMLElement>("[data-turn-heading]") ?? document.getElementById("ask-title"))?.focus();
+  }, [turns]);
+
+  // Mark the step whose section is at the top of the reading area, watching the column (wide) or the window (narrow).
+  useEffect(() => {
+    if (!showSteps || typeof IntersectionObserver === "undefined") return;
+    const column = scrollRef.current;
+    if (!column) return;
+    const root = narrow ? null : column;
+    const top = () => (root ? root.getBoundingClientRect().top : stickyTop()) + 120;
+    const compute = () => {
+      let current: Step = "question";
+      for (const s of STEPS) {
+        const el = column.querySelector(`[data-step="${s.id}"]`);
+        if (el && el.getBoundingClientRect().top <= top()) current = s.id;
+      }
+      setStep(current);
+    };
+    const thresholds = Array.from({ length: 21 }, (_, i) => i / 20);
+    const io = new IntersectionObserver(compute, { root, threshold: thresholds });
+    column.querySelectorAll("[data-step]").forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [showSteps, narrow, active?.id]);
+
+  // Grow the question box with its text where CSS `field-sizing` is not supported.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el || (typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content"))) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight + 2, 220)}px`;
+  }, [question]);
+
+  const offline = stats.isError;
+  const limit = retrievalOnly ? MAX_SEARCH : MAX_QUESTION;
+  const length = question.trim().length;
+  const overLimit = question.length > limit;
+  const nearLimit = question.length > limit * 0.8;
 
   const submit = (text: string) => {
     const q = text.trim();
-    if (q.length < 3 || busy) return;
+    if (busy) {
+      setBusyHint(true);
+      announce("An answer is still being written. Wait for it, or stop it, before asking again.");
+      return;
+    }
+    if (q.length < 3 || offline || q.length > limit) return;
     setActiveId(null);
     setPicked(null);
+    setInlineFor(null);
     setStep("question");
-    scrollRef.current?.scrollTo({ top: 0 });
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: model.trim() || undefined, showPrompt, retrievalOnly, local, agent: agentic });
+    if (advancedRef.current?.open) advancedRef.current.open = false; // the panel floats over the answer
+    announce(local ? "Searching your browser documents…" : "Searching your material…");
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly, local, agent: agentic });
+    setReveal((n) => n + 1);
     setQuestion("");
   };
+  useEffect(() => {
+    if (!busyHint) return;
+    const t = window.setTimeout(() => setBusyHint(false), 5000);
+    return () => window.clearTimeout(t);
+  }, [busyHint, busy]);
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     submit(question);
@@ -180,36 +364,35 @@ export function AskView() {
   const goTo = (id: Step) => {
     setStep(id);
     const target = scrollRef.current?.querySelector(`[data-step="${id}"]`);
-    target?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  };
-  // Mark the step whose section has scrolled to the top of the column.
-  const onScroll = () => {
-    const root = scrollRef.current;
-    if (!root) return;
-    const top = root.getBoundingClientRect().top + 120;
-    let current: Step = "question";
-    for (const s of STEPS) {
-      const el = root.querySelector(`[data-step="${s.id}"]`);
-      if (el && el.getBoundingClientRect().top <= top) current = s.id;
-    }
-    if (current !== step) setStep(current);
+    if (!target) return;
+    const behavior = prefersReducedMotion() ? "auto" : "smooth";
+    if (narrow) window.scrollTo({ top: Math.max(0, target.getBoundingClientRect().top + window.scrollY - stickyTop() - 8), behavior });
+    else target.scrollIntoView({ behavior, block: "start" });
   };
 
-  const empty = (stats.data?.chunks ?? 0) === 0 && !stats.isPending;
+  const empty = stats.isSuccess && (stats.data?.chunks ?? 0) === 0 && !hasMine;
   const chips = suggestions.data?.questions.length ? suggestions.data.questions : STARTERS;
   const traceable = refs.some((r) => r.chunk !== null);
+  const askAgain = (t: Turn, extra: { local?: boolean } = {}) =>
+    void ask({ question: t.question, mode: t.mode, k, temperature, model: demo ? undefined : model.trim() || undefined, noCache: true, local: extra.local ?? Boolean(t.local), agent: t.agent });
 
   return (
-    <div className={styles.desk}>
+    <div className={styles.desk} ref={deskRef}>
       <Library
         turns={turns}
         activeId={active?.id}
         demo={demo}
-        onClear={clear}
+        onClear={() => {
+          clear();
+          setActiveId(null);
+          announce("History cleared");
+          requestAnimationFrame(() => document.getElementById("ask-title")?.focus());
+        }}
         onPick={(id) => {
           setActiveId(id);
+          setInlineFor(null);
           setStep("question");
-          scrollRef.current?.scrollTo({ top: 0 });
+          setReveal((n) => n + 1);
         }}
       />
 
@@ -217,7 +400,9 @@ export function AskView() {
         <div className={styles.toolbar}>
           <div className={styles.crumbs}>
             <BookOpen aria-hidden="true" />
-            <h1 id="ask-title">Ask</h1>
+            <h1 id="ask-title" tabIndex={-1}>
+              Ask
+            </h1>
             <span aria-hidden="true">/</span>
             <span>{active ? "A study session" : "A new question"}</span>
           </div>
@@ -228,9 +413,9 @@ export function AskView() {
           ) : null}
         </div>
 
-        {active ? (
-          <nav className={styles.steps} aria-label="Steps">
-            {STEPS.map((s, i) => (
+        {active && showSteps ? (
+          <nav className={styles.steps} aria-label="Steps" data-steps-bar>
+            {STEPS.filter((s) => s.id !== "understanding" || showUnderstanding).map((s, i) => (
               <span key={s.id} className={styles.stepItem}>
                 {i > 0 ? <span className={styles.stepLine} aria-hidden="true" /> : null}
                 <button type="button" aria-current={step === s.id ? "step" : undefined} onClick={() => goTo(s.id)}>
@@ -242,10 +427,10 @@ export function AskView() {
           </nav>
         ) : null}
 
-        <div className={styles.scroll} ref={scrollRef} onScroll={onScroll} data-desk-scroll>
+        <div className={styles.scroll} ref={scrollRef} data-desk-scroll>
           {active ? (
             <>
-              <div data-step="question">
+              <div data-step="question" className={styles.turnAnchor}>
                 <TurnCard
                   key={active.id}
                   turn={active}
@@ -253,25 +438,48 @@ export function AskView() {
                   selection={selection}
                   onSelect={select}
                   linked={linked}
+                  announce={announce}
+                  narrow={narrow}
+                  scope={scope}
+                  inlinePassage={inlineOpen ? <InlinePassage turn={active} refs={refs} selection={selection} onClose={closeInline} scope={scope} /> : null}
                   onStop={() => stop(active.id)}
-                  onRemove={() => remove(active.id)}
-                  onFresh={() => void ask({ question: active.question, mode: active.mode, k, temperature, model: model.trim() || undefined, noCache: true, local, agent: active.agent })}
+                  onRemove={() => {
+                    remove(active.id);
+                    setActiveId(null);
+                    focusAfterRemove.current = true;
+                    announce("Question removed");
+                  }}
+                  onFresh={() => askAgain(active)}
+                  onSearchShared={
+                    active.error?.code === "no_local_match"
+                      ? () => {
+                          setPickedSource("shared");
+                          askAgain(active, { local: false });
+                          setReveal((n) => n + 1);
+                        }
+                      : undefined
+                  }
                 />
               </div>
-              <section data-step="understanding" className={styles.understanding} aria-labelledby="understanding-title">
-                <p className="eyebrow">Understanding / something to keep</p>
-                <h2 id="understanding-title">Make the idea yours.</h2>
-                <p className={styles.understandingLead}>Keep the source open, then turn what you read into something you can review later.</p>
-                <div className={styles.nextSteps}>
-                  <Link href="/study">
-                    Review your flashcards <ArrowUpRight aria-hidden="true" />
-                  </Link>
-                  <Link href="/tutor?tool=socratic">
-                    Work through it with guiding questions <ArrowUpRight aria-hidden="true" />
-                  </Link>
-                </div>
+              {showUnderstanding ? (
+                <section data-step="understanding" className={styles.understanding} aria-labelledby="understanding-title">
+                  <p className="eyebrow">Understanding / something to keep</p>
+                  <h2 id="understanding-title">Make the idea yours.</h2>
+                  <p className={styles.understandingLead}>Keep the source open, then turn what you read into something you can review later.</p>
+                  <div className={styles.nextSteps}>
+                    <Link href="/study">
+                      Review your flashcards <ArrowUpRight aria-hidden="true" />
+                    </Link>
+                    <Link href="/tutor?tool=socratic">
+                      Work through it with guiding questions <ArrowUpRight aria-hidden="true" />
+                    </Link>
+                  </div>
+                </section>
+              ) : null}
+              {/* Notes cover the whole session, so they stay available whichever question is on the desk. */}
+              <div className={styles.sessionNotes}>
                 <NotesPanel turns={turns} />
-              </section>
+              </div>
             </>
           ) : (
             <div className={styles.opening}>
@@ -285,7 +493,18 @@ export function AskView() {
                 Keep the source close.
               </h2>
               <p className={styles.openingLead}>Bring your material into the conversation. Every answer cites the passages it came from, and each citation opens beside the answer.</p>
-              {empty ? (
+              {offline ? (
+                <div className={styles.offline}>
+                  <CloudOff aria-hidden="true" />
+                  <div>
+                    <p className={styles.offlineTitle}>Can&apos;t reach Lectern right now</p>
+                    <p>Your library and answers come from the Lectern server, which is not answering. Check your connection, then try again.</p>
+                    <Button variant="secondary" size="sm" className="mt-3" disabled={stats.isFetching} onClick={() => void stats.refetch()}>
+                      {stats.isFetching ? "Trying again…" : "Retry"}
+                    </Button>
+                  </div>
+                </div>
+              ) : empty ? (
                 <div className={styles.openingEmpty}>
                   <EmptyState title="No study material yet">
                     <Link href="/sources" className="text-accent-2 underline">
@@ -299,7 +518,7 @@ export function AskView() {
               <ul className={styles.starters}>
                 {chips.map((c) => (
                   <li key={c}>
-                    <button type="button" onClick={() => submit(c)} disabled={busy} className={styles.starter}>
+                    <button type="button" onClick={() => submit(c)} disabled={busy || offline} className={styles.starter}>
                       {c}
                       <ArrowUpRight aria-hidden="true" />
                     </button>
@@ -312,103 +531,139 @@ export function AskView() {
 
         <form onSubmit={onSubmit} className={styles.composer}>
           <div className={styles.composerBox}>
-            <div className={styles.questionLabel}>
-              <Label htmlFor="question">Your question</Label>
-              <span>{local ? "Searching your browser documents" : "Searching your study material"}</span>
-            </div>
+            <label htmlFor="question" className="sr-only">
+              Your question
+            </label>
             <Textarea
+              ref={inputRef}
               id="question"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={active ? "Ask a follow-up, or pull on a new thread…" : "What would you like to understand?"}
-              maxLength={2000}
-              rows={2}
+              placeholder={active ? (narrow ? "Ask a follow-up…" : "Ask a follow-up, or pull on a new thread…") : "What would you like to understand?"}
+              maxLength={limit}
+              rows={1}
+              aria-describedby={nearLimit ? "question-count" : undefined}
               className={styles.questionInput}
             />
             <div className={styles.composerBar}>
+              <details
+                ref={advancedRef}
+                className={styles.advanced}
+                onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && advancedRef.current?.open) {
+                    e.stopPropagation();
+                    advancedRef.current.open = false;
+                    advancedRef.current.querySelector("summary")?.focus();
+                  }
+                }}
+              >
+                <summary>
+                  <SlidersHorizontal aria-hidden="true" />
+                  <span>Advanced</span>
+                  <span className={styles.advancedHint}>Adjust the search and answer</span>
+                </summary>
+                <div className={styles.advancedPanel}>
+                  <div className={styles.advancedGrid}>
+                    <div>
+                      <Label htmlFor="mode">Style</Label>
+                      <Select id="mode" value={mode} onChange={(e) => setMode(e.target.value as "" | Mode)}>
+                        {MODES.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="k">Passages</Label>
+                      <Select id="k" value={k} onChange={(e) => setK(Number(e.target.value))}>
+                        {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <label className={styles.check}>
+                      <input type="checkbox" checked={agentic && !local && !retrievalOnly} onChange={(e) => setAgentic(e.target.checked)} disabled={local || retrievalOnly} className="mt-1 accent-[var(--color-accent)]" />
+                      <span>
+                        <span className="font-medium">Agentic mode</span>{" "}
+                        <span className="text-muted">
+                          rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls{demo ? ", each counted against the demo's daily limit" : ""})
+                          {local ? ". Not available for your own documents." : ""}
+                        </span>
+                      </span>
+                    </label>
+                    <div>
+                      <Label htmlFor="temperature">Temperature: {temperature.toFixed(2)}</Label>
+                      <input id="temperature" type="range" min={0} max={1} step={0.05} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} className="w-full accent-[var(--color-accent)]" />
+                    </div>
+                    {demo ? null : (
+                      <div>
+                        <Label htmlFor="model">Model</Label>
+                        {models.data ? (
+                          <Select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
+                            <option value="">Server default ({models.data.default})</option>
+                            {models.data.models.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                          <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="server default" />
+                        )}
+                      </div>
+                    )}
+                    <label className={styles.check}>
+                      <input type="checkbox" checked={retrievalOnly} onChange={(e) => setRetrievalOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
+                      <span>
+                        Only show matching passages (skip the model)
+                        <span className={styles.checkNote}>Searches take questions of up to {MAX_SEARCH} characters.</span>
+                      </span>
+                    </label>
+                    {demo ? null : (
+                      <label className={styles.check}>
+                        <input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} disabled={retrievalOnly} className="accent-[var(--color-accent)]" />
+                        Show the prompt sent to the model
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </details>
               {hasMine ? (
                 <div className={styles.inlineField}>
                   <Label htmlFor="source">Search in</Label>
                   <Select id="source" value={local ? "mine" : "shared"} onChange={(e) => setPickedSource(e.target.value as "shared" | "mine")}>
-                    <option value="mine">My documents (in this browser)</option>
-                    <option value="shared">The shared textbooks</option>
+                    <option value="mine">My documents</option>
+                    <option value="shared">Shared textbooks</option>
                   </Select>
                 </div>
               ) : null}
-              <div className={styles.inlineField}>
-                <Label htmlFor="mode">Style</Label>
-                <Select id="mode" value={mode} onChange={(e) => setMode(e.target.value as "" | Mode)}>
-                  {MODES.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className={styles.inlineField}>
-                <Label htmlFor="k">Passages</Label>
-                <Select id="k" value={k} onChange={(e) => setK(Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <Button type="submit" disabled={busy || question.trim().length < 3} className={styles.askButton}>
-                <Send className="h-4 w-4" /> Ask
+              {nearLimit ? (
+                <span id="question-count" className={styles.counter} data-over={overLimit ? "true" : undefined}>
+                  {question.length} / {limit}
+                  <span className="sr-only"> characters</span>
+                </span>
+              ) : null}
+              <Button type="submit" disabled={busy || offline || length < 3 || overLimit} className={styles.askButton}>
+                <Send className="h-4 w-4" aria-hidden="true" /> Ask
               </Button>
             </div>
-            <details className={styles.advanced} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
-              <summary aria-label="Advanced">
-                <SlidersHorizontal aria-hidden="true" /> Advanced
-                <span>Adjust the search and answer</span>
-              </summary>
-              <div className={styles.advancedGrid}>
-                <label className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" checked={agentic && !local && !retrievalOnly} onChange={(e) => setAgentic(e.target.checked)} disabled={local || retrievalOnly} className="mt-1 accent-[var(--color-accent)]" />
-                  <span>
-                    <span className="font-medium">Agentic mode</span>{" "}
-                    <span className="text-muted">
-                      rewrites the search, checks the passages and re-checks the citations (slower, up to 6 model calls)
-                      {local ? ". Not available for your own documents." : ""}
-                    </span>
-                  </span>
-                </label>
-                <div>
-                  <Label htmlFor="temperature">Temperature: {temperature.toFixed(2)}</Label>
-                  <input id="temperature" type="range" min={0} max={1} step={0.05} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} className="w-full accent-[var(--color-accent)]" />
-                </div>
-                <div>
-                  <Label htmlFor="model">Model</Label>
-                  {models.data ? (
-                    <Select id="model" value={model} onChange={(e) => setModel(e.target.value)}>
-                      <option value="">Server default ({models.data.default})</option>
-                      {models.data.models.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="server default" />
-                  )}
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={retrievalOnly} onChange={(e) => setRetrievalOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
-                  Only show matching passages (skip the model)
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={showPrompt} onChange={(e) => setShowPrompt(e.target.checked)} disabled={retrievalOnly} className="accent-[var(--color-accent)]" />
-                  Show the prompt sent to the model
-                </label>
-              </div>
-            </details>
           </div>
           <div className={styles.composerFoot}>
-            <span>Sources stay one click away.</span>
-            <span>
+            {busyHint && busy ? (
+              <span className={styles.footHint}>An answer is still being written. Wait for it, or stop it, then ask again.</span>
+            ) : offline ? (
+              <span className={styles.footHint}>Can&apos;t reach Lectern right now, so questions can&apos;t be sent.</span>
+            ) : overLimit ? (
+              <span className={styles.footHint}>A passage-only search takes up to {MAX_SEARCH} characters. Shorten the question or turn the option off.</span>
+            ) : (
+              <span>{local ? "Searching your browser documents" : "Searching your study material"}</span>
+            )}
+            <span className={styles.kbdHint}>
               <kbd>⌘ / Ctrl + Enter</kbd> to send
             </span>
           </div>
@@ -416,10 +671,15 @@ export function AskView() {
       </section>
 
       <aside className={cn(styles.margin, "paper")} aria-label="Source margin">
-        <SourceMargin turn={active} refs={refs} selection={selection} onSelect={select} />
+        <SourceMargin turn={active} refs={refs} selection={selection} onSelect={select} scope={scope} />
       </aside>
 
-      <TraceLine enabled={Boolean(active) && trace && traceable} version={`${active?.id}:${selection.ref}:${selection.chunk}`} />
+      <TraceLine enabled={Boolean(active) && trace && traceable && !narrow} version={`${active?.id}:${selection.ref}:${selection.chunk}`} />
+
+      {/* One status region for the whole desk; the streaming answer itself is not a live region. */}
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
     </div>
   );
 }

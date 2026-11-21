@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ErrorNotice, Spinner } from "@/components/ui/feedback";
 import { api, errorMessage, unwrap } from "@/lib/api";
+import { useDemo } from "@/lib/demo";
 import { downloadBlob } from "@/lib/download";
-import { toFlashcardsCsv } from "./flashcards";
+import { toFlashcardsCsv, toNotesMarkdown } from "./flashcards";
 import type { Turn } from "./session";
 import styles from "./ask.module.css";
 
 type Format = "pdf" | "html" | "md";
 
 export function NotesPanel({ turns }: { turns: Turn[] }) {
+  // The public demo refuses /notes and /export, so notes are written in the browser and downloaded as Markdown.
+  const demo = useDemo();
   const finished = turns
     .filter((t) => t.status === "done" && t.answer)
     .slice(0, 20)
@@ -22,7 +25,9 @@ export function NotesPanel({ turns }: { turns: Turn[] }) {
 
   const notes = useMutation({
     mutationFn: async () =>
-      unwrap(
+      demo
+        ? { markdown: toNotesMarkdown(finished) }
+        : unwrap(
         await api.http.POST("/api/v1/notes", {
           body: {
             history: finished.map((t) => ({ q: t.question, answer: t.answer })),
@@ -33,6 +38,10 @@ export function NotesPanel({ turns }: { turns: Turn[] }) {
 
   const exportAs = useMutation({
     mutationFn: async (format: Format) => {
+      if (demo) {
+        downloadBlob(new Blob([notes.data?.markdown ?? ""], { type: "text/markdown" }), "study-notes.md");
+        return;
+      }
       const result = await api.http.POST("/api/v1/export", {
         body: {
           markdown: notes.data?.markdown ?? "",
@@ -93,7 +102,7 @@ export function NotesPanel({ turns }: { turns: Turn[] }) {
             {notes.data.markdown}
           </Markdown>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(["md", "html", "pdf"] as const).map((f) => (
+            {(demo ? (["md"] as const) : (["md", "html", "pdf"] as const)).map((f) => (
               <Button
                 key={f}
                 variant="ghost"
@@ -106,6 +115,7 @@ export function NotesPanel({ turns }: { turns: Turn[] }) {
               </Button>
             ))}
           </div>
+          {demo ? <p className="mt-2 text-xs text-muted">Written in this browser from your answers. HTML and PDF exports need a private Lectern server.</p> : null}
           {exportAs.isError ? (
             <ErrorNotice className="mt-2">
               {errorMessage(exportAs.error)}

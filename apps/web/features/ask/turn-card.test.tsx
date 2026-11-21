@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const post = vi.fn();
@@ -13,7 +14,7 @@ vi.mock("@/lib/api", () => ({
   errorMessage: (e: unknown) => (e instanceof Error ? e.message : "unknown"),
 }));
 
-import { TurnCard } from "./turn-card";
+import { TurnCard, type Selection } from "./turn-card";
 import type { Turn } from "./session";
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -50,6 +51,9 @@ describe("TurnCard", () => {
     expect(onStop).toHaveBeenCalled();
     rerender(<TurnCard turn={turn({ answer: "Done." })} onStop={onStop} onRemove={onRemove} />);
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(onRemove).not.toHaveBeenCalled(); // asks first
+    expect(screen.getByRole("button", { name: "Confirm remove" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm remove" }));
     expect(onRemove).toHaveBeenCalled();
   });
 
@@ -61,9 +65,45 @@ describe("TurnCard", () => {
     expect(container.querySelector("img, script")).toBeNull();
   });
 
-  it("says when nothing matched", () => {
+  it("says once when nothing matched, and offers nothing to save", () => {
     render(<TurnCard turn={turn({ answer: "I could not find that.", chunks: [] })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.getByText("Not found in your material")).toBeInTheDocument();
+    expect(screen.queryByText(/No matching passages/)).toBeNull();
+    expect(screen.queryByText("An explanation you can inspect")).toBeNull();
+    expect(screen.queryByRole("button", { name: /flashcard/i })).toBeNull();
+  });
+
+  it("says when a passage-only search matched nothing", () => {
+    render(<TurnCard turn={turn({ answer: "", chunks: [] })} onStop={() => {}} onRemove={() => {}} />);
     expect(screen.getByText(/No matching passages/)).toBeInTheDocument();
+  });
+
+  it("cancels Remove with Escape and returns focus to it", async () => {
+    const onRemove = vi.fn();
+    render(<TurnCard turn={turn({ answer: "Done." })} onStop={() => {}} onRemove={onRemove} />);
+    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Confirm remove" })).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Remove" })).toHaveFocus());
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it("after Stop, says the answer was stopped (not that nothing matched) and keeps focus on the question", async () => {
+    const onFresh = vi.fn();
+    const { rerender } = render(<TurnCard turn={turn({ status: "streaming" })} onStop={() => {}} onRemove={() => {}} onFresh={onFresh} />);
+    await userEvent.click(screen.getByRole("button", { name: /stop/i }));
+    rerender(<TurnCard turn={turn({ status: "stopped" })} onStop={() => {}} onRemove={() => {}} onFresh={onFresh} />);
+    expect(screen.getByText(/You stopped this answer/)).toBeInTheDocument();
+    expect(screen.queryByText(/No matching passages/)).toBeNull();
+    expect(screen.getByRole("heading", { name: "what is a heap" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Try this question again" }));
+    expect(onFresh).toHaveBeenCalled();
+  });
+
+  it("says a failed question did not reach the sources", () => {
+    render(<TurnCard turn={turn({ status: "error", error: { code: "network_error", message: "Network down" } })} onStop={() => {}} onRemove={() => {}} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("This question didn't reach your sources.");
+    expect(screen.queryByText(/No matching passages/)).toBeNull();
   });
 });
 
@@ -134,9 +174,14 @@ describe("TurnCard citation checks", () => {
 
   it("saves a finished answer as a flashcard", async () => {
     post.mockResolvedValue({ data: { id: 1 } });
-    render(<TurnCard turn={turn({ answer: "A **heap** is a tree.", chunks })} onStop={() => {}} onRemove={() => {}} />);
-    await userEvent.click(screen.getByRole("button", { name: "Save as flashcard" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Saved as flashcard" })).toBeDisabled());
+    const announce = vi.fn();
+    const cites = [{ label: "heaps.pdf (page 1)", doc: "heaps.pdf", page: 1, status: "ok" as const }];
+    render(<TurnCard turn={turn({ answer: "A **heap** is a tree.", chunks, citations: cites })} onStop={() => {}} onRemove={() => {}} announce={announce} />);
+    const button = screen.getByRole("button", { name: "Save as flashcard" });
+    await userEvent.click(button);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saved as flashcard" })).toHaveAttribute("aria-disabled", "true"));
+    expect(screen.getByRole("button", { name: "Saved as flashcard" })).toHaveFocus(); // still focusable, focus kept
+    expect(announce).toHaveBeenCalledWith("Saved to flashcards");
     expect(post).toHaveBeenCalledWith("/api/v1/cards", { body: { front: "what is a heap", back: "A heap is a tree.", source: "heaps.pdf" } });
   });
 
@@ -263,5 +308,42 @@ describe("citation chips on the Evidence Desk", () => {
     render(<TurnCard turn={turn({ answer, chunks, citations, status: "streaming" })} onStop={() => {}} onRemove={() => {}} onSelect={() => {}} />);
     expect(screen.getByText(/\[heaps\.pdf \(page 1\)\]/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Citation heaps/ })).toBeNull();
+  });
+});
+
+describe("citation chips keep focus and say what they open", () => {
+  const answer = "A heap keeps the smallest key on top [heaps.pdf (page 1)]. Also [Invented Notes.pdf (page 9)].";
+  const citations = [
+    { label: "heaps.pdf (page 1)", doc: "heaps.pdf", page: 1, status: "ok" as const },
+    { label: "Invented Notes.pdf (page 9)", doc: "Invented Notes.pdf", page: 9, status: "unknown_source" as const },
+  ];
+
+  function Desk() {
+    const [selection, setSelection] = useState<Selection>({ ref: null, chunk: null });
+    return <TurnCard turn={turn({ answer, chunks, citations })} onStop={() => {}} onRemove={() => {}} selection={selection} onSelect={setSelection} />;
+  }
+
+  it("keeps the same chip element, and focus on it, when a chip is chosen with the keyboard", async () => {
+    render(<Desk />);
+    const chip = screen.getByRole("button", { name: /^Citation heaps\.pdf/ });
+    chip.focus();
+    await userEvent.keyboard("{Enter}");
+    const after = screen.getByRole("button", { name: /^Citation heaps\.pdf/ });
+    expect(after).toBe(chip); // not rebuilt
+    expect(after).toHaveAttribute("aria-pressed", "true");
+    expect(after).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: /^Unverified citation/ }));
+    expect(screen.getByRole("button", { name: /^Unverified citation/ })).toHaveFocus();
+    expect(after).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("gives an unverified chip a short visible label", () => {
+    render(<Desk />);
+    expect(screen.getByRole("button", { name: /^Unverified citation Invented Notes\.pdf/ })).toHaveTextContent("Invented Notes p.9");
+  });
+
+  it("shows a one-line verdict above the answer", () => {
+    render(<Desk />);
+    expect(screen.getByText("1 of 2 citations could not be checked")).toBeInTheDocument();
   });
 });

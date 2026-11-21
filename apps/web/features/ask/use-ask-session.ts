@@ -99,7 +99,7 @@ export function useAskSession() {
     const controller = new AbortController();
     controllers.current.set(id, controller);
     const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly;
-    dispatch({ type: "start", id, question: p.question, mode: p.mode, agent });
+    dispatch({ type: "start", id, question: p.question, mode: p.mode, agent, local: Boolean(p.local) });
     try {
       let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
       if (p.local) {
