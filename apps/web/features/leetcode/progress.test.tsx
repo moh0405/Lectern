@@ -23,3 +23,19 @@ it("in the public demo, marks are kept in this browser and never sent to the ser
   await waitFor(() => expect(loadLocalProgress().summary.solved).toBe(1));
   expect(screen.getByRole("button", { name: "Solved" })).toHaveAttribute("aria-pressed", "true");
 });
+
+it("saves notes on their own when the field is left, says so, and keeps them after a reload", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <DemoContext.Provider value={true}>
+      <QueryClientProvider client={client}>
+        <ProgressPanel problem={problem} />
+        <button type="button">elsewhere</button>
+      </QueryClientProvider>
+    </DemoContext.Provider>,
+  );
+  await userEvent.type(screen.getByLabelText("Notes"), "hash map");
+  await userEvent.click(screen.getByRole("button", { name: "elsewhere" }));
+  expect(await screen.findByText("Notes saved.")).toBeInTheDocument();
+  expect(loadLocalProgress().items[0]?.notes).toBe("hash map");
+});

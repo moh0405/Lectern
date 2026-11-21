@@ -106,11 +106,31 @@ def test_plan_targets_weak_topics_and_excludes_solved(api, pid):
     start = api.get(f"{LC}/plan", params={"size": 5}).json()
     assert start["weak_topics"] == [] and 0 < len(start["items"]) <= 5
     api.put(f"{LC}/progress/{pid}", json={"status": "attempted"})
+    assert api.get(f"{LC}/plan").json()["weak_topics"] == [], "one attempt is not enough evidence"
+    other = next(p["pid"] for p in api.get(f"{LC}/search", params={"query": "contains duplicate", "top_k": 5}).json()["problems"]
+                 if p["title"] == "Contains Duplicate")
+    api.put(f"{LC}/progress/{other}", json={"status": "attempted"})
     plan = api.get(f"{LC}/plan", params={"size": 8}).json()
-    assert plan["weak_topics"], "an attempted-but-unsolved problem makes its topics weak"
+    assert "Array" in plan["weak_topics"], "two attempted-but-unsolved problems make their shared topics weak"
     assert any(i["reason"].startswith("Weak topic") for i in plan["items"])
+    api.delete(f"{LC}/progress/{other}")
     api.put(f"{LC}/progress/{pid}", json={"status": "solved"})
     assert all(i["pid"] != pid for i in api.get(f"{LC}/plan", params={"size": 30}).json()["items"])
+
+
+def test_cold_start_plan_is_well_known_algorithm_problems(api):
+    plan = api.get(f"{LC}/plan", params={"size": 8}).json()
+    titles = [i["title"] for i in plan["items"]]
+    assert len(titles) == 8 and "Two Sum" in titles
+    assert all(i["topics"] and i["difficulty"] == "Easy" for i in plan["items"])
+    assert not any("Database" in i["topics"] for i in plan["items"])
+
+
+def test_resetting_to_todo_clears_attempts(api, pid):
+    api.put(f"{LC}/progress/{pid}", json={"status": "attempted"})
+    assert api.put(f"{LC}/progress/{pid}", json={"status": "todo"}).json()["attempts"] == 0
+    assert api.put(f"{LC}/progress/{pid}", json={"status": "attempted"}).json()["attempts"] == 1
+    api.delete(f"{LC}/progress/{pid}")
 
 
 # ------------------------------------------------------------------ history

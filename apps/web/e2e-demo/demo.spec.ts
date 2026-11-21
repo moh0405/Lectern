@@ -22,6 +22,7 @@ test("flashcards: add, review and delete, all in the browser, with no refused re
   await expect(page.getByText("All caught up")).toBeVisible();
 
   await page.getByRole("button", { name: /Delete card/ }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.getByText("No flashcards yet")).toBeVisible();
   expect(refused).toEqual([]);
 });

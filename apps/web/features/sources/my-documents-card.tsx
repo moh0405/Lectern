@@ -123,13 +123,13 @@ export function MyDocumentsCard() {
       >
         <span className={styles.dropIcon}>{busy ? <Spinner className="h-5 w-5" /> : <Upload className="h-5 w-5" aria-hidden="true" />}</span>
         <div className={styles.dropCopy}>
-          <p role="status" aria-live="polite">{busy ?? "Drop your study material here"}</p>
+          <p role="status" aria-live="polite">{busy ?? <><span className="pointer-coarse:hidden">Drop your study material here</span><span className="hidden pointer-coarse:inline">Add your study material</span></>}</p>
           <span>PDF, plain text, or Markdown · up to {MAX_FILE_MB} MB per file</span>
         </div>
         <Button type="button" onClick={() => input.current?.click()} disabled={busy !== null || !ready || !storageSupported}>Choose files</Button>
-        {ready ? <input ref={input} type="file" multiple accept={ACCEPT} aria-label="Add my documents" className="sr-only" disabled={busy !== null || !storageSupported} onChange={(event) => { void addFiles(event.target.files); event.target.value = ""; }} /> : null}
+        {ready ? <input ref={input} type="file" multiple accept={ACCEPT} aria-label="Add my documents" tabIndex={-1} className="sr-only" disabled={busy !== null || !storageSupported} onChange={(event) => { void addFiles(event.target.files); event.target.value = ""; }} /> : null}
       </div>
-      <div className={styles.details}><Info aria-hidden="true" /><p>{embeddingsEnabled() ? "Meaning search downloads a model on first use (about 25 MB, then cached). Large books can take a few minutes." : "Meaning search is disabled on this deployment; documents use keyword search."} Scanned PDFs need selectable text or OCR first.</p></div>
+      <div className={styles.details}><Info aria-hidden="true" /><p>{embeddingsEnabled() ? "Meaning search downloads a model on first use (about 25 MB, then cached). Large books can take a few minutes." : "For your documents in this browser, meaning search is off on this deployment, so they use keyword search. (The shared textbooks below have their own search mode.)"} Scanned PDFs need selectable text or OCR first.</p></div>
       <div className={styles.details}><Database aria-hidden="true" /><p>Documents stay in this browser’s storage, not the shared textbook index. Clearing browser data removes them; keep your original files. Storage capacity depends on your device.</p></div>
       {!storageSupported ? <ErrorNotice className="mt-3">This browser does not support the document storage Lectern needs. Try a browser with IndexedDB enabled. Shared textbooks below are still available.</ErrorNotice> : null}
       {keywordOnly ? <Notice className="mt-3">Meaning search was unavailable for one or more added documents, so they use keyword search only. Adding them again later may enable meaning search.</Notice> : null}

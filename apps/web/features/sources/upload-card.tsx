@@ -39,9 +39,9 @@ export function UploadCard({ onJob }: { onJob: (jobId: string, label: string) =>
       <div className={styles.sectionHead}><div><div className={styles.titleRow}><CardTitle>Upload files</CardTitle><span className={styles.scope}>Server index</span></div><p className="text-muted">Add PDFs or recordings to the source library. Accepted files are indexed in the background.</p></div></div>
       <div onDragOver={(event) => { event.preventDefault(); if (!submitting.current) setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop} className={cn(styles.dropzone, over && styles.dropOver)}>
         <span className={styles.dropIcon}>{upload.isPending ? <Spinner className="h-5 w-5" /> : <Upload className="h-5 w-5" aria-hidden="true" />}</span>
-        <div className={styles.dropCopy}><p role="status">{upload.isPending ? "Uploading files…" : "Drop PDFs or recordings here"}</p><span>.pdf, .mp3, .mp4, .wav, .m4a · up to 50 MB each</span></div>
+        <div className={styles.dropCopy}><p role="status">{upload.isPending ? "Uploading files…" : <><span className="pointer-coarse:hidden">Drop PDFs or recordings here</span><span className="hidden pointer-coarse:inline">Add PDFs or recordings</span></>}</p><span>.pdf, .mp3, .mp4, .wav, .m4a · up to 50 MB each</span></div>
         <Button onClick={() => input.current?.click()} disabled={upload.isPending}>Choose files</Button>
-        <input ref={input} type="file" multiple accept={ACCEPT} aria-label="Upload files" className="sr-only" disabled={upload.isPending} onChange={(event) => { submit(event.target.files); event.target.value = ""; }} />
+        <input ref={input} type="file" multiple accept={ACCEPT} aria-label="Upload files" tabIndex={-1} className="sr-only" disabled={upload.isPending} onChange={(event) => { submit(event.target.files); event.target.value = ""; }} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">Audio processing needs an OpenAI key configured on the server. Only new or changed files are processed.</p>
       {upload.isSuccess && upload.data.job_id ? <p className="mt-3 text-sm text-muted" role="status">Upload received. Follow indexing progress in Processing activity below.</p> : null}
