@@ -14,7 +14,7 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 **Demo video (51 s):** [docs/demo/lectern-demo.mp4](docs/demo/lectern-demo.mp4). Recorded with Playwright against the local demo server (scripted model, as below); regenerate with `cd apps/web && npx playwright test -c playwright.video.config.ts`.
 
-> **About the screenshots.** They are captured from `scripts/demo_server.py`, which runs the real API, real chunking, real MiniLM embeddings and real hybrid retrieval over a small committed corpus, but uses a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
+> **About the screenshots.** They use **scripted test data**: the real API, chunking and retrieval over small committed fixtures (`tests/screenshot_server.py`; the embedding map and Insights use the sample corpus in `scripts/demo_server.py`), with the simple hashing embedder and a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
 
 ---
 
