@@ -185,6 +185,10 @@ class ConceptMap(BaseModel):
 
 class SocraticRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
+    context: Optional[List[ContextPassage]] = Field(
+        None, max_length=20,
+        description="Guide from these passages instead of the server index. Nothing is stored or recorded.",
+    )
     depth: int = Field(0, ge=0, le=5, description="Higher means the student has struggled more")
     k: int = Field(3, ge=0, le=10)
     temperature: float = Field(0.2, ge=0.0, le=1.0)

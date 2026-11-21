@@ -7,6 +7,7 @@ import { useDemo } from "@/lib/demo";
 import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Mode, type Turn } from "./session";
 
 export interface AskParams {
+  guided?: boolean;
   question: string;
   mode?: Mode;
   k: number;
@@ -57,7 +58,7 @@ export function useAskSession() {
 
   useEffect(() => {
     const loaded = loadTurns();
-    loaded.forEach((t) => synced.current.add(t.id));
+    loaded.filter((t) => t.answer).forEach((t) => synced.current.add(t.id));
     dispatch({ type: "hydrate", turns: loaded });
     if (loaded.length > 0 || demo) return;
     void (async () => {
@@ -79,8 +80,8 @@ export function useAskSession() {
     if (!hydrated) return;
     for (const t of turns) {
       if (t.status !== "done" || synced.current.has(t.id)) continue;
+      if (!t.answer) continue; // Hints and retrieval-only lookups are not answers.
       synced.current.add(t.id);
-      if (!t.answer) continue; // retrieval-only lookups are not history
       if (!demo) void saveRemote(t, serverIds.current);
     }
   }, [turns, hydrated, demo]);
@@ -94,16 +95,28 @@ export function useAskSession() {
     return () => map.forEach((c) => c.abort());
   }, []);
 
-  const ask = useCallback(async (p: AskParams) => {
-    const id = newId();
+  const evidenceRuns = useRef(new Set<string>());
+  const ask = useCallback(async (p: AskParams, existing?: Turn, evidence = false) => {
+    const id = existing?.id ?? newId();
+    if (existing && !evidence && (existing.guided?.hints !== undefined || controllers.current.has(id))) return;
+    if (evidence && (existing?.guided?.evidenceStarted || evidenceRuns.current.has(id))) return;
+    if (evidence) evidenceRuns.current.add(id);
+    controllers.current.get(id)?.abort();
     const controller = new AbortController();
     controllers.current.set(id, controller);
     const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly;
-    dispatch({ type: "start", id, question: p.question, mode: p.mode, agent, local: Boolean(p.local) });
+    const guiding = Boolean(p.guided) && !evidence;
+    if (existing) dispatch({ type: "resume", id, evidence, agent: evidence && agent });
+    else dispatch({ type: "start", id, question: p.question, mode: p.mode, agent: !guiding && agent, local: Boolean(p.local),
+      guided: guiding ? { params: p, revealed: 0, evidenceStarted: false } : undefined });
     try {
       let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
       if (p.local) {
         context = await retrieveLocal(p.question, p.k);
+        if (controller.signal.aborted) {
+          if (controllers.current.get(id) === controller) dispatch({ type: "stop", id });
+          return;
+        }
         if (context.length === 0) {
           // Never fall through to the shared index: the question was about the visitor's own documents.
           dispatch({ type: "meta", id, chunks: [] });
@@ -115,6 +128,18 @@ export function useAskSession() {
           dispatch({ type: "done", id });
           return;
         }
+      }
+      if (controller.signal.aborted) {
+        if (controllers.current.get(id) === controller) dispatch({ type: "stop", id });
+        return;
+      }
+      if (guiding) {
+        const result = unwrap(await api.http.POST("/api/v1/socratic", {
+          body: { question: p.question, k: Math.min(p.k, 10), temperature: p.temperature, context }, signal: controller.signal,
+        }));
+        if (result.warning) throw new Error("Source-based hints are unavailable right now. Try again or show the evidence.");
+        if (!controller.signal.aborted) dispatch({ type: "hints", id, hints: result.hints });
+        return;
       }
       if (p.retrievalOnly) {
         const res = unwrap(await api.http.GET("/api/v1/search", { params: { query: { query: p.question, k: p.k } }, signal: controller.signal }));
@@ -160,6 +185,7 @@ export function useAskSession() {
         else dispatch({ type: "error", id, code: ev.data.code, message: ev.data.message });
       }
     } catch (err) {
+      if (controllers.current.get(id) !== controller) return;
       if (controller.signal.aborted) dispatch({ type: "stop", id });
       else
         dispatch({
@@ -169,7 +195,7 @@ export function useAskSession() {
           message: errorMessage(err),
         });
     } finally {
-      controllers.current.delete(id);
+      if (controllers.current.get(id) === controller) controllers.current.delete(id);
     }
   }, []);
 
@@ -189,5 +215,8 @@ export function useAskSession() {
     if (!demo) void bestEffort(() => api.http.DELETE("/api/v1/history"));
   }, [demo]);
 
-  return { turns, ask, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
+  const nextHint = (id: string) => dispatch({ type: "next-hint", id });
+  const retryHints = (t: Turn) => t.guided && ask({ ...t.guided.params, guided: true }, t);
+  const showEvidence = (t: Turn) => t.guided && ask(t.guided.params, t, true);
+  return { turns, ask, nextHint, retryHints, showEvidence, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
 }

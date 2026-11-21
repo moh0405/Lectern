@@ -75,3 +75,36 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
   await page.getByRole("group", { name: "Remove graphs.pdf?", exact: true }).getByRole("button", { name: "Confirm remove" }).click();
   await expect(page.getByRole("list", { name: "Your documents" })).toHaveCount(0);
 });
+
+test("Guided hints use selected browser passages, then reveal evidence in the same turn", async ({ page }) => {
+  const calls: { route: string; body: { context?: { doc: string; text: string }[] } }[] = [];
+  const uploads: string[] = [];
+  page.on("request", request => {
+    if (request.method() !== "POST") return;
+    if (request.url().includes("/sources/")) uploads.push(request.url());
+    if (/\/(socratic|ask\/stream)$/.test(request.url())) calls.push({ route: request.url(), body: request.postDataJSON() });
+  });
+  await page.goto("/sources");
+  await page.getByLabel("Add my documents").setInputFiles(PDF);
+  await expect(page.getByRole("list", { name: "Your documents" })).toContainText("graphs.pdf", { timeout: 60_000 });
+  await page.goto("/ask");
+  await expect(page.getByLabel("Search in")).toHaveValue("mine");
+  await page.getByRole("radio", { name: "Guided", exact: true }).check();
+  await page.getByLabel("Your question", { exact: true }).fill("How are graphs represented?");
+  const response = page.waitForResponse(r => r.url().endsWith("/socratic"));
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const body = await (await response).json();
+  expect(body.chunks.length).toBeGreaterThan(0);
+  expect(body.chunks.every((c: { doc: string }) => c.doc === "graphs.pdf")).toBe(true);
+  await expect(page.getByText("h1", { exact: true })).toBeVisible();
+  expect(calls).toHaveLength(1);
+  expect(calls[0]!.body.context?.every(c => c.doc === "graphs.pdf" && c.text.length > 0)).toBe(true);
+  await page.getByRole("button", { name: "Next hint" }).click();
+  expect(calls).toHaveLength(1);
+  await page.getByRole("button", { name: "Show me the evidence" }).click();
+  await expect(page.getByRole("button", { name: "Save as flashcard" })).toBeVisible();
+  expect(calls).toHaveLength(2);
+  expect(calls[1]!.body.context).toEqual(calls[0]!.body.context);
+  await expect(page.getByText("Sources (").first()).toContainText("In this browser");
+  expect(uploads).toEqual([]);
+});

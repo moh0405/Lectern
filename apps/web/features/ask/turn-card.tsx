@@ -192,6 +192,8 @@ function QuestionHeading({ question, headingRef }: { question: string; headingRe
 export function TurnCard({
   turn,
   onStop,
+  onNextHint,
+  onEvidence,
   onRemove,
   onFresh,
   busy = false,
@@ -206,6 +208,8 @@ export function TurnCard({
 }: {
   turn: Turn;
   onStop: () => void;
+  onNextHint?: () => void;
+  onEvidence?: () => void;
   onRemove: () => void;
   onFresh?: () => void;
   busy?: boolean;
@@ -225,7 +229,7 @@ export function TurnCard({
   onSearchShared?: () => void;
 }) {
   const streaming = turn.status === "streaming";
-  const noKey = turn.error?.code === "llm_unavailable";
+  const noKey = turn.error?.code === "llm_unavailable" && !turn.guided;
   const noLocalMatch = turn.error?.code === "no_local_match";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const controlId = useId();
@@ -325,6 +329,7 @@ export function TurnCard({
         <div className={styles.neutralNotice} role="status">
           <p>{turn.error?.message}</p>
           <div className={styles.noticeActions}>
+            {turn.guided && onFresh ? <Button variant="secondary" onClick={onFresh} disabled={busy}>Try this question again</Button> : null}
             {onSearchShared ? (
               <Button variant="secondary" size="sm" onClick={onSearchShared} disabled={busy}>
                 Search the shared textbooks instead
@@ -349,7 +354,7 @@ export function TurnCard({
         </div>
       ) : turn.status === "stopped" ? (
         <div className="space-y-3">
-          <p className={styles.quietNote}>You stopped this answer before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
+          <p className={styles.quietNote}>You stopped this {turn.guided && !turn.guided.evidenceStarted ? "hint request" : "answer"} before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
           {onFresh ? (
             <Button variant="secondary" onClick={onFresh} disabled={busy}>
               Try this question again
@@ -358,9 +363,10 @@ export function TurnCard({
         </div>
       ) : null}
 
+      {turn.guided ? <GuidedHints turn={turn} onNext={onNextHint} onEvidence={() => { onEvidence?.(); headingRef.current?.focus(); }} /> : null}
       <AgentSteps turn={turn} />
 
-      {turn.answer || streaming ? (
+      {turn.answer || (streaming && (!turn.guided || turn.guided.evidenceStarted)) ? (
         <div className={styles.answer} data-step="evidence">
           <p className={styles.answerLabel}>
             <Sparkles aria-hidden="true" />
@@ -430,9 +436,41 @@ export function TurnCard({
             ))}
           </div>
         </details>
-      ) : turn.status === "done" && !turn.answer ? (
+      ) : turn.status === "done" && !turn.answer && !turn.guided ? (
         <p className={cn("text-sm text-muted")}>No matching passages were found in your sources.</p>
       ) : null}
     </div>
+  );
+}
+
+/** Hidden hints are stored on the turn, but only revealed text enters the DOM. */
+function GuidedHints({ turn, onNext, onEvidence }: { turn: Turn; onNext?: () => void; onEvidence?: () => void }) {
+  const guided = turn.guided!;
+  const latest = useRef<HTMLParagraphElement>(null);
+  const previous = useRef(guided.revealed);
+  useEffect(() => {
+    if (guided.revealed > previous.current) latest.current?.focus();
+    previous.current = guided.revealed;
+  }, [guided.revealed]);
+  const hints = guided.hints ?? [];
+  return (
+    <section className={styles.guidedHints} data-step="evidence" aria-label="Guided hints">
+      <p className="eyebrow">Guided / think it through</p>
+      <p className={styles.quietNote}>Hints are prompts to help you think. Reveal the cited answer whenever you are ready.</p>
+      <div aria-live="polite" aria-atomic="false">
+        {hints.slice(0, guided.revealed).map((hint, i) => (
+          <div key={i}>
+            <p className="eyebrow">Hint {i + 1} of {hints.length}</p>
+            <p tabIndex={-1} ref={i === guided.revealed - 1 ? latest : undefined}>{hint}</p>
+          </div>
+        ))}
+        {!guided.evidenceStarted && turn.status === "streaming" ? <p>Preparing your hints…</p> : null}
+        {guided.hints && !hints.length ? <p>No hints were returned. You can still explore the evidence.</p> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {guided.revealed < hints.length ? <Button variant="secondary" onClick={onNext}>Next hint</Button> : null}
+        {!guided.evidenceStarted ? <Button onClick={onEvidence}>Show me the evidence</Button> : null}
+      </div>
+    </section>
   );
 }
