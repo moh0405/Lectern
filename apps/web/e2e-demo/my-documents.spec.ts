@@ -61,7 +61,8 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText(/Nothing in your documents matches/)).toBeVisible();
     // a neutral notice, not an error, with a way to search the shared textbooks instead
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    // (scoped to the page content: Next.js keeps its own route announcer, role=alert, outside it)
+    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Search the shared textbooks instead" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Add material", exact: true }).first()).toBeVisible();
   }

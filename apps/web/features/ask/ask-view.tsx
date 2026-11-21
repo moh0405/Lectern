@@ -198,7 +198,8 @@ export function AskView() {
   const [pickedSource, setPickedSource] = useState<"shared" | "mine" | null>(null);
   const local = hasMine && (pickedSource ?? "mine") === "mine";
 
-  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")) });
+  // Retry a failed stats call quickly, so a slow or cold first response settles into the empty or offline state promptly.
+  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => unwrap(await api.http.GET("/api/v1/stats")), retryDelay: (n) => Math.min(300 * 2 ** n, 1200) });
   const models = useQuery({
     queryKey: ["models"],
     queryFn: async () => unwrap(await api.http.GET("/api/v1/models")),
@@ -473,9 +474,12 @@ export function AskView() {
                       Work through it with guiding questions <ArrowUpRight aria-hidden="true" />
                     </Link>
                   </div>
-                  <NotesPanel turns={turns} />
                 </section>
               ) : null}
+              {/* Notes cover the whole session, so they stay available whichever question is on the desk. */}
+              <div className={styles.sessionNotes}>
+                <NotesPanel turns={turns} />
+              </div>
             </>
           ) : (
             <div className={styles.opening}>

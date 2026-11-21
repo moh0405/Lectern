@@ -440,6 +440,8 @@
 .nextSteps a:hover { text-decoration-color: var(--color-accent-2); }
 .nextSteps svg { width: 15px; height: 15px; }
 
+.sessionNotes { max-width: 920px; }
+.sessionNotes:not(:empty) { margin-top: 32px; }
 .notes {
   padding: 23px 26px !important;
   box-shadow: none;
