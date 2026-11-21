@@ -62,7 +62,7 @@ test("a repeated question is served from the cache, and Fresh answer asks the mo
   await withModelRetries(
     page,
     async () => void (await page.getByRole("button", { name: "Fresh answer" }).first().click()),
-    async () => (await page.getByRole("heading", { name: /hash tables handle collisions/i }).count()) >= 2 && (await page.getByRole("button", { name: "Stop" }).count()) === 0,
+    async () => (await page.getByRole("list", { name: "This session" }).getByRole("button", { name: /hash tables handle collisions/i }).count()) >= 2 && (await page.getByRole("button", { name: "Stop" }).count()) === 0,
   );
 });
 

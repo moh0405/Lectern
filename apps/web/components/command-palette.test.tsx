@@ -41,7 +41,7 @@ describe("CommandPalette", () => {
 
   it("finds tools by keyword and says when nothing matches", async () => {
     render(<CommandPalette />);
-    await userEvent.click(screen.getByRole("button", { name: /Jump to/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Find a page or tool/ }));
     const input = await screen.findByPlaceholderText(/Go to a page/);
     await userEvent.type(input, "eli5");
     await userEvent.keyboard("{Enter}");

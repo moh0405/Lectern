@@ -27,7 +27,8 @@ test("the agent chooses a tool, you see the call and its result, then a cited an
 
 test("it is in the navigation and the example prompts run the agent", async ({ page }) => {
   await page.goto("/ask");
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Agent" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Tools" }).click();
+  await page.getByRole("navigation", { name: "Tools pages" }).getByRole("link", { name: "Agent" }).click();
   await expect(page).toHaveURL(/\/agent$/);
   await page.getByRole("button", { name: /Explain how hash tables handle collisions/ }).click();
   await expect(page.getByTestId("tool-step").first()).toBeVisible({ timeout: 30_000 });
