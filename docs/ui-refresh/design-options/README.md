@@ -12,7 +12,7 @@ The user rejected the deployed app's centered form, small scale and unused scree
 | B — Open Notebook | Warm paper, editorial reading typography and margin notes. |
 | C — Study Studio | Visual explanations, sources and adjacent practice. |
 
-The user's latest design comment was “okayy but you have to make it stand out.” A was refined in response. There is **no explicit approval yet to port A to the live app**.
+The user's latest design comment was “okayy but you have to make it stand out.” A was refined in response. On 21 November 2026 the user chose **A: Evidence Desk**; the implementation plan is [../EVIDENCE_DESK_PLAN.md](../EVIDENCE_DESK_PLAN.md).
 
 ## Run
 
