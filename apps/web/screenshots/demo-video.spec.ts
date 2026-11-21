@@ -78,8 +78,8 @@ test("walkthrough", async ({ page }) => {
   await expect(page.getByTestId("math-result")).toHaveCount(1, { timeout: 30_000 });
   await pause(page, 3500);
 
-  await page.goto("/tutor");
-  await caption(page, "Tutor tools: concept maps, a Socratic tutor that gives hints, source comparison");
+  await page.goto("/concept-map");
+  await caption(page, "Concept maps, guided hints instead of answers, and source comparison");
   await page.getByLabel("Topic").fill("Hash tables");
   await page.getByRole("button", { name: "Generate map" }).click();
   await expect(page.getByTestId("concept-graph").locator(".react-flow__node").first()).toBeVisible();

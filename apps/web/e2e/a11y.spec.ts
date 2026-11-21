@@ -28,10 +28,13 @@ const PAGES: [string, string, (page: Page) => Promise<void>][] = [
   ["Flashcards", "/study", async (p) => void (await p.getByRole("button", { name: "Show answer" }).waitFor())],
   ["LeetCode", "/leetcode?q=two+sum&p=1", async (p) => void (await p.getByLabel("Problem detail").getByRole("heading").first().waitFor())],
   ["Agent", "/agent", async () => {}],
-  ["Tutor tools", "/tutor", async () => {}],
+  ["Concept map", "/concept-map", async () => {}],
+  ["Compare sources", "/compare", async () => {}],
+  ["Work it out", "/work-it-out", async () => {}],
+  ["Explain at my level", "/explain", async () => {}],
   ["Math", "/math", async () => {}],
-  ["Embedding map", "/visualize", async (p) => void (await p.getByText(/Showing \d+/).waitFor())],
-  ["Analytics", "/analytics", async () => {}],
+  ["Map", "/visualize", async (p) => void (await p.getByText(/Showing \d+/).waitFor())],
+  ["Insights", "/analytics", async () => {}],
 ];
 
 for (const [name, url, ready] of PAGES) {

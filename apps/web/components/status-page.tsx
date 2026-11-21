@@ -4,9 +4,9 @@ import { SECTIONS } from "@/lib/sections";
 
 const BLURB: Record<string, string> = {
   Ask: "Ask a question; the answer cites its sources.",
-  Library: "Add and manage the material Lectern answers from.",
-  Practice: "Flashcards and LeetCode problems.",
-  Tools: "Tutor tools, math, the agent, the map and analytics.",
+  Library: "Your sources, the embedding map and insights into what you asked.",
+  Practice: "Flashcards, LeetCode, guided hints and explanations at your level.",
+  Tools: "Concept maps, source comparison, the agent and math.",
 };
 
 /** The four sections as large links, for pages that have lost their way (404, error). */

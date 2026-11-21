@@ -11,9 +11,9 @@ export interface Section {
 
 export const SECTIONS: Section[] = [
   { label: "Ask", href: "/ask", paths: ["/ask"] },
-  { label: "Library", href: "/sources", paths: ["/sources"] },
-  { label: "Practice", href: "/study", paths: ["/study", "/leetcode"] },
-  { label: "Tools", href: "/tutor", paths: ["/tutor", "/math", "/agent", "/visualize", "/analytics"] },
+  { label: "Library", href: "/sources", paths: ["/sources", "/visualize", "/analytics"] },
+  { label: "Practice", href: "/study", paths: ["/study", "/leetcode", "/work-it-out", "/explain"] },
+  { label: "Tools", href: "/concept-map", paths: ["/concept-map", "/compare", "/agent", "/math"] },
 ];
 
 const inPath = (pathname: string, path: string) => pathname === path || pathname.startsWith(path + "/");

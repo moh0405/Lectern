@@ -138,7 +138,7 @@ export function AnalyticsView() {
   return (
     <>
       <PageHeader
-        title="Analytics"
+        title="Insights"
         description="See what you have asked, how fast it was answered and which sources did the work."
         actions={
           !demo && s && s.queries > 0 ? (

@@ -22,10 +22,6 @@ export interface PaletteItem {
 
 /** Shortcuts into a page, listed under the section their page belongs to. */
 const SHORTCUTS: Omit<PaletteItem, "id">[] = [
-  { label: "Concept map", hint: "Tutor tools", run: { href: "/tutor" }, keywords: ["graph", "diagram", "topic"] },
-  { label: "Socratic tutor", hint: "Tutor tools", run: { href: "/tutor?tool=socratic" }, keywords: ["hints", "guide", "questions"] },
-  { label: "Compare sources", hint: "Tutor tools", run: { href: "/tutor?tool=synthesis" }, keywords: ["synthesis", "documents", "contrast"] },
-  { label: "Explain at my level", hint: "Tutor tools", run: { href: "/tutor?tool=adaptive" }, keywords: ["eli5", "adaptive", "simple"] },
   { label: "Upload a PDF", hint: "Library", run: { href: "/sources" }, keywords: ["file", "audio", "add", "document"] },
   { label: "Add a link", hint: "Library", run: { href: "/sources" }, keywords: ["youtube", "github", "url", "web"] },
   { label: "Hard tree problems", hint: "LeetCode", run: { href: "/leetcode?d=Hard&t=Tree" }, keywords: ["practice"] },

@@ -168,7 +168,7 @@ Lectern/
 │       ├── github_source.py    # README via API, else clone; .md/.rst/.txt/.py
 │       └── audio_source.py     # OpenAI Whisper transcription with segment timestamps
 ├── apps/web/                   # Next.js app (App Router, strict TypeScript, Tailwind)
-│   ├── app/                    # routes: /ask /sources /leetcode /tutor /math /visualize /analytics
+│   ├── app/                    # routes: /ask /sources /visualize /analytics /study /leetcode /work-it-out /explain /concept-map /compare /agent /math
 │   ├── features/               # one folder per feature (ask, sources, leetcode, tutor, math, visualize, analytics)
 │   ├── components/             # shell, command palette, markdown, UI primitives
 │   ├── lib/                    # typed API helpers, URL state, formatting
@@ -391,12 +391,15 @@ E2E_PYTHON=$(which python) npx playwright test     # browser tests against the r
 | **Ask** | Type a question (or click a suggestion) and watch the answer stream in, with its sources underneath. *Advanced* has temperature, model, "only show matching passages" and "show the prompt". Your session is remembered in the browser; generate study notes or flashcards from it. |
 | **Sources** | Drop PDFs or audio, paste YouTube/GitHub/web links, watch indexing progress, delete sources. |
 | **LeetCode** | Search the problem bank, filter by difficulty and topic, read a problem, generate a study guide. |
-| **Tutor tools** | Concept map, Socratic tutor, compare sources, explain at my level (tabs). |
+| **Concept map** | See how the ideas in a topic connect. |
+| **Compare sources** | See where your documents agree and differ. |
+| **Work it out** | Socratic: guiding questions and hints you reveal one at a time. |
+| **Explain at my level** | The same idea from ELI5 to expert. |
 | **Math** | Type or click an example such as `differentiate sin(x)`, `solve x^2 - 5x + 6 = 0`, `factor x^3 - x`. |
-| **Embedding map** | Rotate and zoom your passages in 3D; click a point to read it. |
-| **Analytics** | See what you asked and which sources answered; export a report or CSV. |
+| **Map** | The embedding map: rotate and zoom your passages in 3D; click a point to read it. |
+| **Insights** | See what you asked and which sources answered; export a report or CSV. |
 
-**Keyboard:** `Ctrl/⌘ + K` opens the command palette (pages, tutor tools, shortcuts); `Ctrl/⌘ + Enter` sends a question.
+**Keyboard:** `Ctrl/⌘ + K` opens the command palette (pages, tools, shortcuts); `Ctrl/⌘ + Enter` sends a question.
 
 ### Study modes (Ask tab / `RAGEngine`)
 | Mode | Output style |

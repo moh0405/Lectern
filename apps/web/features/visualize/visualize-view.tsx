@@ -75,7 +75,7 @@ export function VisualizeView() {
 
   return (
     <>
-      <PageHeader title="Embedding map" description="See which passages in the library are about the same thing: similar meaning sits close together." />
+      <PageHeader title="Map" description="The embedding map of your library: passages with similar meaning sit close together, so you can see what belongs with what." />
       {q.isError ? <div className="mb-4 space-y-3"><ErrorNotice>{errorMessage(q.error)}</ErrorNotice><Button variant="secondary" disabled={q.isFetching} onClick={() => void q.refetch()}>{q.isFetching ? "Checking…" : "Try loading the map again"}</Button></div> : null}
 
       {q.isPending ? (

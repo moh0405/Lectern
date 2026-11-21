@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label, Select, Textarea } from "@/components/ui/field";
 import { api, unwrap } from "@/lib/api";
+import { useInitialParam } from "@/lib/use-url-params";
 import { IdlePreview } from "./library";
 import { PassageList } from "./passages";
 import { Announce, BusyIcon, PendingPanel, useToolRequest } from "./pending";
@@ -21,8 +22,8 @@ const LEVELS = [
 ] as const;
 type Level = (typeof LEVELS)[number]["value"];
 
-export function Adaptive() {
-  const [question, setQuestion] = useState("");
+export function Adaptive({ initial = "" }: { initial?: string }) {
+  const [question, setQuestion] = useState(initial);
   const [asked, setAsked] = useState("");
   const [level, setLevel] = useState<Level>("Undergrad");
   const input = useRef<HTMLTextAreaElement>(null);
@@ -100,4 +101,9 @@ export function Adaptive() {
       ) : null}
     </div>
   );
+}
+
+/** The tool on its own page, its field prefilled from `?question=` (the "Go further" links on Ask use this). */
+export function AdaptiveFromUrl() {
+  return <Adaptive initial={useInitialParam("question", 2000)} />;
 }

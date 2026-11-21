@@ -7,10 +7,13 @@ const routes = [
   ["/study", "Flashcards"],
   ["/leetcode", "LeetCode"],
   ["/agent", "Agent"],
-  ["/tutor", "Tutor tools"],
+  ["/concept-map", "Concept map"],
+  ["/compare", "Compare sources"],
+  ["/work-it-out", "Work it out"],
+  ["/explain", "Explain at my level"],
   ["/math", "Math"],
-  ["/visualize", "Embedding map"],
-  ["/analytics", "Analytics"],
+  ["/visualize", "Map"],
+  ["/analytics", "Insights"],
 ] as const;
 
 async function setReadingTheme(page: Page, theme: "light" | "dark") {
@@ -80,7 +83,7 @@ test("every page is reachable from the four sections on a phone, by keyboard", a
     await expect.poll(() => link.evaluate(e => { const b = e.getBoundingClientRect(); return b.height >= 44; })).toBe(true);
     await expect.poll(() => withinViewport(link)).toBe(true);
   }
-  const groups = [["Practice", ["Flashcards", "LeetCode"]], ["Tools", ["Tutor tools", "Math", "Agent", "Embedding map", "Analytics"]]] as const;
+  const groups = [["Library", ["Sources", "Map", "Insights"]], ["Practice", ["Flashcards", "LeetCode", "Work it out", "Explain at my level"]], ["Tools", ["Concept map", "Compare sources", "Agent", "Math"]]] as const;
   for (const [section, pages] of groups) {
     await nav.getByRole("link", { name: section, exact: true }).focus();
     await page.keyboard.press("Enter");
@@ -91,9 +94,10 @@ test("every page is reachable from the four sections on a phone, by keyboard", a
       await expect(link).toBeFocused();
     }
   }
-  await page.getByRole("navigation", { name: "Tools pages", exact: true }).getByRole("link", { name: "Embedding map", exact: true }).click();
+  await nav.getByRole("link", { name: "Library", exact: true }).click();
+  await page.getByRole("navigation", { name: "Library pages", exact: true }).getByRole("link", { name: "Map", exact: true }).click();
   await expect(page).toHaveURL(/\/visualize$/);
-  await expect(page.getByRole("link", { name: "Embedding map", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Library pages", exact: true }).getByRole("link", { name: "Map", exact: true })).toHaveAttribute("aria-current", "page");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

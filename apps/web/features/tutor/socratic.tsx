@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label, Textarea } from "@/components/ui/field";
 import { api, unwrap } from "@/lib/api";
+import { useInitialParam } from "@/lib/use-url-params";
 import { plural } from "@/lib/format";
 import { IdlePreview } from "./library";
 import { PassageList } from "./passages";
 import { Announce, BusyIcon, PendingPanel, useToolRequest } from "./pending";
 
-export function Socratic() {
-  const [question, setQuestion] = useState("");
+export function Socratic({ initial = "" }: { initial?: string }) {
+  const [question, setQuestion] = useState(initial);
   const [depth, setDepth] = useState(0);
   const [shown, setShown] = useState(0);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -127,4 +128,9 @@ export function Socratic() {
       ) : null}
     </div>
   );
+}
+
+/** The tool on its own page, its field prefilled from `?question=` (the "Go further" links on Ask use this). */
+export function SocraticFromUrl() {
+  return <Socratic initial={useInitialParam("question", 2000)} />;
 }

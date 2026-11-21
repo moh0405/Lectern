@@ -439,6 +439,16 @@
 .nextSteps a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: var(--color-fg); font-size: 14px; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 5px; }
 .nextSteps a:hover { text-decoration-color: var(--color-accent-2); }
 .nextSteps svg { width: 15px; height: 15px; }
+/* Go further: the study tools, opened on this question. */
+.goFurther { margin: 0 0 24px; padding-top: 18px; border-top: 1px dashed var(--color-border); }
+.goFurther h3 { color: var(--color-muted); }
+.goFurther ul { display: flex; flex-wrap: wrap; gap: 4px 26px; margin-top: 8px; }
+.goFurther a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: var(--color-fg); font-size: 14px; text-decoration: underline; text-decoration-color: var(--color-border); text-underline-offset: 5px; }
+.goFurther a:hover { text-decoration-color: var(--color-accent-2); }
+.goFurther svg { width: 15px; height: 15px; }
+@media (pointer: coarse) {
+  .nextSteps a, .goFurther a { min-height: 44px; }
+}
 
 .sessionNotes { max-width: 920px; }
 .sessionNotes:not(:empty) { margin-top: 32px; }

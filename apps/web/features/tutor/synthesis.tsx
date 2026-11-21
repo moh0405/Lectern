@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
 import { Notice } from "@/components/ui/feedback";
 import { api, unwrap } from "@/lib/api";
+import { useInitialParam } from "@/lib/use-url-params";
 import { IdlePreview } from "./library";
 import { matchPassage, passageId, PassageList } from "./passages";
 import { Announce, BusyIcon, PendingPanel, useToolRequest } from "./pending";
@@ -30,8 +31,8 @@ function Bullets({ title, items, empty }: { title: string; items: string[]; empt
   );
 }
 
-export function Synthesis() {
-  const [topic, setTopic] = useState("");
+export function Synthesis({ initial = "" }: { initial?: string }) {
+  const [topic, setTopic] = useState(initial);
   const [target, setTarget] = useState<{ index: number; nonce: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { run, cancel, cancelled, error } = useToolRequest(
@@ -134,4 +135,9 @@ export function Synthesis() {
       ) : null}
     </div>
   );
+}
+
+/** The tool on its own page, its field prefilled from `?topic=` (the "Go further" links on Ask use this). */
+export function SynthesisFromUrl() {
+  return <Synthesis initial={useInitialParam("topic", 200)} />;
 }

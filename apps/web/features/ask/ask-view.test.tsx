@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Turn } from "./session";
@@ -14,6 +14,8 @@ vi.mock("@/lib/api", () => ({
   errorMessage: (e: unknown) => (e instanceof Error ? e.message : "unknown"),
 }));
 vi.mock("@/lib/browser-rag/use-local-docs", () => ({ useLocalDocs: () => ({ data: [] }) }));
+const url = vi.hoisted(() => ({ search: "" }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(url.search) }));
 
 const session = { turns: [] as Turn[], ask: vi.fn(), stop: vi.fn(), remove: vi.fn(), clear: vi.fn(), busy: false };
 vi.mock("./use-ask-session", () => ({ useAskSession: () => session }));
@@ -48,6 +50,7 @@ beforeEach(() => {
   get.mockReset();
   session.turns = [];
   session.busy = false;
+  url.search = "";
   Object.values(session).forEach((v) => typeof v === "function" && "mockReset" in v && v.mockReset());
 });
 
@@ -88,6 +91,18 @@ describe("AskView opening state", () => {
     await userEvent.click(screen.getByLabelText(/Only show matching passages/));
     const box = screen.getByLabelText("Your question") as HTMLTextAreaElement;
     expect(box.maxLength).toBe(500);
+  });
+
+  it("prefills and focuses the composer from ?q= without sending it, then drops q from the address", async () => {
+    serve();
+    url.search = "?q=What%20is%20a%20heap%3F";
+    window.history.replaceState(null, "", "/ask?q=What%20is%20a%20heap%3F");
+    view();
+    const box = screen.getByLabelText("Your question");
+    await waitFor(() => expect(box).toHaveValue("What is a heap?"));
+    await waitFor(() => expect(box).toHaveFocus());
+    expect(session.ask).not.toHaveBeenCalled();
+    expect(window.location.search).toBe("");
   });
 });
 
@@ -132,6 +147,25 @@ describe("AskView with a session", () => {
     });
     expect(session.ask).not.toHaveBeenCalled();
     expect(screen.getByText(/An answer is still being written/)).toBeInTheDocument();
+  });
+
+  it("offers to go further with the study tools, carrying the question", () => {
+    serve();
+    session.turns = [done];
+    view();
+    const links = within(screen.getByRole("list", { name: "Go further" })).getAllByRole("link");
+    expect(links.map((l) => [l.textContent?.trim(), l.getAttribute("href")])).toEqual([
+      ["Concept map of this topic", "/concept-map?topic=What%20is%20a%20binary%20heap%20used%20for%3F"],
+      ["Compare your sources", "/compare?topic=What%20is%20a%20binary%20heap%20used%20for%3F"],
+      ["Work it out with hints", "/work-it-out?question=What%20is%20a%20binary%20heap%20used%20for%3F"],
+    ]);
+  });
+
+  it("does not offer the tools for an answer without passages", () => {
+    serve();
+    session.turns = [{ ...done, chunks: [], citations: [] }];
+    view();
+    expect(screen.queryByTestId("go-further")).toBeNull();
   });
 
   it("does not show the steps or Understanding for an answer that failed", () => {

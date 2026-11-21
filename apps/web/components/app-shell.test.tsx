@@ -43,8 +43,30 @@ describe("AppShell", () => {
     expect(within(main()).getByRole("link", { name: "Tools" })).toHaveAttribute("aria-current", "true");
     expect(within(main()).getByRole("link", { name: "Ask" })).not.toHaveAttribute("aria-current");
     const bar = screen.getByRole("navigation", { name: "Tools pages" });
-    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Tutor tools", "Math", "Agent", "Embedding map", "Analytics"]);
+    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Concept map", "Compare sources", "Agent", "Math"]);
     expect(within(bar).getByRole("link", { name: "Math" })).toHaveAttribute("aria-current", "page");
+    expect(within(main()).getByRole("link", { name: "Tools" })).toHaveAttribute("href", "/concept-map");
+  });
+
+  it("puts the map and insights in Library and the guided tools in Practice", () => {
+    const { rerender, client } = renderShell();
+    const again = () => rerender(<QueryClientProvider client={client}><AppShell><h1>Page</h1></AppShell></QueryClientProvider>);
+    const main = () => screen.getByRole("navigation", { name: "Main" });
+    nav.pathname = "/visualize";
+    again();
+    expect(within(main()).getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "true");
+    const library = screen.getByRole("navigation", { name: "Library pages" });
+    expect(within(library).getAllByRole("link").map((l) => l.textContent)).toEqual(["Sources", "Map", "Insights"]);
+    expect(within(library).getByRole("link", { name: "Map" })).toHaveAttribute("aria-current", "page");
+    nav.pathname = "/work-it-out";
+    again();
+    expect(within(main()).getByRole("link", { name: "Practice" })).toHaveAttribute("aria-current", "true");
+    const practice = screen.getByRole("navigation", { name: "Practice pages" });
+    expect(within(practice).getAllByRole("link").map((l) => l.textContent)).toEqual(["Flashcards", "LeetCode", "Work it out", "Explain at my level"]);
+    expect(within(practice).getByRole("link", { name: "Work it out" })).toHaveAttribute("aria-current", "page");
+    nav.pathname = "/concept-map";
+    again();
+    expect(within(main()).getByRole("link", { name: "Tools" })).toHaveAttribute("aria-current", "page");
   });
 
   it("describes the index in plain words, readable at every width", async () => {

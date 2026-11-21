@@ -152,7 +152,7 @@ test("the agent saves a flashcard when the deployment allows writes, and it appe
 });
 
 test("tutor: concept map, Socratic hints, comparison and level-adaptive explanation all work with a real model", async ({ page }) => {
-  await page.goto("/tutor");
+  await page.goto("/concept-map");
   await withModelRetries(
     page,
     async () => {
@@ -163,7 +163,7 @@ test("tutor: concept map, Socratic hints, comparison and level-adaptive explanat
   );
   expect(await page.getByTestId("concept-graph").locator(".react-flow__edge").count()).toBeGreaterThanOrEqual(2);
 
-  await page.goto("/tutor?tool=socratic");
+  await page.goto("/work-it-out");
   await withModelRetries(
     page,
     async () => {
@@ -176,7 +176,7 @@ test("tutor: concept map, Socratic hints, comparison and level-adaptive explanat
   await page.getByRole("button", { name: /Show hint 1/ }).click();
   await expect(page.getByText(/Hint 1\./)).toBeVisible();
 
-  await page.goto("/tutor?tool=synthesis");
+  await page.goto("/compare");
   await withModelRetries(
     page,
     async () => {
@@ -186,7 +186,7 @@ test("tutor: concept map, Socratic hints, comparison and level-adaptive explanat
     async () => (await page.getByText(/Agreements|Similarities|Combined|Unified/i).count()) > 0,
   );
 
-  await page.goto("/tutor?tool=adaptive");
+  await page.goto("/explain");
   await withModelRetries(
     page,
     async () => {

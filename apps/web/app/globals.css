@@ -160,7 +160,9 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .desk-subnav-link[aria-current="page"] { color: var(--color-fg); border-bottom-color: var(--color-accent-2); }
 .desk-subnav-link svg { width: 15px; height: 15px; }
 
-.api-status { display: flex; align-items: center; gap: 7px; font: 10px/1.5 var(--font-mono), monospace; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.api-status { display: flex; align-items: center; gap: 7px; font: 10px/1.5 var(--font-mono), monospace; color: var(--color-muted); white-space: nowrap; overflow: hidden; min-width: 0; }
+.api-status-text, .api-status-short { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.api-status-short { display: none; }
 /* State is never colour alone: online is a filled dot, connecting a hollow ring, busy a clock, offline an unplugged cable. */
 .api-status-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--color-muted); background: transparent; }
 .api-status-dot.online { background: var(--color-good); border-color: var(--color-good); }
@@ -168,7 +170,7 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .api-status-icon.busy { color: var(--color-warn); }
 .api-status-icon.offline { color: var(--color-bad); }
 
-.workspace-jump { display: flex; align-items: center; gap: 9px; min-height: 40px; width: 236px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-muted); background: var(--color-surface); font-size: 12px; cursor: pointer; }
+.workspace-jump { display: flex; align-items: center; gap: 9px; min-height: 40px; flex-shrink: 0; width: max-content; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-muted); background: var(--color-surface); font-size: 12px; cursor: pointer; }
 .workspace-jump:hover { border-color: var(--color-accent-2); color: var(--color-fg); }
 .workspace-jump kbd { font-size: 9px; line-height: 1.8; }
 .reading-theme { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; background: var(--color-surface); color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; }
@@ -248,6 +250,12 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .cite-chip.unverified[aria-pressed="true"] { border-color: var(--color-warn); box-shadow: inset 0 0 0 1px var(--color-warn); background: color-mix(in srgb, var(--color-warn) 9%, transparent); }
 @media (pointer: coarse) { .cite-chip { min-height: 28px; padding: 0 9px; } }
 
+/* Mid-width headers: a shorter visible label, with the full text kept for screen readers and the tooltip. */
+@media (min-width: 1101px) and (max-width: 1439px) {
+  .api-status:has(.api-status-short) .api-status-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .api-status-short { display: block; }
+}
+@media (max-width: 1259px) { .workspace-jump kbd { display: none; } }
 @media (max-width: 1100px) {
   .desk-header { padding: 0 20px; column-gap: 14px; }
   .workspace-jump { width: auto; }
@@ -267,7 +275,8 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
   .desk-nav { height: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 6px -16px 0; border-top: 1px solid var(--color-border); }
   .desk-nav-link { justify-content: center; padding: 0 4px; font-size: 14px; min-height: 48px; }
   .desk-nav-link.active::after { left: 22%; right: 22%; }
-  .desk-subnav { padding: 0 12px; }
+  .desk-subnav { padding: 6px 12px 0; }
+  .desk-subnav-link { min-height: 44px; }
   .workspace-content { padding: 28px 16px 42px; }
   .workspace-footer { margin-inline: 16px; font-size: 9px; }
   .workspace-footer > span:last-child { display: none; }
@@ -280,5 +289,4 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
   .workspace-jump, .reading-theme { min-height: 44px; min-width: 44px; }
   .reading-theme { width: 44px; height: 44px; }
   .demo-strip-close { width: 44px; height: 44px; }
-  .desk-subnav-link { min-height: 48px; }
 }

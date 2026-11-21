@@ -48,10 +48,13 @@ function ApiStatus() {
   const text = state === "online" && data
     ? `${plural(data.chunks, "passage")} indexed · ${data.semantic_search ? "meaning search" : "keyword search"}`
     : state === "busy" ? "Service busy · retrying shortly" : state === "offline" ? "Offline" : "Connecting…";
+  // Mid-width headers show this instead; the full text stays in the accessibility tree and the tooltip.
+  const short = state === "online" && data ? `${plural(data.chunks, "passage")} indexed` : state === "busy" ? "Service busy" : text;
   const Icon = state === "busy" ? Clock : state === "offline" ? Unplug : null;
   return <div className="api-status" title={data ? `Lectern API v${data.version} · ${text}` : text} data-state={state}>
     {Icon ? <Icon aria-hidden="true" className={cn("api-status-icon", state)} strokeWidth={2.2} /> : <span aria-hidden="true" className={cn("api-status-dot", state)} />}
     <span className="api-status-text">{text}</span>
+    {short !== text ? <span aria-hidden="true" className="api-status-short">{short}</span> : null}
     <span role="status" className="sr-only">{seen.announce}</span>
   </div>;
 }
