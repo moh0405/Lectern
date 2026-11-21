@@ -46,6 +46,10 @@ export function ConceptMap() {
       position: { x: n.x, y: n.y },
       data: { label: n.label },
       ariaLabel: nodeAriaLabel(n, data.edges),
+      // Fixed dimensions: these node objects are rebuilt whenever the selection changes, and React Flow
+      // hides a rebuilt node until it is measured again, which a node whose size did not change never is.
+      width: NODE_W,
+      height: NODE_H,
       selected: n.id === selected,
       style: {
         width: NODE_W,
