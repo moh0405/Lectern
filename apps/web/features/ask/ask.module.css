@@ -845,9 +845,74 @@
   .starter, .composerBox, .evidenceChevron { transition: none; }
 }
 
-.guidedChoice { display: flex; gap: 1rem; border: 0; padding: 0; margin: 0 0 .5rem; }
-.guidedChoice label { display: flex; align-items: center; gap: .5rem; min-height: 44px; cursor: pointer; }
-.guidedChoice input { accent-color: var(--color-accent); }
+/* ------------------------------------------------------------ approach (Answer / Guided / Try first) */
+.approach { margin: 0 0 8px; }
+
+/* Try first: the attempt box inside the composer. */
+.attemptPanel { display: grid; gap: 8px; margin: 2px 10px 4px; padding: 10px 0 2px; border-top: 1px dashed var(--color-border); }
+.attemptControls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.attemptLabel { display: flex; flex-wrap: wrap; gap: 2px 8px; color: var(--color-fg); font-size: 13px; font-weight: 600; }
+.attemptLabel span { color: var(--color-muted); font-weight: 400; }
+.attemptInput { min-height: 96px !important; max-height: 32vh; resize: vertical; font-size: 14px !important; line-height: 1.6; }
+.attemptInput[data-code] { font-family: var(--font-mono), monospace; font-size: 13px !important; tab-size: 4; white-space: pre; overflow-x: auto; }
+@media (max-width: 1179px) {
+  .attemptInput { max-height: 24vh; }
+}
+
+/* Try first: feedback, one row per step / line / sentence. */
+.attempt { display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; border: 1px solid var(--color-border); border-radius: 12px; padding: 18px 20px; background: var(--color-surface); }
+.attemptTitle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.attemptLang { padding: 2px 8px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-muted); font: 400 12px var(--font-mono), monospace; }
+.attemptSummary { font-size: 15px; line-height: 1.6; }
+.attemptSummary:focus-visible { outline: 2px solid var(--color-accent-2); outline-offset: 4px; border-radius: 4px; }
+.attemptTally { color: var(--color-muted); font: 12px var(--font-mono), monospace; }
+.attemptLines { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); }
+.attemptLine { display: grid; grid-template-columns: 2.4em minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--color-border); border-left: 3px solid transparent; }
+.attemptLine[data-blank] { padding: 0; min-height: 10px; border-bottom: 0; }
+.attemptLine[data-verdict="supported"] { border-left-color: var(--color-good); }
+.attemptLine[data-verdict="contradicted"] { border-left-color: var(--color-bad); }
+.attemptLine[data-verdict="unchecked"] { border-left-color: var(--color-warn); }
+.attemptLine[data-verdict="not_covered"] { border-left-color: var(--color-muted); }
+.lineNo { padding-right: 4px; color: var(--color-muted); font: 12px/1.9 var(--font-mono), monospace; text-align: right; }
+.lineBody { display: grid; gap: 6px; min-width: 0; }
+.lineText { font-size: 15px; line-height: 1.6; }
+.lineText code { font: 13px/1.7 var(--font-mono), monospace; white-space: pre-wrap; }
+.verdictRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: var(--color-bg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.verdict[data-static] { cursor: default; }
+.verdict svg { width: 14px; height: 14px; flex-shrink: 0; }
+.verdict[data-kind="supported"] { color: var(--color-good); }
+.verdict[data-kind="contradicted"] { color: var(--color-bad); }
+.verdict[data-kind="unchecked"] { color: var(--color-warn); }
+.verdict[data-kind="not_covered"] { color: var(--color-muted); }
+button.verdict:hover { background: var(--color-surface-2); }
+button.verdict:focus-visible { outline: 2px solid var(--color-accent-2); outline-offset: 2px; }
+button.verdict[aria-pressed="true"] { outline: 2px solid var(--color-accent-2); outline-offset: 1px; }
+.verdictPassage { padding-left: 6px; border-left: 1px solid currentColor; font: 400 11px var(--font-mono), monospace; }
+.verdictNote { color: var(--color-muted); font-size: 12px; }
+.lineNote { color: var(--color-muted); font-size: 14px; line-height: 1.55; }
+.lineWarn { display: flex; gap: 6px; color: var(--color-warn); font-size: 12px; line-height: 1.5; }
+.lineWarn svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+.attemptActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+@media (max-width: 767px), (pointer: coarse) {
+  .verdict, .attempt :global(.cite-chip) { min-height: 44px; }
+}
+@media (max-width: 767px) {
+  .attempt { padding: 16px 14px; }
+  .attemptLine { grid-template-columns: 1.8em minmax(0, 1fr); gap: 8px; }
+}
 .guidedHints { display: grid; gap: 1rem; min-width: 0; overflow-wrap: anywhere; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
 .guidedHints [aria-live] { display: grid; gap: 1rem; }
 .guidedHints [data-guided-hint]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }

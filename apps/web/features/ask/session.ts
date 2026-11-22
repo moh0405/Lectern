@@ -9,10 +9,27 @@ export interface AgentStep {
   detail: string;
 }
 
+/** What a turn needs to ask for its cited answer later ("Show me the evidence"). */
+export interface AskSettings { question: string; mode?: Mode; k: number; temperature: number; model?: string; showPrompt?: boolean; local?: boolean; agent?: boolean }
+
 export interface Guided {
-  params: { question: string; mode?: Mode; k: number; temperature: number; model?: string; showPrompt?: boolean; local?: boolean; agent?: boolean };
+  params: AskSettings;
   hints?: string[];
   revealed: number;
+  evidenceStarted: boolean;
+}
+
+export type AttemptFormat = components["schemas"]["AttemptFeedbackRequest"]["format"] & string;
+export type AttemptFeedback = components["schemas"]["AttemptFeedback"];
+export type AttemptItem = components["schemas"]["AttemptItem"];
+
+/** Try first: the student's own attempt, the feedback on it, and whether the cited answer has been asked for. */
+export interface Attempt {
+  params: AskSettings;
+  text: string;
+  format: AttemptFormat;
+  language?: string;
+  feedback?: AttemptFeedback;
   evidenceStarted: boolean;
 }
 
@@ -38,15 +55,17 @@ export interface Turn {
   /** Answered from documents kept in this browser (public demo), not the shared index. */
   local?: boolean;
   guided?: Guided;
+  attempt?: Attempt;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
 
 export type Action =
-  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean; local?: boolean; guided?: Guided }
+  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean; local?: boolean; guided?: Guided; attempt?: Attempt }
   | { type: "resume"; id: string; evidence: boolean; agent?: boolean }
   | { type: "hints"; id: string; hints: string[] }
   | { type: "next-hint"; id: string }
+  | { type: "feedback"; id: string; feedback: AttemptFeedback }
   | { type: "step"; id: string; step: AgentStep }
   /** The agentic workflow discards the answer streamed so far; a corrected one follows. */
   | { type: "replace"; id: string }
@@ -61,6 +80,8 @@ export type Action =
   /** Turns loaded from the server; applied only while this browser has none of its own. */
   | { type: "restore"; turns: Turn[] };
 
+const samePassage = (a: Chunk, b: Chunk) => a.doc === b.doc && a.page === b.page && a.text === b.text;
+
 const update = (turns: Turn[], id: string, fn: (t: Turn) => Turn) => turns.map((t) => (t.id === id ? fn(t) : t));
 
 /** Newest turn first. */
@@ -68,13 +89,17 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
   switch (action.type) {
     case "start":
       return [
-        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", guided: action.guided, ...(action.agent ? { agent: true, steps: [] } : {}), ...(action.local ? { local: true } : {}) },
+        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", guided: action.guided, attempt: action.attempt, ...(action.agent ? { agent: true, steps: [] } : {}), ...(action.local ? { local: true } : {}) },
         ...turns,
       ];
     case "resume":
       return update(turns, action.id, (t) => ({ ...t, status: "streaming", error: undefined, agent: action.agent ?? t.agent,
         ...(action.evidence ? { answer: "", chunks: [], citations: undefined, uncited: undefined, cached: undefined, prompt: undefined, steps: [], model: undefined, llmCalls: undefined, rewritten: undefined } : {}),
-        guided: t.guided ? { ...t.guided, evidenceStarted: t.guided.evidenceStarted || action.evidence } : undefined }));
+        guided: t.guided ? { ...t.guided, evidenceStarted: t.guided.evidenceStarted || action.evidence } : undefined,
+        attempt: t.attempt ? { ...t.attempt, evidenceStarted: t.attempt.evidenceStarted || action.evidence } : undefined }));
+    case "feedback":
+      return update(turns, action.id, (t) => ({ ...t, status: "done", chunks: action.feedback.chunks, model: action.feedback.model ?? undefined,
+        attempt: t.attempt ? { ...t.attempt, feedback: action.feedback } : undefined }));
     case "hints":
       return update(turns, action.id, (t) => ({ ...t, status: "done", guided: t.guided ? { ...t.guided, hints: action.hints, revealed: Math.min(1, action.hints.length) } : undefined }));
     case "next-hint":
@@ -84,7 +109,12 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
     case "replace":
       return update(turns, action.id, (t) => ({ ...t, answer: "", rewritten: true }));
     case "meta":
-      return update(turns, action.id, (t) => ({ ...t, chunks: action.chunks, prompt: action.prompt ?? t.prompt }));
+      return update(turns, action.id, (t) => {
+        // After Try first, keep the passages the feedback cited reachable from its verdicts, after the answer's own.
+        const fed = t.attempt?.evidenceStarted ? (t.attempt.feedback?.chunks ?? []) : [];
+        const chunks = [...action.chunks, ...fed.filter((c) => !action.chunks.some((a) => samePassage(a, c)))];
+        return { ...t, chunks, prompt: action.prompt ?? t.prompt };
+      });
     case "token":
       return update(turns, action.id, (t) => ({ ...t, answer: t.answer + action.text }));
     case "done":

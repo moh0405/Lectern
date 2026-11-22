@@ -60,7 +60,7 @@ export function InlinePassage({ turn, refs, selection, onClose, scope }: { turn:
       </div>
       {chunk ? (
         <>
-          <Passage key={`${turn.id}-${index}-${ref?.id ?? "p"}`} anchor={false} text={chunk.text} sentence={ref?.sentence || turn.question} reason={ref?.sentence ? "the cited sentence" : "your question"} className={styles.inlineQuote} />
+          <Passage key={`${turn.id}-${index}-${ref?.id ?? "p"}-${selection.sentence ?? ""}`} anchor={false} text={chunk.text} sentence={ref?.sentence || selection.sentence || turn.question} reason={ref?.sentence ? "the cited sentence" : selection.sentence ? "your attempt" : "your question"} className={styles.inlineQuote} />
           {href ? (
             <a className={styles.openSource} href={href} target="_blank" rel="noopener noreferrer">
               Open the source <ArrowUpRight aria-hidden="true" />
@@ -86,7 +86,7 @@ export function InlinePassage({ turn, refs, selection, onClose, scope }: { turn:
         </div>
       )}
       <button type="button" className={styles.inlineBack} onClick={onClose}>
-        <X aria-hidden="true" /> Back to answer
+        <X aria-hidden="true" /> {turn.answer ? "Back to answer" : "Back to feedback"}
       </button>
     </section>
   );

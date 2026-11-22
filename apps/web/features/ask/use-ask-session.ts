@@ -4,10 +4,12 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
 import { retrieveLocal } from "@/lib/browser-rag/retrieve";
 import { useDemo } from "@/lib/demo";
-import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Mode, type Turn } from "./session";
+import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type AttemptFormat, type Mode, type Turn } from "./session";
 
 export interface AskParams {
   guided?: boolean;
+  /** Try first: the student's own attempt, judged against the passages before any answer is shown. */
+  attempt?: { text: string; format: AttemptFormat; language?: string };
   question: string;
   mode?: Mode;
   k: number;
@@ -98,18 +100,20 @@ export function useAskSession() {
   const evidenceRuns = useRef(new Set<string>());
   const ask = useCallback(async (p: AskParams, existing?: Turn, evidence = false) => {
     const id = existing?.id ?? newId();
-    if (existing && !evidence && (existing.guided?.hints !== undefined || controllers.current.has(id))) return;
+    if (existing && !evidence && (existing.guided?.hints !== undefined || existing.attempt?.feedback !== undefined || controllers.current.has(id))) return;
     if (existing && [...controllers.current.keys()].some((key) => key !== id)) return;
-    if (evidence && (evidenceRuns.current.has(id) || (existing?.guided?.evidenceStarted && existing.status !== "error" && existing.status !== "stopped"))) return;
+    if (evidence && (evidenceRuns.current.has(id) || ((existing?.guided?.evidenceStarted || existing?.attempt?.evidenceStarted) && existing.status !== "error" && existing.status !== "stopped"))) return;
     if (evidence) evidenceRuns.current.add(id);
     controllers.current.get(id)?.abort();
     const controller = new AbortController();
     controllers.current.set(id, controller);
     const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly;
     const guiding = Boolean(p.guided) && !evidence;
+    const attempting = Boolean(p.attempt) && !guiding && !evidence;
     if (existing) dispatch({ type: "resume", id, evidence, agent: evidence && agent });
-    else dispatch({ type: "start", id, question: p.question, mode: p.mode, agent: !guiding && agent, local: Boolean(p.local),
-      guided: guiding ? { params: p, revealed: 0, evidenceStarted: false } : undefined });
+    else dispatch({ type: "start", id, question: p.question, mode: p.mode, agent: !guiding && !attempting && agent, local: Boolean(p.local),
+      guided: guiding ? { params: p, revealed: 0, evidenceStarted: false } : undefined,
+      attempt: attempting && p.attempt ? { params: p, text: p.attempt.text, format: p.attempt.format, language: p.attempt.language, evidenceStarted: false } : undefined });
     try {
       let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
       if (p.local) {
@@ -140,6 +144,16 @@ export function useAskSession() {
         }));
         if (result.warning) throw new Error("Source-based hints are unavailable right now. Try again or show the evidence.");
         if (!controller.signal.aborted) dispatch({ type: "hints", id, hints: result.hints });
+        return;
+      }
+      if (attempting && p.attempt) {
+        // One model call; the passages come back with the feedback so each verdict can open its passage.
+        const feedback = unwrap(await api.http.POST("/api/v1/attempt/feedback", {
+          body: { question: p.question, attempt: p.attempt.text, format: p.attempt.format, language: p.attempt.language || undefined,
+            k: Math.min(p.k, 10), temperature: p.temperature, model: p.model || undefined, context },
+          signal: controller.signal,
+        }));
+        if (!controller.signal.aborted) dispatch({ type: "feedback", id, feedback });
         return;
       }
       if (p.retrievalOnly) {
@@ -221,6 +235,10 @@ export function useAskSession() {
 
   const nextHint = (id: string) => dispatch({ type: "next-hint", id });
   const retryHints = (t: Turn) => t.guided && ask({ ...t.guided.params, guided: true }, t);
-  const showEvidence = (t: Turn) => t.guided && ask(t.guided.params, t, true);
-  return { turns, ask, nextHint, retryHints, showEvidence, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
+  const retryFeedback = (t: Turn) => t.attempt && ask(t.attempt.params, t);
+  const showEvidence = (t: Turn) => {
+    const params = t.attempt?.params ?? t.guided?.params;
+    return params ? ask({ ...params, guided: false, attempt: undefined }, t, true) : undefined;
+  };
+  return { turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
 }

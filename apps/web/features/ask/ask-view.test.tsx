@@ -177,3 +177,32 @@ describe("AskView with a session", () => {
     expect(screen.getByRole("complementary", { name: "Source margin" })).toHaveTextContent("This question didn't reach your sources. Try again.");
   });
 });
+
+describe("AskView approach control", () => {
+  it("offers Answer, Guided and Try first as one radio group, Answer by default", () => {
+    serve();
+    view();
+    const group = screen.getByRole("group", { name: "How Lectern responds" });
+    expect(within(group).getAllByRole("radio").map((r) => r.getAttribute("value"))).toEqual(["answer", "guided", "try"]);
+    expect(within(group).getByRole("radio", { name: "Answer" })).toBeChecked();
+    expect(screen.queryByLabelText(/Your attempt/)).toBeNull();
+  });
+
+  it("Try first asks for an attempt and sends it with its format", async () => {
+    serve();
+    view();
+    await userEvent.click(screen.getByRole("radio", { name: "Try first" }));
+    await userEvent.type(screen.getByLabelText("Your question"), "Why is heap insert O(log n)?");
+    const check = screen.getByRole("button", { name: "Check my attempt" });
+    expect(check).toBeDisabled(); // nothing to check yet
+    expect(screen.getByRole("radio", { name: "Steps" })).toBeChecked();
+    expect(screen.getByLabelText(/Your attempt/)).toHaveAccessibleName("Your attempt Show your working, one step per line.");
+    await userEvent.click(screen.getByRole("radio", { name: "Code" }));
+    await userEvent.selectOptions(screen.getByLabelText("Language"), "Java");
+    await userEvent.type(screen.getByLabelText(/Your attempt/), "heap.add(x);");
+    await userEvent.click(check);
+    expect(session.ask).toHaveBeenCalledTimes(1);
+    expect(session.ask.mock.calls[0]![0]).toMatchObject({ question: "Why is heap insert O(log n)?", guided: false, retrievalOnly: false, attempt: { text: "heap.add(x);", format: "code", language: "Java" } });
+    expect(screen.getByLabelText(/Your attempt/)).toHaveValue("");
+  });
+});
