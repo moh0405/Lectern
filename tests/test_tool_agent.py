@@ -372,3 +372,89 @@ def test_the_scripted_busy_model_shows_the_switch(indexed, fake_gemini):
     thought = [d["text"] for n, d in events if n == "thought"]
     assert thought == ["fake-model was unavailable (busy or out of quota), so gemini-3.1-flash-lite continued with the tool results gathered so far."]
     assert events[-1][1]["models"] == ["fake-model", "gemini-3.1-flash-lite"]
+
+
+# ---------------------------------------------------------------- citations through a real run
+class _Store:
+    """Chunks as the store keeps them: a passage's end page lives in `extra`."""
+
+    def __init__(self, chunks):
+        self.chunks = chunks
+
+    def _docstore_iter(self):
+        return self.chunks
+
+    def retrieve_context(self, query, k=4):
+        return [{**c, "end_page": (c.get("extra") or {}).get("end_page"), "score": 0.5} for c in self.chunks[:k]]
+
+
+def _run_with(chunks, script):
+    from backend.react_agent import run_react_agent
+    from backend.tool_chat import TurnResult
+    from backend.tools import ToolContext, default_tools
+
+    class Chat:
+        model = "m"
+
+        def __init__(self):
+            self.turn = 0
+
+        def send(self, message):
+            item = script[self.turn]
+            self.turn += 1
+            return item if isinstance(item, TurnResult) else TurnResult(text=item)
+
+    ctx = ToolContext(engine=_Store(chunks))
+    events = list(run_react_agent(Chat(), default_tools(), ctx, "What is a binary heap?"))
+    return {e["event"]: e["data"] for e in events}, ctx
+
+
+def test_read_page_keeps_the_end_page_so_a_spanning_citation_verifies():
+    from backend.tool_chat import ToolCall, TurnResult
+
+    chunks = [{"doc": "Dsa.pdf", "page": 118, "text": "A binary heap is a complete tree.", "extra": {"end_page": 119}}]
+    out, ctx = _run_with(chunks, [TurnResult(calls=[ToolCall("read_page", {"document": "Dsa.pdf", "page": 119})]), "A heap is complete [Dsa.pdf (page 119)]."])
+    assert ctx.passages[0]["end_page"] == 119
+    assert out["done"]["unverified_citations"] == 0 and out["done"]["citations"][0]["status"] == "ok"
+
+
+def test_a_citation_beyond_the_first_twelve_passages_keeps_its_evidence():
+    from backend.tool_chat import ToolCall, TurnResult
+
+    chunks = [{"doc": "big.pdf", "page": n, "text": f"passage number {n} about heaps"} for n in range(1, 16)]
+    calls = [TurnResult(calls=[ToolCall("read_page", {"document": "big.pdf", "page": n}) for n in range(a, a + 4)]) for a in (1, 5, 9, 13)]
+    out, _ctx = _run_with(chunks, [*calls, "See [big.pdf (page 15)]."])
+    assert out["done"]["unverified_citations"] == 0
+    assert any(c["page"] == 15 for c in out["meta"]["chunks"]) and len(out["meta"]["chunks"]) == 12
+
+
+def test_a_search_only_counts_passages_the_model_actually_received():
+    from backend.tools import RESULT_CHARS, ToolContext, run_tool, default_tools
+
+    chunks = [{"doc": "big.pdf", "page": n, "text": "x" * 900} for n in range(1, 9)]
+    ctx = ToolContext(engine=_Store(chunks))
+    res = run_tool(default_tools(), ctx, "search_documents", {"query": "heap", "k": 8})
+    assert "truncated" not in res and len(str(res)) <= RESULT_CHARS + 200
+    assert [p["page"] for p in res["passages"]] == [p["page"] for p in ctx.passages] and res["count"] < 8
+
+
+def test_passages_survive_a_failover_between_turns():
+    """The chat may move to another model mid-run; the record of what was retrieved lives outside it."""
+    from backend.react_agent import run_react_agent
+    from backend.tool_chat import ToolCall, TurnResult
+    from backend.tools import ToolContext, default_tools
+
+    class Chat:
+        model = "gemini-3.6-flash"
+        turn = 0
+
+        def send(self, message):
+            self.turn += 1
+            if self.turn == 1:
+                return TurnResult(calls=[ToolCall("search_documents", {"query": "heap"})])
+            self.model = "gemini-3.1-flash-lite"
+            return TurnResult(text="A heap [Dsa.pdf page 118] is a tree [Dsa.pdf (page 118)].")
+
+    ctx = ToolContext(engine=_Store([{"doc": "Dsa.pdf", "page": 118, "text": "A binary heap."}]))
+    done = [e for e in run_react_agent(Chat(), default_tools(), ctx, "q") if e["event"] == "done"][0]["data"]
+    assert done["models"][-1] == "gemini-3.1-flash-lite" and len(done["citations"]) == 2 and done["unverified_citations"] == 0

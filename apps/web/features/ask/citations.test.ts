@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { Chunk } from "@ai-study-mentor/api-client";
 import { describe, expect, it } from "vitest";
-import { chunkForCitation, cleanParen, closestSentence, excerpt, linkCitations } from "./citations";
+import { chunkForCitation, cleanParen, closestSentence, excerpt, linkCitations, splitCitations } from "./citations";
 import type { CitationCheck } from "./session";
 
 const chunk = (doc: string, page: number | null, text = "text", end_page: number | null = null): Chunk => ({ doc, page, end_page, text, score: 0.8 });
@@ -249,5 +251,33 @@ describe("chip glitches", () => {
     const { markdown, refs } = linkCitations("A heap [heaps.pdf (page 1)]. Also a tree [heaps.pdf (page 1)].", cites, chunks);
     expect(markdown).toBe("A heap [0](#cite-0). Also a tree [1](#cite-1).");
     expect(refs.map((r) => r.chunk)).toEqual([0, 0]);
+  });
+});
+
+describe("the citation formats shared with the server (tests/fixtures/citation_labels.json)", () => {
+  const data = JSON.parse(readFileSync(resolve(__dirname, "../../../../tests/fixtures/citation_labels.json"), "utf8")) as {
+    docs: string[];
+    cases: { inner: string; labels: string[] }[];
+  };
+  it.each(data.cases)("splits $inner like the server", ({ inner, labels }) => {
+    expect(splitCitations(inner, data.docs)).toEqual(labels);
+  });
+
+  const chunks = [
+    { doc: "Dsa.pdf", page: 118, text: "A heap.", score: 1 },
+    { doc: "Dsa.pdf", page: 120, end_page: 121, text: "Sift down.", score: 1 },
+  ] as Chunk[];
+
+  it.each(["Dsa.pdf page 120", "doc: Dsa.pdf, page: 121", "*Dsa.pdf*, page 120", "Dsa.pdf (pages 120—121)", "Dsa.pdf (pages 120 to 121)"])("opens the right passage for %s", (label) => {
+    expect(chunkForCitation({ doc: "Dsa.pdf", page: Number(/\d+/.exec(label)![0]), status: "ok", label }, chunks)).toBe(1);
+  });
+
+  it("links a citation written right after another", () => {
+    const citations = [
+      { label: "Dsa.pdf (page 118)", doc: "Dsa.pdf", page: 118, status: "ok" as const },
+      { label: "Invented.pdf (page 2)", doc: "Invented.pdf", page: 2, status: "unknown_source" as const },
+    ];
+    const { refs } = linkCitations("Claim [Dsa.pdf (page 118)][Invented.pdf (page 2)].", citations, chunks);
+    expect(refs.map((r) => r.status)).toEqual(["ok", "unknown_source"]);
   });
 });

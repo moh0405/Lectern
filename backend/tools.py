@@ -33,9 +33,9 @@ class ToolContext:
     passages: List[Dict[str, Any]] = field(default_factory=list)
 
     def remember(self, items: List[Dict[str, Any]]) -> None:
-        seen = {(p.get("doc"), p.get("page"), (p.get("text") or "")[:80]) for p in self.passages}
+        seen = {(p.get("doc"), p.get("page"), p.get("end_page"), (p.get("text") or "")[:80]) for p in self.passages}
         for it in items:
-            key = (it.get("doc"), it.get("page"), (it.get("text") or "")[:80])
+            key = (it.get("doc"), it.get("page"), it.get("end_page"), (it.get("text") or "")[:80])
             if key not in seen:
                 seen.add(key)
                 self.passages.append(it)
@@ -77,12 +77,18 @@ def _int(args: Dict[str, Any], key: str, default: int, low: int, high: int) -> i
     return max(low, min(high, n))
 
 
+def _end_page(c: Dict[str, Any]) -> Optional[int]:
+    """Where a passage ends. Search results carry `end_page`; chunks straight from the store keep it in `extra`."""
+    return c.get("end_page") or (c.get("extra") or {}).get("end_page")
+
+
 def _passage(c: Dict[str, Any], limit: int = PASSAGE_CHARS) -> Dict[str, Any]:
     out: Dict[str, Any] = {"doc": c.get("doc"), "text": (c.get("text") or "")[:limit]}
     if c.get("page") is not None:  # leave the key out for sources without pages, so a model does not write "(null)"
         out["page"] = c["page"]
-    if c.get("end_page"):
-        out["end_page"] = c["end_page"]
+    end = _end_page(c)
+    if end:
+        out["end_page"] = end
     return out
 
 
@@ -91,8 +97,15 @@ def _search_documents(ctx: ToolContext, args: Dict[str, Any]) -> Dict[str, Any]:
     query = _text(args, "query", 500)
     k = _int(args, "k", 4, 1, 8)
     chunks = ctx.engine.retrieve_context(query, k=k)
-    passages = [{**_passage(c), "score": round(float(c.get("score") or 0), 3)} for c in chunks]
-    ctx.remember([{**_passage(c), "score": float(c.get("score") or 0)} for c in chunks])
+    # Whole passages, only as many as fit in one tool result. A passage cut off by `bounded` would never reach the model,
+    # yet would count as "retrieved" when its citations are checked.
+    passages: List[Dict[str, Any]] = []
+    for c in chunks:
+        item = {**_passage(c), "score": round(float(c.get("score") or 0), 3)}
+        if passages and len(json.dumps({"count": len(passages) + 1, "passages": [*passages, item]}, ensure_ascii=False, default=str)) > RESULT_CHARS:
+            break
+        passages.append(item)
+    ctx.remember([{**_passage(c), "score": float(c.get("score") or 0)} for c in chunks[: len(passages)]])
     return {"count": len(passages), "passages": passages} if passages else {"count": 0, "passages": [], "note": "No matching passages. Try different words."}
 
 
@@ -120,7 +133,7 @@ def _read_page(ctx: ToolContext, args: Dict[str, Any]) -> Dict[str, Any]:
         ctx.remember([{**_passage(c, 4000), "score": 0.0} for c in of_doc[:3]])
         text = "\n\n".join((c.get("text") or "") for c in of_doc)[:PAGE_CHARS]
         return {"doc": chosen, "page": None, "text": text, "note": "This document has no page numbers; this is its beginning. Cite it as [" + chosen + "]."}
-    hits = [c for c in of_doc if (c.get("page") or 0) <= page <= (c.get("end_page") or c.get("page") or 0)]
+    hits = [c for c in of_doc if (c.get("page") or 0) <= page <= (_end_page(c) or c.get("page") or 0)]
     if not hits:
         return {"error": f"No text found on page {page} of {chosen}. Use search_documents to find the right page."}
     ctx.remember([{**_passage(c, 4000), "score": 0.0} for c in hits])

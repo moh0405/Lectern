@@ -42,7 +42,7 @@ export interface LinkedAnswer {
 export const CITE_PREFIX = "#cite-";
 
 // Same shape the server accepts as a citation (backend/citations.py `_BRACKET`).
-const BRACKET = /(?<![\w\])])\[([^[\]\n]{3,200})\](?!\()/g;
+const BRACKET = /(?<![\w)])\[([^[\]\n]{3,200})\](?!\()/g;
 // A prose parenthesis that may hold citations (server `_PAREN`): no brackets inside, one level of nesting, never a
 // Markdown link target. Matched together with brackets so references are numbered in reading order.
 const PAREN_SRC = String.raw`(?<![\]\w])\(((?:[^()[\]\n]|\([^()[\]\n]*\)){3,300})\)`;
@@ -85,13 +85,53 @@ function documentPart(doc: string): string | null {
   return head || null;
 }
 
-// Page lists and page suffixes, parsed as the server does (`_PAGES`, `_PAGE_LIST`, `_PAGE`, `_WITH_PAGE_*`).
-const PAGES = String.raw`(?:pages?|pp?\.?)\s*\d+(?:\s*[,;&]\s*(?:(?:pages?|pp?\.?)\s*)?\d+)+`;
-const PAGE_LIST = new RegExp(String.raw`^(?<doc>.+?)\s*(?:\(\s*(?<p1>${PAGES})\s*\)|[,;:·–-]\s*(?<p2>${PAGES}))\s*$`, "i");
-const PAGE = String.raw`(?:pages?|pp?\.?)\s*(\d+)(?:\s*[-–]\s*(\d+))?`;
+// Page lists and page suffixes, parsed as the server does (`_RANGE`, `_PAGE_WORD`, `_PAGES`, `_PAGE_LIST`, `_WITH_PAGE_*`).
+// tests/fixtures/citation_labels.json is run against both parsers.
+const RANGE = String.raw`(?:\s*[-–—‒‑]\s*|\s+to\s+)`;
+const PAGE_WORD = String.raw`(?:pages?|pgs?\.?|pp?\.?)(?:\s*no\.?)?\s*[:=#]?`;
+const DOC_SEP = "[,;:·–—-]";
+const ITEM = String.raw`\d+(?:${RANGE}\d+)?`;
+const LIST_SEP = String.raw`\s*(?:[,;&]\s*(?:and\s+)?|and\s+)`;
+const PAGES = String.raw`${PAGE_WORD}\s*${ITEM}(?:${LIST_SEP}(?:${PAGE_WORD}\s*)?${ITEM})+`;
+const PAGE_LIST = new RegExp(String.raw`^(?<doc>.+?)\s*(?:\(\s*(?<p1>${PAGES})\s*\)|${DOC_SEP}\s*(?<p2>${PAGES}))\s*$`, "i");
+const PAGE_LIST_SPACE = new RegExp(String.raw`^(?<doc>.+?)\s+(?<p1>${PAGES})\s*$`, "i");
+const PAGE = String.raw`${PAGE_WORD}\s*(\d+)(?:${RANGE}(\d+))?`;
 const WITH_PAGE_PAREN = new RegExp(String.raw`^(.+?)\s*\(\s*${PAGE}\s*\)\s*$`, "i");
-const WITH_PAGE_COMMA = new RegExp(String.raw`^(.+?)\s*[,;:·–-]\s*${PAGE}\s*$`, "i");
-const PART_SPLIT = /(?<=\))\s*[,;]\s*|\s*;\s*/;
+const WITH_PAGE_COMMA = new RegExp(String.raw`^(.+?)\s*${DOC_SEP}\s*${PAGE}\s*$`, "i");
+const WITH_PAGE_SPACE = new RegExp(String.raw`^(.+?)\s+${PAGE}\s*$`, "i");
+const PART_SPLIT = /(?<=\))\s*(?:[,;&]|[aA][nN][dD]\b)\s*|\s*;\s*/;
+const JOINED_SPLIT = new RegExp(String.raw`(?<=\d)\s*,\s*(?!\d|${PAGE_WORD}\s*\d)|\s+(?:and|&)\s+`, "i");
+const LABEL_LEAD = /^(?:doc(?:ument)?|source|file)\s*:\s*/i;
+const EXTENSION = /\.(pdf|md|txt|py|rst|docx?|pptx?|mp3|mp4|wav|m4a|html?)\b/i;
+const NO_PAGE = /\s*(?:\(\s*(?:(?:pages?|pp?\.?)\s*:?\s*)?(?:none|n\/?a|null|nil|unknown|-)\s*\)|,\s*(?:pages?|pp?\.?)\s*:?\s*(?:none|n\/?a|null|nil|unknown|-))\s*$/i;
+
+/** A label without emphasis, a "doc:" lead or an explicit empty page (server `_parse`). */
+const bareLabel = (label: string) => label.trim().replace(NO_PAGE, "").replace(/[*`]/g, "").trim().replace(LABEL_LEAD, "");
+
+/** The document part of a label (server `_parse`). */
+function labelDoc(label: string): string {
+  const text = bareLabel(label);
+  for (const pattern of [WITH_PAGE_PAREN, WITH_PAGE_COMMA, WITH_PAGE_SPACE]) {
+    const m = pattern.exec(text);
+    if (m) return m[1]!.replace(/^[ ,;:]+|[ ,;:]+$/g, "");
+  }
+  return text;
+}
+
+/** Whether `doc` is a retrieved document, directly or before a section path (server `_match_doc`). */
+function isRetrieved(doc: string, chunkDocs: string[]): boolean {
+  if (chunkDocs.some((d) => sameKeys(d, doc))) return true;
+  const head = documentPart(doc);
+  return head !== null && chunkDocs.some((d) => sameKeys(d, head));
+}
+
+/** One label per page or range of a page list (server `_page_labels`). */
+function pageLabels(doc: string, pages: string): string[] {
+  return (pages.match(new RegExp(ITEM, "gi")) ?? []).map((item) => {
+    const numbers = item.match(/\d+/g) ?? [];
+    return numbers.length === 1 ? `${doc} (page ${numbers[0]})` : `${doc} (pages ${numbers[0]}-${numbers[1]})`;
+  });
+}
 
 /**
  * The citation labels the server derives from one bracket's inner text (server `_split_multi`): one label per page
@@ -100,9 +140,11 @@ const PART_SPLIT = /(?<=\))\s*[,;]\s*|\s*;\s*/;
 export function splitCitations(inner: string, chunkDocs: string[]): string[] {
   const text = inner.trim();
   const listed = PAGE_LIST.exec(text);
-  if (listed?.groups) {
-    const { doc, p1, p2 } = listed.groups;
-    return ((p1 ?? p2 ?? "").match(/\d+/g) ?? []).map((n) => `${doc} (page ${n})`);
+  if (listed?.groups) return pageLabels(listed.groups.doc!, listed.groups.p1 ?? listed.groups.p2 ?? "");
+  const spaced = PAGE_LIST_SPACE.exec(text);
+  if (spaced?.groups) {
+    const doc = bareLabel(spaced.groups.doc!);
+    if (EXTENSION.test(doc) || isRetrieved(doc, chunkDocs)) return pageLabels(spaced.groups.doc!, spaced.groups.p1!);
   }
   const parts = text
     .split(PART_SPLIT)
@@ -116,13 +158,19 @@ export function splitCitations(inner: string, chunkDocs: string[]): string[] {
       .filter(Boolean);
     if (pieces.length > 1 && pieces.every((p) => chunkDocs.some((d) => sameKeys(d, p)))) return pieces;
   }
+  // "a.pdf, page 3, b.md" or "a.pdf and b.md": split only when every part names a retrieved document.
+  const joined = text
+    .split(JOINED_SPLIT)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (joined.length > 1 && joined.every((p) => isRetrieved(labelDoc(p), chunkDocs))) return joined;
   return [text];
 }
 
 /** The cited pages from a label such as "doc (pages 4-6)"; just the server's page when no range is written. */
 function citedPages(label: string | undefined, page: number | null | undefined): [number, number] | null {
-  const text = (label ?? "").trim();
-  for (const pattern of [WITH_PAGE_PAREN, WITH_PAGE_COMMA]) {
+  const text = bareLabel(label ?? "");
+  for (const pattern of [WITH_PAGE_PAREN, WITH_PAGE_COMMA, WITH_PAGE_SPACE]) {
     const m = pattern.exec(text);
     if (!m) continue;
     const lo = Number(m[2]);

@@ -20,6 +20,13 @@ parenthesis that names an unknown document is ignored rather than flagged, becau
 things too. Markdown emphasis and a leading "see" are dropped from its label; the web app strips them the same way.
 
 A page range ("pages 118-120") is verified when any page in the range was retrieved; `page` is its first page.
+
+Models vary the format, so these all read as the same citation: "doc page 3", "doc, Page: 3", "doc: Dsa.pdf, page: 3",
+"*doc*, p. 3", "pages 3 to 5", "pages 3—5", "pages 3, 5-6", "pages 3 and 5", "a.pdf (page 3) and b.md". A page written
+after a bare space only counts when the text before it is a known document or a file name, so "[see page 3]" stays
+ordinary text. An invented source with neither a page nor a file extension ("[Some Book]") cannot be told from ordinary
+bracketed text and is not flagged, unless it carries an explicit empty page ("[Some Book (page None)]").
+The web parser (apps/web/features/ask/citations.ts) mirrors this; tests/fixtures/citation_labels.json is run against both.
 """
 
 from __future__ import annotations
@@ -28,12 +35,20 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
-_BRACKET = re.compile(r"(?<![\w\])])\[([^\[\]\n]{3,200})\](?!\()")
-_PAGE = r"(?:pages?|pp?\.?)\s*(\d+)(?:\s*[-–]\s*(\d+))?"
+_BRACKET = re.compile(r"(?<![\w)])\[([^\[\]\n]{3,200})\](?!\()")
+_RANGE = r"(?:\s*[-–—‒‑]\s*|\s+to\s+)"
+_PAGE_WORD = r"(?:pages?|pgs?\.?|pp?\.?)(?:\s*no\.?)?\s*[:=#]?"
+_PAGE = rf"{_PAGE_WORD}\s*(\d+)(?:{_RANGE}(\d+))?"
+_DOC_SEP = r"[,;:·–—-]"
 _WITH_PAGE_PAREN = re.compile(rf"^(?P<doc>.+?)\s*\(\s*{_PAGE}\s*\)\s*$", re.I)
-_WITH_PAGE_COMMA = re.compile(rf"^(?P<doc>.+?)\s*[,;:·–-]\s*{_PAGE}\s*$", re.I)
-_PAGES = r"(?:pages?|pp?\.?)\s*\d+(?:\s*[,;&]\s*(?:(?:pages?|pp?\.?)\s*)?\d+)+"
-_PAGE_LIST = re.compile(rf"^(?P<doc>.+?)\s*(?:\(\s*(?P<p1>{_PAGES})\s*\)|[,;:·–-]\s*(?P<p2>{_PAGES}))\s*$", re.I)
+_WITH_PAGE_COMMA = re.compile(rf"^(?P<doc>.+?)\s*{_DOC_SEP}\s*{_PAGE}\s*$", re.I)
+_WITH_PAGE_SPACE = re.compile(rf"^(?P<doc>.+?)\s+{_PAGE}\s*$", re.I)
+_ITEM = rf"\d+(?:{_RANGE}\d+)?"
+_LIST_SEP = r"\s*(?:[,;&]\s*(?:and\s+)?|and\s+)"
+_PAGES = rf"{_PAGE_WORD}\s*{_ITEM}(?:{_LIST_SEP}(?:{_PAGE_WORD}\s*)?{_ITEM})+"
+_PAGE_LIST = re.compile(rf"^(?P<doc>.+?)\s*(?:\(\s*(?P<p1>{_PAGES})\s*\)|{_DOC_SEP}\s*(?P<p2>{_PAGES}))\s*$", re.I)
+_PAGE_LIST_SPACE = re.compile(rf"^(?P<doc>.+?)\s+(?P<p1>{_PAGES})\s*$", re.I)
+_LABEL_LEAD = re.compile(r"^(?:doc(?:ument)?|source|file)\s*:\s*", re.I)
 # A prose parenthesis that may hold citations: no brackets inside (a bracket citation is handled on its own), one
 # level of nested parentheses allowed ("(doc.pdf (page 3))"), and never a Markdown link target "](...)".
 _PAREN = re.compile(r"(?<![\]\w])\(((?:[^()\[\]\n]|\([^()\[\]\n]*\)){3,300})\)")
@@ -65,7 +80,16 @@ def _doc_keys(name: str) -> set:
     return {base, stem}
 
 
-_NO_PAGE = re.compile(r"\s*\(\s*(?:(?:pages?|pp?\.?)\s*)?(?:none|n/?a|null|nil|unknown|-)\s*\)\s*$", re.I)
+_NO_PAGE = re.compile(r"\s*(?:\(\s*(?:(?:pages?|pp?\.?)\s*:?\s*)?(?:none|n/?a|null|nil|unknown|-)\s*\)|,\s*(?:pages?|pp?\.?)\s*:?\s*(?:none|n/?a|null|nil|unknown|-))\s*$", re.I)
+
+
+def _page_labels(doc: str, pages: str) -> List[str]:
+    """One label per page or range of a page list."""
+    out = []
+    for item in re.findall(_ITEM, pages, re.I):
+        numbers = re.findall(r"\d+", item)
+        out.append(f"{doc} (page {numbers[0]})" if len(numbers) == 1 else f"{doc} (pages {numbers[0]}-{numbers[1]})")
+    return out
 
 
 def _split_multi(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]:
@@ -74,15 +98,27 @@ def _split_multi(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]
     can also belong to a title."""
     listed = _PAGE_LIST.match(inner)
     if listed:  # "doc (page 58, page 170)", "doc (pages 58, 59)" or "doc, pages 58, 170": one citation per page
-        return [f"{listed.group('doc')} (page {n})" for n in re.findall(r"\d+", listed.group("p1") or listed.group("p2"))]
-    parts = [p.strip() for p in re.split(r"(?<=\))\s*[,;]\s*|\s*;\s*", inner) if p.strip()]
+        return _page_labels(listed.group("doc"), listed.group("p1") or listed.group("p2"))
+    spaced = _PAGE_LIST_SPACE.match(inner)
+    if spaced and _names_a_document(spaced.group("doc"), docs):  # "doc pages 58 and 170"
+        return _page_labels(spaced.group("doc"), spaced.group("p1"))
+    parts = [p.strip() for p in re.split(r"(?<=\))\s*(?:[,;&]|(?i:and)\b)\s*|\s*;\s*", inner) if p.strip()]
     if len(parts) > 1:
         return parts
     if "," in inner:
         pieces = [p.strip() for p in inner.split(",") if p.strip()]
         if len(pieces) > 1 and all(any(k in docs for k in _doc_keys(p)) for p in pieces):
             return pieces
+    # "a.pdf, page 3, b.md" or "a.pdf and b.md": split only when every part names a retrieved document.
+    pieces = [p.strip() for p in re.split(rf"(?<=\d)\s*,\s*(?!\d|{_PAGE_WORD}\s*\d)|\s+(?:(?i:and)|&)\s+", inner) if p.strip()]
+    if len(pieces) > 1 and all(_match_doc(_parse(p)["doc"], docs)[0] is not None for p in pieces):
+        return pieces
     return [inner.strip()]
+
+
+def _names_a_document(text: str, docs: Dict[str, List[Dict[str, Any]]]) -> bool:
+    clean = _LABEL_LEAD.sub("", re.sub(r"[*`]", "", text).strip())
+    return bool(_EXTENSION.search(clean)) or _match_doc(clean, docs)[0] is not None
 
 
 # Sources without pages (Markdown, web pages, transcripts) are often cited by document and section, for example
@@ -106,12 +142,24 @@ def _match_doc(doc_text: str, docs: Dict[str, List[Dict[str, Any]]]) -> tuple:
 
 def _parse(inner: str) -> Optional[Dict[str, Any]]:
     """(doc, page, has_page_suffix) from the text inside brackets, or None if it cannot be a citation."""
-    text = _NO_PAGE.sub("", inner.strip())  # "(page None)": a source without pages, cited as written
+    raw = inner.strip()
+    text = _NO_PAGE.sub("", raw)  # "(page None)": a source without pages, cited as written
+    marked_no_page = text != raw
+    text = _LABEL_LEAD.sub("", re.sub(r"[*`]", "", text).strip())
     for pattern in (_WITH_PAGE_PAREN, _WITH_PAGE_COMMA):
         m = pattern.match(text)
         if m:
             return {"doc": m.group("doc").strip(" ,;:"), "page": int(m.group(2)), "end": m.group(3), "suffix": True}
-    return {"doc": text, "page": None, "end": None, "suffix": False}
+    m = _WITH_PAGE_SPACE.match(text)
+    if m:  # no separator: a citation only if the rest names a document, which the caller checks
+        return {"doc": m.group("doc").strip(" ,;:"), "page": int(m.group(2)), "end": m.group(3), "suffix": False}
+    return {"doc": text, "page": None, "end": None, "suffix": marked_no_page}
+
+
+def _wanted_pages(parsed: Dict[str, Any]) -> set:
+    lo = parsed["page"]
+    hi = int(parsed["end"]) if parsed["end"] else lo
+    return set(range(lo, hi + 1)) if hi >= lo and hi - lo < 50 else {lo}
 
 
 def clean_paren(inner: str) -> str:
@@ -180,9 +228,7 @@ def extract_citations(answer: str, chunks: Sequence[Dict[str, Any]]) -> List[Cit
         elif parsed["page"] is None:
             status = "ok"
         else:
-            lo = parsed["page"]
-            hi = int(parsed["end"]) if parsed["end"] else lo
-            wanted = set(range(lo, hi + 1)) if hi >= lo and hi - lo < 50 else {lo}
+            wanted = _wanted_pages(parsed)
             status = "ok" if any(wanted & _pages_of(c) for c in matches) else "page_not_retrieved"
         key = (raw.lower(), status)
         if key in seen:
@@ -199,6 +245,29 @@ def _pages_of(chunk: Dict[str, Any]) -> set:
     if end and end >= page:
         return set(range(page, end + 1))
     return {page}
+
+
+def passages_to_show(answer: str, passages: Sequence[Dict[str, Any]], limit: int = 12) -> List[Dict[str, Any]]:
+    """The passages to send with an answer: at most `limit`, except that a passage backing a verified citation is never
+    left out, so every citation checked against `passages` can open its evidence. Original order is kept."""
+    docs = _index(passages)
+    position = {id(p): i for i, p in enumerate(passages)}
+    keep = set()
+    for c in extract_citations(answer, passages):
+        if c.status != "ok":
+            continue
+        parsed = _parse(c.label)
+        matches = _match_doc(parsed["doc"], docs)[0] or []
+        if parsed["page"] is not None:
+            wanted = _wanted_pages(parsed)
+            matches = [m for m in matches if wanted & _pages_of(m)]
+        if matches and not any(id(m) in {id(passages[i]) for i in keep} for m in matches):
+            keep.add(position[id(matches[0])])
+    for i in range(len(passages)):
+        if len(keep) >= limit:
+            break
+        keep.add(i)
+    return [passages[i] for i in sorted(keep)]
 
 
 def check_answer(answer: str, chunks: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
