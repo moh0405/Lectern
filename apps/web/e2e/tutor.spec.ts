@@ -91,7 +91,17 @@ test("old tutor addresses redirect to each tool's own page", async ({ page }) =>
 test("a redirect keeps the other query parameters", async ({ page }) => {
   await page.goto("/tutor?tool=synthesis&topic=Heaps");
   expect(new URL(page.url()).pathname).toBe("/compare");
+  expect(new URL(page.url()).search).toBe("?topic=Heaps"); // the old `tool` parameter is dropped
   await expect(page.getByLabel(/Topic to compare/)).toHaveValue("Heaps");
+});
+
+test("a redirect drops the old tool parameter", async ({ page, request }) => {
+  const response = await request.get("/tutor?tool=map", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  const location = new URL(response.headers().location ?? "", "http://localhost");
+  expect(location.pathname + location.search).toBe("/concept-map");
+  await page.goto("/tutor?tool=map");
+  expect(page.url()).toMatch(/\/concept-map$/);
 });
 
 test("Ask's Go further links open each tool prefilled, without running it", async ({ page }) => {
