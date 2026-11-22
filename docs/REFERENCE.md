@@ -290,6 +290,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
 | `MAX_UPLOAD_MB` | No | `50` | Per-file upload limit |
 | `AGENT_ALLOW_WRITES` | No | off | Set to `1` to let the tool-using agent save flashcards. Never set it on a public deployment. |
+| `AGENT_DEADLINE_S` | No | `100` | The tool-using agent's stream ends with `error` code `timeout` this many seconds after the request arrived. Keep it under the Lambda timeout (120 s). |
+| `STREAM_KEEPALIVE_S` | No | `10` | Seconds of silence after which the agent stream sends a `: keep-alive` comment. |
 | `GEMINI_TIMEOUT_S` | No | `30` | Per-attempt time limit for model calls |
 | `RATE_LIMIT_PER_MIN` | No | `60` | Per-IP request limit for `/api/v1` |
 | `UPLOAD_DIR`, `STORE_DIR`, `ANALYTICS_DB`, `STUDY_DB` | No | `data/uploaded_files`, `data/vector_store`, `data/analytics.db`, `data/study.db` | Where the API keeps files, the index, analytics, and your flashcards / LeetCode progress / saved history |

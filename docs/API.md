@@ -196,6 +196,8 @@ The model decides what to do. Body: `{task, max_steps (1-8, default 6), model?, 
 
 Bounds: at most 4 tool calls per turn; an identical repeated call is refused; each tool result is cut at 6,000 characters; every model turn counts against the daily cap. A tool failure is returned to the model as `{"error": ...}` so it can recover. Needs the Gemini provider (other providers answer `tools_unsupported`) and the `agent` extra (`503 agent_unavailable` without it).
 
+
+The stream always ends with `done` or `error`. It opens with an SSE comment line (`: stream open`) and sends `: keep-alive` comments whenever nothing else has gone out for `STREAM_KEEPALIVE_S` seconds (default 10), for example while a model call is pending; SSE readers ignore comments. A run still going `AGENT_DEADLINE_S` seconds (default 100) after the request arrived ends with `error` code `timeout`, so the stream finishes before the Lambda's 120 s limit can cut it off silently. A model failure mid-run (out of quota, overloaded after retries) ends with a typed `error` (`quota_exhausted`, `daily_limit`, `llm_error`); after the first turn the conversation stays on one model, so it does not fail over.
 ## Indexing a PDF
 
 ```bash
