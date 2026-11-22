@@ -10,7 +10,7 @@ export interface AgentStep {
 }
 
 /** What a turn needs to ask for its cited answer later ("Show me the evidence"). */
-export interface AskSettings { question: string; mode?: Mode; k: number; temperature: number; model?: string; showPrompt?: boolean; local?: boolean; agent?: boolean }
+export interface AskSettings { question: string; mode?: Mode; k: number; temperature: number; model?: string; showPrompt?: boolean; local?: boolean; agent?: boolean; passages?: components["schemas"]["ContextPassage"][] }
 
 export interface Guided {
   params: AskSettings;
@@ -32,6 +32,11 @@ export interface Attempt {
   feedback?: AttemptFeedback;
   evidenceStarted: boolean;
 }
+
+/** A practice question written from this turn's passages. Its answer is never sent to the browser. */
+export interface SimilarExample { question: string; citations: CitationCheck[] }
+/** The same idea explained at another level. */
+export interface Explanation { answer: string; warning?: string }
 
 export interface Turn {
   id: string;
@@ -56,6 +61,13 @@ export interface Turn {
   local?: boolean;
   guided?: Guided;
   attempt?: Attempt;
+  /** The learner's own-words note. */
+  note?: string;
+  /** This turn's row in the server's history, once saved. */
+  serverId?: number;
+  /** Kept on the turn so nothing is fetched twice. */
+  similar?: SimilarExample[];
+  explanations?: Record<string, Explanation>;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
@@ -75,6 +87,10 @@ export type Action =
   | { type: "error"; id: string; code: string; message: string }
   | { type: "stop"; id: string }
   | { type: "remove"; id: string }
+  | { type: "note"; id: string; note: string }
+  | { type: "saved"; id: string; serverId: number }
+  | { type: "similar"; id: string; example: SimilarExample }
+  | { type: "explanation"; id: string; level: string; explanation: Explanation }
   | { type: "clear" }
   | { type: "hydrate"; turns: Turn[] }
   /** Turns loaded from the server; applied only while this browser has none of its own. */
@@ -132,6 +148,14 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
       return update(turns, action.id, (t) => ({ ...t, status: "error", error: { code: action.code, message: action.message } }));
     case "stop":
       return update(turns, action.id, (t) => (t.status === "streaming" ? { ...t, status: "stopped" } : t));
+    case "note":
+      return update(turns, action.id, (t) => ({ ...t, note: action.note || undefined }));
+    case "saved":
+      return update(turns, action.id, (t) => ({ ...t, serverId: action.serverId }));
+    case "similar":
+      return update(turns, action.id, (t) => ({ ...t, similar: [...(t.similar ?? []), action.example] }));
+    case "explanation":
+      return update(turns, action.id, (t) => ({ ...t, explanations: { ...t.explanations, [action.level]: action.explanation } }));
     case "remove":
       return turns.filter((t) => t.id !== action.id);
     case "clear":
@@ -197,6 +221,7 @@ export function toHistoryTurn(t: Turn): HistoryTurn {
     citations: t.citations ?? [],
     unverified_citations: (t.citations ?? []).filter((c) => c.status !== "ok").length,
     uncited: t.uncited ?? false,
+    ...(t.note ? { note: t.note } : {}),
   };
 }
 
@@ -212,6 +237,8 @@ export function fromSavedTurn(s: SavedTurn): Turn {
     chunks: s.chunks ?? [],
     citations: s.citations ?? [],
     uncited: s.uncited ?? false,
+    note: s.note ?? undefined,
+    serverId: s.id,
     status: "done",
   };
 }

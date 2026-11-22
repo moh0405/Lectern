@@ -24,6 +24,8 @@ import type { AttemptFormat, Mode, Turn } from "./session";
 import { SourceMargin } from "./source-margin";
 import { TraceLine } from "./trace-line";
 import { TurnCard } from "./turn-card";
+import { toPassages, type ContextPassage } from "./understanding";
+import { UnderstandingTools } from "./understanding-panel";
 import { NARROW_QUERY, prefersReducedMotion, useMedia } from "./use-media";
 import { useAskSession } from "./use-ask-session";
 import styles from "./ask.module.css";
@@ -205,7 +207,7 @@ function Library({ turns, activeId, onPick, onClear, demo }: { turns: Turn[]; ac
 }
 
 export function AskView() {
-  const { turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy } = useAskSession();
+  const { saveNote, addSimilar, addExplanation, turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy } = useAskSession();
   const [approach, setApproach] = useState<Approach>("answer");
   const guided = approach === "guided";
   const trying = approach === "try";
@@ -217,6 +219,8 @@ export function AskView() {
   const composerRef = useRef<HTMLFormElement>(null);
   const [language, setLanguage] = useState(CODE_LANGUAGES[0]!);
   const [question, setQuestion] = useState("");
+  // A similar example waiting in the composer: judged against the passages it was written from while its text is unchanged.
+  const [practice, setPractice] = useState<{ question: string; passages: ContextPassage[]; local: boolean } | null>(null);
   const [mode, setMode] = useState<"" | Mode>("");
   const [k, setK] = useState(3);
   const [temperature, setTemperature] = useState(0.2);
@@ -418,6 +422,17 @@ export function AskView() {
   const overLimit = question.length > limit;
   const nearLimit = question.length > limit * 0.8;
 
+  const practising = practice !== null && trying && question.trim() === practice.question;
+  const practise = (t: Turn, q: string) => {
+    setPractice({ question: q, passages: toPassages(t.chunks), local: Boolean(t.local) });
+    setApproach("try");
+    setAttemptFormat("short_answer");
+    setAttempt("");
+    setQuestion(q);
+    openAttempt();
+    announce("Practice question is in the composer. Write your attempt, then check it.");
+  };
+
   const submit = (text: string) => {
     const q = text.trim();
     if (busy) {
@@ -437,10 +452,11 @@ export function AskView() {
     setStep("question");
     if (advancedRef.current?.open) advancedRef.current.open = false; // the panel floats over the answer
     announce(trying ? "Checking your attempt against your sources…" : local ? "Searching your browser documents…" : "Searching your material…");
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly: searchOnly, guided, local, agent: agentic,
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly: searchOnly, guided, local: practising ? practice.local : local, agent: !practising && agentic, passages: practising ? practice.passages : undefined,
       attempt: trying ? { text: attempt, format: attemptFormat, language: attemptFormat === "code" ? language : undefined } : undefined });
     setReveal((n) => n + 1);
     setQuestion("");
+    setPractice(null);
     if (trying) {
       setAttempt("");
       setAttemptOpen(false);
@@ -576,6 +592,7 @@ export function AskView() {
                   <p className="eyebrow">Understanding / something to keep</p>
                   <h2 id="understanding-title">Make the idea yours.</h2>
                   <p className={styles.understandingLead}>Keep the source open, then turn what you read into something you can review later.</p>
+                  <UnderstandingTools key={active.id} turn={active} busy={busy} onSaveNote={saveNote} onSimilar={addSimilar} onExplanation={addExplanation} onPractise={practise} announce={announce} />
                   <div className={styles.nextSteps}>
                     <Link href="/study">
                       Review your flashcards <ArrowUpRight aria-hidden="true" />
@@ -835,7 +852,7 @@ export function AskView() {
             ) : overLimit ? (
               <span className={styles.footHint}>A passage-only search takes up to {MAX_SEARCH} characters. Shorten the question or turn the option off.</span>
             ) : (
-              <span>{local ? "Searching your browser documents" : "Searching your study material"}</span>
+              <span>{practising ? "Checking against the passages this question came from" : local ? "Searching your browser documents" : "Searching your study material"}</span>
             )}
             <span className={styles.kbdHint}>
               <kbd>⌘ / Ctrl + Enter</kbd> to send
