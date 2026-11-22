@@ -123,6 +123,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempt/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Feedback on your own attempt, checked against your sources (never the full solution)
+         * @description Splits the attempt into steps, code lines or sentences and judges each one as `supported`, `contradicted` or `not_covered` by the passages retrieved for the question (or the `context` given). Each verdict's citations are checked against those passages the same way `/ask` checks an answer; a verdict without a verified citation has `checked: false` and should be shown as not checked against your sources. The feedback gives pointers only: ask `/ask` ("Show me the evidence") for the answer. One model call per request; nothing is cached or stored.
+         */
+        post: operations["feedback_api_v1_attempt_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cards": {
         parameters: {
             query?: never;
@@ -847,6 +867,121 @@ export interface components {
              * @description How many citations are not among the retrieved passages
              */
             unverified_citations: number;
+        };
+        /** AttemptFeedback */
+        AttemptFeedback: {
+            /**
+             * Chunks
+             * @description The passages the attempt was judged against
+             */
+            chunks: components["schemas"]["Chunk"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "steps" | "code" | "short_answer";
+            /**
+             * Items
+             * @description One verdict per judged unit, in order. Units without an item were not judged
+             */
+            items: components["schemas"]["AttemptItem"][];
+            /** Model */
+            model?: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Units
+             * @description The attempt as it was split for judging: steps, code lines or sentences
+             */
+            units: string[];
+            /**
+             * Unverified Citations
+             * @default 0
+             */
+            unverified_citations?: number;
+            /**
+             * Withheld
+             * @description Notes replaced by a neutral pointer because they gave the answer away
+             * @default 0
+             */
+            withheld?: number;
+        };
+        /** AttemptFeedbackRequest */
+        AttemptFeedbackRequest: {
+            /**
+             * Attempt
+             * @description The student's own attempt, written before seeing an answer
+             */
+            attempt: string;
+            /**
+             * Context
+             * @description Judge against these passages instead of the server index (for example the visitor's browser documents). Nothing is stored or recorded.
+             */
+            context?: components["schemas"]["ContextPassage"][] | null;
+            /**
+             * Format
+             * @description steps: one step per line. code: a program, judged line by line. short_answer: a paragraph, judged sentence by sentence.
+             * @default steps
+             * @enum {string}
+             */
+            format?: "steps" | "code" | "short_answer";
+            /**
+             * K
+             * @description Number of passages to judge against (ignored when `context` is given)
+             * @default 3
+             */
+            k?: number;
+            /**
+             * Language
+             * @description Programming language of a `code` attempt, for the rubric
+             */
+            language?: string | null;
+            /**
+             * Model
+             * @description A model named here is used as is, never swapped for another
+             */
+            model?: string | null;
+            /** Question */
+            question: string;
+            /**
+             * Temperature
+             * @default 0.2
+             */
+            temperature?: number;
+        };
+        /** AttemptItem */
+        AttemptItem: {
+            /**
+             * Checked
+             * @description True when the verdict is supported or contradicted and at least one of its citations is verified. Otherwise the verdict was not checked against your sources and should be shown as such.
+             */
+            checked: boolean;
+            /**
+             * Citations
+             * @description The passages the verdict relies on, checked like Ask's citations
+             */
+            citations: components["schemas"]["CitationCheck"][];
+            /**
+             * Note
+             * @description A pointer for the student. Never the corrected step or the solution
+             */
+            note: string;
+            /**
+             * Ref
+             * @description How to name the unit, e.g. 'Step 2', 'Line 5', 'Sentence 1'
+             */
+            ref: string;
+            /**
+             * Unit
+             * @description 1-based index into `units`
+             */
+            unit: number;
+            /**
+             * Verdict
+             * @description supported or contradicted by the passages, or not_covered by them
+             * @enum {string}
+             */
+            verdict: "supported" | "contradicted" | "not_covered";
         };
         /** Body_upload_files_api_v1_sources_files_post */
         Body_upload_files_api_v1_sources_files_post: {
@@ -2453,6 +2588,102 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    feedback_api_v1_attempt_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptFeedback"];
                 };
             };
             /** @description Bad Request */

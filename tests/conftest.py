@@ -39,6 +39,7 @@ def fake_gemini(monkeypatch):
         "backend.api.routers.agent.create_llm",
         "backend.api.routers.tracking.create_llm",
         "backend.advanced_ai.create_llm",
+        "backend.attempt_feedback.create_llm",
         "backend.leetcode_handler.create_llm",
     ):
         monkeypatch.setattr(target, FakeGemini)

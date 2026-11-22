@@ -113,6 +113,8 @@ Each phase ends with passing checks and is its own PR. Phases 1–2 deliver the 
 
 **Done when:** feedback is grounded and cited, wrong steps are flagged in the eval set, OpenAPI client regenerated, CI green.
 
+*Built (decision 2: a composer toggle):* the Answer / Guided radios became one segmented radio group (`components/ui/segmented.tsx`, 44px targets on phones) with **Try first** as the third option. Code: `backend/attempt_feedback.py`, `backend/api/routers/attempt.py`, `features/ask/{attempt.ts,attempt-feedback.tsx}`. A verdict that has no verified citation is shown as "unchecked"; notes that restate the hidden answer key (or contain code) are replaced by a neutral pointer. "Show me the evidence" asks for the cited answer into the same turn, and the passages the feedback cited stay reachable after it. Eval: `eval/attempts.jsonl`, `python -m eval.attempt_eval`.
+
 ### Phase 4: Understanding step
 - **In your own words:** an editable note seeded from the answer's key distinction. Saved to the session notes (and `/history` when writes are allowed; browser storage in demo).
 - **Similar example:** generate one new practice question on the same concept from the same passages, with the answer hidden behind a Try first flow (reuses Phase 3). Implement as an `/adaptive`-style call or a small `POST /practice/similar` endpoint (decide when building; prefer extending an existing route).

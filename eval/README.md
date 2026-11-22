@@ -1,5 +1,10 @@
 # Retrieval evaluation
 
+> **Try first feedback** has its own small eval: `python -m eval.attempt_eval` scores 15 labelled attempts
+> (`attempts.jsonl`, 10 with deliberately wrong steps) offline with the scripted baseline judge, and
+> `--outputs`/`--live --save` re-score saved or live model replies. CI runs it without a model. See
+> [`reports/attempts.md`](reports/attempts.md) and the docstring of `attempt_eval.py`.
+
 Measures how well the retriever finds the passage that answers a question, so every change to
 chunking, search or ranking shows up as a number instead of a feeling.
 

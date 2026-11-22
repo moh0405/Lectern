@@ -10,6 +10,38 @@ import json
 import re
 
 
+_WORD = re.compile(r"[a-z][a-z0-9]{3,}")
+_NEGATION = re.compile(r"\b(not|never|no|cannot|can't|doesn't|isn't|don't|without)\b", re.I)
+_HEDGE = re.compile(r"\b(i think|maybe|probably|i guess)\b", re.I)
+
+
+def scripted_attempt_feedback(prompt: str) -> dict:
+    """A deterministic judge for Try first feedback, so tests and the e2e server need no model. Not a real tutor: a unit
+    sharing two or more words with a passage is judged against it (contradicted when the unit is negated, supported
+    otherwise, and supported but uncited when it hedges with "I think"/"maybe"); anything else is not covered."""
+    passages = re.findall(r"^- \[(.+?)\] (.+)$", prompt, re.M)
+    units = re.findall(r"^(Step|Line|Sentence) (\d+): (.+)$", prompt, re.M)
+    items = []
+    for _kind, n, text in units:
+        words = set(_WORD.findall(text.lower()))
+        best, overlap = None, 0
+        for label, body in passages:
+            shared = len(words & set(_WORD.findall(body.lower())))
+            if shared > overlap:
+                best, overlap = label, shared
+        if best is None or overlap < 2:
+            items.append({"unit": int(n), "verdict": "not_covered", "note": "Your passages do not mention this.", "citations": []})
+        elif _HEDGE.search(text):
+            items.append({"unit": int(n), "verdict": "supported", "note": "This sounds right, but say which passage backs it.", "citations": []})
+        elif _NEGATION.search(text):
+            items.append({"unit": int(n), "verdict": "contradicted", "note": f"Compare this with what {best} says.", "citations": [best]})
+        else:
+            items.append({"unit": int(n), "verdict": "supported", "note": f"This matches {best}.", "citations": [best]})
+    wrong = [i["unit"] for i in items if i["verdict"] == "contradicted"]
+    summary = f"Look at step {wrong[0]} first." if wrong else "Your attempt is on track so far."
+    return {"answer_key": "", "summary": summary, "items": items}
+
+
 class FakeGemini:
     """Stand-in for GeminiClient. Override `FakeGemini.handler` in a test to script replies."""
 
@@ -27,6 +59,8 @@ class FakeGemini:
 
     @staticmethod
     def default_reply(prompt: str, json_mode: bool) -> str:
+        if "TASK: ATTEMPT_FEEDBACK" in prompt:
+            return json.dumps(scripted_attempt_feedback(prompt))
         if "TASK: REWRITE_QUERY" in prompt:  # the agentic workflow's planning calls
             return json.dumps({"query": "binary heap priority queue data structure"})
         if "TASK: GRADE_PASSAGES" in prompt:

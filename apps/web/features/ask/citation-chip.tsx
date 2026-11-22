@@ -9,6 +9,8 @@ import { CITE_PREFIX, twoDigits, type CiteRef, type LinkedAnswer } from "./citat
 export interface Selection {
   ref: number | null;
   chunk: number | null;
+  /** Text the passage should be highlighted against when no citation is selected (a step of a Try first attempt). */
+  sentence?: string;
 }
 
 export const CITE_PROBLEM: Record<string, string> = {

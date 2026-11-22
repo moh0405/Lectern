@@ -469,6 +469,221 @@
         "title": "AskResponse",
         "type": "object"
       },
+      "AttemptFeedback": {
+        "properties": {
+          "chunks": {
+            "description": "The passages the attempt was judged against",
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "steps",
+              "code",
+              "short_answer"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "items": {
+            "description": "One verdict per judged unit, in order. Units without an item were not judged",
+            "items": {
+              "$ref": "#/components/schemas/AttemptItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "units": {
+            "description": "The attempt as it was split for judging: steps, code lines or sentences",
+            "items": {
+              "type": "string"
+            },
+            "title": "Units",
+            "type": "array"
+          },
+          "unverified_citations": {
+            "default": 0,
+            "title": "Unverified Citations",
+            "type": "integer"
+          },
+          "withheld": {
+            "default": 0,
+            "description": "Notes replaced by a neutral pointer because they gave the answer away",
+            "title": "Withheld",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "format",
+          "units",
+          "items",
+          "summary",
+          "chunks"
+        ],
+        "title": "AttemptFeedback",
+        "type": "object"
+      },
+      "AttemptFeedbackRequest": {
+        "properties": {
+          "attempt": {
+            "description": "The student's own attempt, written before seeing an answer",
+            "maxLength": 6000,
+            "minLength": 1,
+            "title": "Attempt",
+            "type": "string"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContextPassage"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Judge against these passages instead of the server index (for example the visitor's browser documents). Nothing is stored or recorded.",
+            "title": "Context"
+          },
+          "format": {
+            "default": "steps",
+            "description": "steps: one step per line. code: a program, judged line by line. short_answer: a paragraph, judged sentence by sentence.",
+            "enum": [
+              "steps",
+              "code",
+              "short_answer"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "k": {
+            "default": 3,
+            "description": "Number of passages to judge against (ignored when `context` is given)",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Programming language of a `code` attempt, for the rubric",
+            "title": "Language"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A model named here is used as is, never swapped for another",
+            "title": "Model"
+          },
+          "question": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Question",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.2,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "question",
+          "attempt"
+        ],
+        "title": "AttemptFeedbackRequest",
+        "type": "object"
+      },
+      "AttemptItem": {
+        "properties": {
+          "checked": {
+            "description": "True when the verdict is supported or contradicted and at least one of its citations is verified. Otherwise the verdict was not checked against your sources and should be shown as such.",
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "citations": {
+            "description": "The passages the verdict relies on, checked like Ask's citations",
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "note": {
+            "description": "A pointer for the student. Never the corrected step or the solution",
+            "title": "Note",
+            "type": "string"
+          },
+          "ref": {
+            "description": "How to name the unit, e.g. 'Step 2', 'Line 5', 'Sentence 1'",
+            "title": "Ref",
+            "type": "string"
+          },
+          "unit": {
+            "description": "1-based index into `units`",
+            "title": "Unit",
+            "type": "integer"
+          },
+          "verdict": {
+            "description": "supported or contradicted by the passages, or not_covered by them",
+            "enum": [
+              "supported",
+              "contradicted",
+              "not_covered"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "ref",
+          "verdict",
+          "note",
+          "citations",
+          "checked"
+        ],
+        "title": "AttemptItem",
+        "type": "object"
+      },
       "Body_upload_files_api_v1_sources_files_post": {
         "properties": {
           "files": {
@@ -3794,6 +4009,118 @@
         "summary": "Stream an answer as Server-Sent Events",
         "tags": [
           "ask"
+        ]
+      }
+    },
+    "/api/v1/attempt/feedback": {
+      "post": {
+        "description": "Splits the attempt into steps, code lines or sentences and judges each one as `supported`, `contradicted` or `not_covered` by the passages retrieved for the question (or the `context` given). Each verdict's citations are checked against those passages the same way `/ask` checks an answer; a verdict without a verified citation has `checked: false` and should be shown as not checked against your sources. The feedback gives pointers only: ask `/ask` (\"Show me the evidence\") for the answer. One model call per request; nothing is cached or stored.",
+        "operationId": "feedback_api_v1_attempt_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttemptFeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptFeedback"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Feedback on your own attempt, checked against your sources (never the full solution)",
+        "tags": [
+          "tutor"
         ]
       }
     },

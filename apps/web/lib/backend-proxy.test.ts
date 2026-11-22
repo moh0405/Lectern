@@ -16,6 +16,12 @@ describe("isAllowed", () => {
       expect(isAllowed(m!, p!), `${m} ${p}`).toBe(false);
     }
   });
+  it("lets Try first feedback through, but only as a POST to that exact route", () => {
+    expect(isAllowed("POST", "attempt/feedback")).toBe(true);
+    expect(isAllowed("GET", "attempt/feedback")).toBe(false);
+    expect(isAllowed("POST", "attempt/feedback/extra")).toBe(false);
+    expect(isAllowed("POST", "attempt")).toBe(false);
+  });
   it("does not match on a prefix", () => {
     expect(isAllowed("GET", "search/../history")).toBe(false);
     expect(isAllowed("GET", "documents/extra")).toBe(false);
@@ -123,7 +129,7 @@ describe("cold-start retries", () => {
   });
 
   it("never retries a POST or a model call", async () => {
-    for (const path of ["ask", "ask/stream", "math", "socratic"]) {
+    for (const path of ["ask", "ask/stream", "math", "socratic", "attempt/feedback"]) {
       const fetchMock = vi.fn(async () => { throw new TypeError("fetch failed"); });
       vi.stubGlobal("fetch", fetchMock);
       const res = await createForwarder({ sleep: noWait })(new Request("https://app.example/x", { method: "POST", body: "{}" }), ["api", "v1", ...path.split("/")], cfg);

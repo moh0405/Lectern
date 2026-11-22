@@ -1,24 +1,26 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, PenLine, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { Segmented } from "@/components/ui/segmented";
 import { EmptyState } from "@/components/ui/feedback";
 import { useLocalDocs } from "@/lib/browser-rag/use-local-docs";
 import { useDemo } from "@/lib/demo";
 import { api, unwrap } from "@/lib/api";
 import { plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ATTEMPT_FORMATS, CODE_LANGUAGES, feedbackMessage, MAX_ATTEMPT } from "./attempt";
 import type { Selection } from "./citation-chip";
 import { linkCitations, type CiteRef } from "./citations";
 import { finishedMessage, groundingOf } from "./grounding";
 import { InlinePassage } from "./inline-passage";
 import { NotesPanel } from "./notes-panel";
-import type { Mode, Turn } from "./session";
+import type { AttemptFormat, Mode, Turn } from "./session";
 import { SourceMargin } from "./source-margin";
 import { TraceLine } from "./trace-line";
 import { TurnCard } from "./turn-card";
@@ -32,6 +34,13 @@ const MODES: { value: "" | Mode; label: string }[] = [
   { value: "technical", label: "Technical" },
   { value: "interview", label: "Interview prep" },
   { value: "summary", label: "Quick summary" },
+];
+
+type Approach = "answer" | "guided" | "try";
+const APPROACHES: { value: Approach; label: string; description: string }[] = [
+  { value: "answer", label: "Answer", description: "A cited answer straight away." },
+  { value: "guided", label: "Guided", description: "Hints first, then the cited answer when you ask." },
+  { value: "try", label: "Try first", description: "Write your own attempt and get feedback checked against your sources, then the answer when you ask." },
 ];
 
 const STARTERS = ["Explain dynamic programming", "What is a hash table?", "Difference between BFS and DFS", "How does quicksort work?"];
@@ -196,8 +205,17 @@ function Library({ turns, activeId, onPick, onClear, demo }: { turns: Turn[]; ac
 }
 
 export function AskView() {
-  const { turns, ask, nextHint, retryHints, showEvidence, stop, remove, clear, busy } = useAskSession();
-  const [guided, setGuided] = useState(false);
+  const { turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy } = useAskSession();
+  const [approach, setApproach] = useState<Approach>("answer");
+  const guided = approach === "guided";
+  const trying = approach === "try";
+  const [attempt, setAttempt] = useState("");
+  const [attemptFormat, setAttemptFormat] = useState<AttemptFormat>("steps");
+  // The attempt box folds to one line after feedback, and when it is empty and focus leaves the composer, so the feedback keeps the room.
+  const [attemptOpen, setAttemptOpen] = useState(true);
+  const attemptRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
+  const [language, setLanguage] = useState(CODE_LANGUAGES[0]!);
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<"" | Mode>("");
   const [k, setK] = useState(3);
@@ -260,7 +278,7 @@ export function AskView() {
   const scope = demo && active ? (active.local ? "In this browser" : "Shared library") : undefined;
   const grounding = groundingOf(active);
   const finished = active?.status === "done" && Boolean(active.answer);
-  const showSteps = finished || Boolean(active?.guided);
+  const showSteps = finished || Boolean(active?.guided) || Boolean(active?.attempt);
   const showUnderstanding = finished && grounding.kind !== "not-found";
 
   const select = (s: Selection) => {
@@ -284,7 +302,7 @@ export function AskView() {
     const seen = statuses.current;
     for (const t of turns) {
       const before = seen.get(t.id);
-      if (before === "streaming" && t.status !== "streaming") announce(t.guided && !t.guided.evidenceStarted ? (t.status === "done" ? "Guided hints ready. Reveal hints or show the evidence." : t.status === "stopped" ? "Guided hints stopped." : "Guided hints unavailable. Retry or show the evidence.") : finishedMessage(t));
+      if (before === "streaming" && t.status !== "streaming") announce(t.attempt && !t.attempt.evidenceStarted ? (t.status === "done" && t.attempt.feedback ? feedbackMessage(t.attempt.feedback) : t.status === "stopped" ? "Feedback stopped." : "Feedback unavailable. Retry or show the evidence.") : t.guided && !t.guided.evidenceStarted ? (t.status === "done" ? "Guided hints ready. Reveal hints or show the evidence." : t.status === "stopped" ? "Guided hints stopped." : "Guided hints unavailable. Retry or show the evidence.") : finishedMessage(t));
       seen.set(t.id, t.status);
     }
   }, [turns, announce]);
@@ -300,6 +318,21 @@ export function AskView() {
     const ro = new ResizeObserver(set);
     ro.observe(header);
     return () => ro.disconnect();
+  }, []);
+
+  // Leave room for the composer when the window scrolls to something (it sticks to the bottom when the columns stack).
+  useLayoutEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--ask-composer-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(set);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      root.style.removeProperty("--ask-composer-h");
+    };
   }, []);
 
   // Bring the new or picked question into view: the answer column on wide screens, the window when the columns stack.
@@ -349,6 +382,22 @@ export function AskView() {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight + 2, 220)}px`;
   }, [question]);
+  // The same for the attempt box, which grows from three rows up to its CSS max-height.
+  useLayoutEffect(() => {
+    const el = attemptRef.current;
+    if (!el || (typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content"))) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [attempt, attemptOpen, trying]);
+
+  const openAttempt = useCallback(() => {
+    setAttemptOpen(true);
+    requestAnimationFrame(() => attemptRef.current?.focus());
+  }, []);
+  const pickApproach = useCallback((value: Approach) => {
+    setApproach(value);
+    if (value === "try") setAttemptOpen(true);
+  }, []);
 
   const prefill = useCallback((q: string) => {
     setQuestion(q);
@@ -361,7 +410,10 @@ export function AskView() {
   }, []);
 
   const offline = stats.isError;
-  const limit = retrievalOnly ? MAX_SEARCH : MAX_QUESTION;
+  const searchOnly = approach === "answer" && retrievalOnly;
+  const limit = searchOnly ? MAX_SEARCH : MAX_QUESTION;
+  const attemptReady = !trying || (attempt.trim().length > 0 && attempt.length <= MAX_ATTEMPT);
+  const formatInfo = ATTEMPT_FORMATS.find((f) => f.value === attemptFormat)!;
   const length = question.trim().length;
   const overLimit = question.length > limit;
   const nearLimit = question.length > limit * 0.8;
@@ -374,15 +426,25 @@ export function AskView() {
       return;
     }
     if (q.length < 3 || offline || q.length > limit) return;
+    if (trying && !attemptReady) {
+      announce("Write your attempt first, then check it.");
+      openAttempt();
+      return;
+    }
     setActiveId(null);
     setPicked(null);
     setInlineFor(null);
     setStep("question");
     if (advancedRef.current?.open) advancedRef.current.open = false; // the panel floats over the answer
-    announce(local ? "Searching your browser documents…" : "Searching your material…");
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly: !guided && retrievalOnly, guided, local, agent: agentic });
+    announce(trying ? "Checking your attempt against your sources…" : local ? "Searching your browser documents…" : "Searching your material…");
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly: searchOnly, guided, local, agent: agentic,
+      attempt: trying ? { text: attempt, format: attemptFormat, language: attemptFormat === "code" ? language : undefined } : undefined });
     setReveal((n) => n + 1);
     setQuestion("");
+    if (trying) {
+      setAttempt("");
+      setAttemptOpen(false);
+    }
   };
   useEffect(() => {
     if (!busyHint) return;
@@ -489,7 +551,13 @@ export function AskView() {
                     focusAfterRemove.current = true;
                     announce("Question removed");
                   }}
-                  onFresh={() => active.guided ? active.guided.evidenceStarted ? void showEvidence(active) : void retryHints(active) : askAgain(active)}
+                  onFresh={() => {
+                    const prelude = active.attempt ?? active.guided;
+                    if (!prelude) askAgain(active);
+                    else if (prelude.evidenceStarted) void showEvidence(active);
+                    else if (active.attempt) void retryFeedback(active);
+                    else void retryHints(active);
+                  }}
                   onNextHint={() => nextHint(active.id)}
                   onEvidence={() => void showEvidence(active)}
                   onSearchShared={
@@ -584,16 +652,16 @@ export function AskView() {
           )}
         </div>
 
-        <form onSubmit={onSubmit} className={styles.composer}>
-          <fieldset className={styles.guidedChoice}>
-            <legend className="sr-only">Response approach</legend>
-            {([false, true] as const).map((value) => (
-              <label key={String(value)}>
-                <input type="radio" name="approach" checked={guided === value} onChange={() => setGuided(value)} />
-                {value ? "Guided" : "Answer"}
-              </label>
-            ))}
-          </fieldset>
+        <form
+          onSubmit={onSubmit}
+          className={styles.composer}
+          ref={composerRef}
+          onBlur={(e) => {
+            // An empty attempt box folds once focus leaves the composer (back to reading), not while the question is being written.
+            if (trying && !attempt.trim() && !e.currentTarget.contains(e.relatedTarget as Node | null)) setAttemptOpen(false);
+          }}
+        >
+          <Segmented legend="How Lectern responds" name="approach" options={APPROACHES} value={approach} onChange={pickApproach} className={styles.approach} fill={narrow} />
           <div className={styles.composerBox}>
             <label htmlFor="question" className="sr-only">
               Your question
@@ -610,6 +678,48 @@ export function AskView() {
               aria-describedby={nearLimit ? "question-count" : undefined}
               className={styles.questionInput}
             />
+            {trying && !attemptOpen ? (
+              <div className={styles.attemptPanel} data-collapsed>
+                <button type="button" className={styles.attemptCollapsed} aria-expanded={false} onFocus={openAttempt} onClick={openAttempt}>
+                  <PenLine aria-hidden="true" />
+                  <span>{turns.some((t) => t.attempt) ? "Write another attempt" : "Write your attempt"}</span>
+                  <span className={styles.attemptCollapsedHint}>{formatInfo.label}</span>
+                </button>
+              </div>
+            ) : trying ? (
+              <div className={styles.attemptPanel} data-format={attemptFormat}>
+                <div className={styles.attemptControls}>
+                  <Segmented legend="Attempt format" name="attempt-format" options={ATTEMPT_FORMATS.map((f) => ({ value: f.value, label: f.label }))} value={attemptFormat} onChange={setAttemptFormat} />
+                  {attemptFormat === "code" ? (
+                    <div className={styles.inlineField}>
+                      <Label htmlFor="attempt-language">Language</Label>
+                      <Select id="attempt-language" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                        {CODE_LANGUAGES.map((l) => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  ) : null}
+                </div>
+                <label htmlFor="attempt" className={styles.attemptLabel}>
+                  Your attempt <span>{formatInfo.hint}</span>
+                </label>
+                <Textarea
+                  ref={attemptRef}
+                  id="attempt"
+                  value={attempt}
+                  onChange={(e) => setAttempt(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={attemptFormat === "steps" ? "Write what you understand so far, one step per line" : "Write what you understand so far"}
+                  maxLength={MAX_ATTEMPT}
+                  rows={3}
+                  spellCheck={attemptFormat !== "code"}
+                  wrap={attemptFormat === "code" ? "off" : undefined}
+                  className={styles.attemptInput}
+                  data-code={attemptFormat === "code" || undefined}
+                />
+              </div>
+            ) : null}
             <div className={styles.composerBar}>
               <details
                 ref={advancedRef}
@@ -712,8 +822,8 @@ export function AskView() {
                   <span className="sr-only"> characters</span>
                 </span>
               ) : null}
-              <Button type="submit" disabled={busy || offline || length < 3 || overLimit} className={styles.askButton}>
-                <Send className="h-4 w-4" aria-hidden="true" /> Ask
+              <Button type="submit" disabled={busy || offline || length < 3 || overLimit || !attemptReady} className={styles.askButton}>
+                <Send className="h-4 w-4" aria-hidden="true" /> {trying ? "Check my attempt" : "Ask"}
               </Button>
             </div>
           </div>

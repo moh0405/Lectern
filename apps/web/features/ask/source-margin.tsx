@@ -171,7 +171,7 @@ export function SourceMargin({ turn, refs, selection, onSelect, scope }: { turn?
             </div>
             <h2 className={`${styles.marginTitle} ${styles.marginDoc} paper-serif`}>{chunk.doc}</h2>
             <div className={styles.paperRule} />
-            <Passage key={`${turn.id}-${index}-${ref?.id ?? "p"}`} text={chunk.text} sentence={ref?.sentence || turn.question} reason={ref?.sentence ? "the cited sentence" : "your question"} />
+            <Passage key={`${turn.id}-${index}-${ref?.id ?? "p"}-${selection.sentence ?? ""}`} text={chunk.text} sentence={ref?.sentence || selection.sentence || turn.question} reason={ref?.sentence ? "the cited sentence" : selection.sentence ? "your attempt" : "your question"} />
             <dl className={styles.passageFacts}>
               <div>
                 <dt>Relevance</dt>

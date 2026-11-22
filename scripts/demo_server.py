@@ -150,6 +150,10 @@ class DemoModel:
 
     def _answer(self, prompt: str, json_mode: bool) -> str:
         low = prompt.lower()
+        if "TASK: ATTEMPT_FEEDBACK" in prompt:  # Try first: the same scripted judge the tests use
+            from tests.fake_gemini import scripted_attempt_feedback
+
+            return json.dumps(scripted_attempt_feedback(prompt))
         if json_mode and "study map" in low:
             return json.dumps(CONCEPT_MAP)
         if json_mode and "socratic" in low:
@@ -208,7 +212,7 @@ def main() -> None:
     if src.exists():
         shutil.copy(src, work / "data" / "leetcode" / "normalized_problems.jsonl")
 
-    for module_name in ("backend.llm_providers", "backend.advanced_ai", "backend.leetcode_handler", "backend.api.routers.ask", "backend.api.routers.tracking"):
+    for module_name in ("backend.llm_providers", "backend.advanced_ai", "backend.attempt_feedback", "backend.leetcode_handler", "backend.api.routers.ask", "backend.api.routers.tracking"):
         __import__(module_name)
         sys.modules[module_name].create_llm = DemoModel
 

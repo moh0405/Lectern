@@ -15,6 +15,7 @@ import { addLocalCard } from "@/lib/local-cards";
 import { cn } from "@/lib/utils";
 import { CITE_PROBLEM, CitedMarkdown, CiteProvider, type Selection } from "./citation-chip";
 import { linkCitations, type LinkedAnswer } from "./citations";
+import { AttemptFeedbackView } from "./attempt-feedback";
 import { plainText } from "./flashcards";
 import { groundingOf, verdictText } from "./grounding";
 import type { Turn } from "./session";
@@ -230,7 +231,10 @@ export function TurnCard({
   onSearchShared?: () => void;
 }) {
   const streaming = turn.status === "streaming";
-  const noKey = turn.error?.code === "llm_unavailable" && !turn.guided;
+  const noKey = turn.error?.code === "llm_unavailable" && !turn.guided && !turn.attempt;
+  // Guided hints or a Try first attempt come before the answer, which is only fetched on "Show me the evidence".
+  const prelude = turn.guided ?? turn.attempt;
+  const beforeEvidence = Boolean(prelude && !prelude.evidenceStarted);
   const noLocalMatch = turn.error?.code === "no_local_match";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const controlId = useId();
@@ -308,8 +312,8 @@ export function TurnCard({
             </div>
           ) : (
             <>
-              {turn.cached && !turn.guided && onFresh ? (
-                <Button variant="ghost" size="sm" className={styles.actionButton} onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
+              {turn.cached && !prelude && onFresh ? (
+                <Button variant="ghost" size="sm" className={styles.actionButton} onClick={() => { onFresh?.(); if (prelude) headingRef.current?.focus(); }} disabled={busy}>
                   Fresh answer
                 </Button>
               ) : null}
@@ -330,7 +334,7 @@ export function TurnCard({
         <div className={styles.neutralNotice} role="status">
           <p>{turn.error?.message}</p>
           <div className={styles.noticeActions}>
-            {turn.guided && onFresh ? <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>Try this question again</Button> : null}
+            {prelude && onFresh ? <Button variant="secondary" onClick={() => { onFresh?.(); if (prelude) headingRef.current?.focus(); }} disabled={busy}>Try this question again</Button> : null}
             {onSearchShared ? (
               <Button variant="secondary" size="sm" onClick={onSearchShared} disabled={busy}>
                 Search the shared textbooks instead
@@ -348,16 +352,16 @@ export function TurnCard({
             <p>{turn.error.message}</p>
           </ErrorNotice>
           {onFresh ? (
-            <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
+            <Button variant="secondary" onClick={() => { onFresh?.(); if (prelude) headingRef.current?.focus(); }} disabled={busy}>
               Try this question again
             </Button>
           ) : null}
         </div>
       ) : turn.status === "stopped" ? (
         <div className="space-y-3">
-          <p className={styles.quietNote}>You stopped this {turn.guided && !turn.guided.evidenceStarted ? "hint request" : "answer"} before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
+          <p className={styles.quietNote}>You stopped this {beforeEvidence ? (turn.guided ? "hint request" : "feedback request") : "answer"} before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
           {onFresh ? (
-            <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
+            <Button variant="secondary" onClick={() => { onFresh?.(); if (prelude) headingRef.current?.focus(); }} disabled={busy}>
               Try this question again
             </Button>
           ) : null}
@@ -365,9 +369,20 @@ export function TurnCard({
       ) : null}
 
       {turn.guided ? <GuidedHints turn={turn} blocked={busy && !streaming} onNext={onNextHint} onEvidence={() => { onEvidence?.(); headingRef.current?.focus(); }} /> : null}
+      {turn.attempt ? (
+        <AttemptFeedbackView
+          turn={turn}
+          selection={selection}
+          onSelect={onSelect}
+          narrow={narrow}
+          blocked={busy && !streaming}
+          inlinePassage={beforeEvidence || !turn.answer ? inlinePassage : null}
+          onEvidence={() => { onEvidence?.(); headingRef.current?.focus(); }}
+        />
+      ) : null}
       <AgentSteps turn={turn} />
 
-      {turn.answer || (streaming && (!turn.guided || turn.guided.evidenceStarted)) ? (
+      {turn.answer || (streaming && !beforeEvidence) ? (
         <div className={styles.answer} data-step="evidence">
           <p className={styles.answerLabel}>
             <Sparkles aria-hidden="true" />
@@ -386,7 +401,7 @@ export function TurnCard({
           ) : (
             <p className="text-sm text-muted">Thinking…</p>
           )}
-          {inlinePassage}
+          {turn.attempt && !turn.answer ? null : inlinePassage}
           {linked?.refs.some((r) => r.chunk !== null) ? (
             <p className={styles.traceHint}>
               <Link2 aria-hidden="true" />
@@ -437,7 +452,7 @@ export function TurnCard({
             ))}
           </div>
         </details>
-      ) : turn.status === "done" && !turn.answer && !turn.guided ? (
+      ) : turn.status === "done" && !turn.answer && !prelude ? (
         <p className={cn("text-sm text-muted")}>No matching passages were found in your sources.</p>
       ) : null}
     </div>

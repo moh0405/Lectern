@@ -1,0 +1,54 @@
+.group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.legend { margin-bottom: 6px; padding: 0; color: var(--color-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.track {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.group[data-fill] .track { display: flex; width: 100%; }
+.group[data-fill] .option { flex: 1 1 0; }
+.option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 7px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.option:hover { color: var(--color-fg); background: var(--color-surface-2); }
+/* The radio covers the whole segment, so the segment is the target, for pointers and for accessibility checks alike. */
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.text { position: relative; pointer-events: none; }
+.option:has(.input:checked) { background: var(--color-accent); color: var(--color-accent-fg); }
+.option:has(.input:focus-visible) { outline: 2px solid var(--color-accent-2); outline-offset: 2px; }
+/* Phones and touch screens: at least 44px targets. */
+@media (max-width: 767px), (pointer: coarse) {
+  .option { min-height: 44px; padding: 0 12px; font-size: 14px; }
+}
+@media (forced-colors: active) {
+  .option:has(.input:checked) { outline: 2px solid CanvasText; outline-offset: -2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .option { transition: none; }
+}
