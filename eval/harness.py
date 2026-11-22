@@ -31,11 +31,14 @@ class Config:
     chunker: str = "v1"  # see CHUNKERS
     retrieval: str = "dense"  # "dense", "keyword", later "bm25" / "hybrid"
     rerank: bool = False
+    expand: bool = True  # acronym / related-term query expansion (backend/query_expansion.py), as the app does
 
     def describe(self) -> str:
         parts = [self.embedder.split("/")[-1], f"chunks {self.chunker}", self.retrieval]
         if self.rerank:
             parts.append("rerank")
+        if not self.expand:
+            parts.append("no expansion")
         return ", ".join(parts)
 
 
@@ -69,11 +72,15 @@ CONFIGS: Dict[str, Config] = {
     "minilm-dense-v2-600": Config("minilm-dense-v2-600", embedder=MINILM, chunker="v2-600", retrieval="dense"),
     "keyword-v2-400": Config("keyword-v2-400", embedder="hashing-512", chunker="v2-400", retrieval="keyword"),
     "minilm-dense-v2-400": Config("minilm-dense-v2-400", embedder=MINILM, chunker="v2-400", retrieval="dense"),
+    # the defaults without query expansion (what the app did before it)
+    "default-minilm-noexpand": Config("default-minilm-noexpand", embedder=MINILM, chunker="v2", retrieval="auto", expand=False),
+    "default-hashing-noexpand": Config("default-hashing-noexpand", embedder="hashing-512", chunker="v2", retrieval="auto", expand=False),
+    "default-minilm-rerank-noexpand": Config("default-minilm-rerank-noexpand", embedder=MINILM, chunker="v2", retrieval="auto", rerank=True, expand=False),
 }
 
 
 # `python -m eval.run --configs headline` is what the committed reports show; `ablations` explains the decisions.
-HEADLINE = ["keyword", "bm25", "minilm-dense", "hybrid-minilm", "default-minilm", "default-minilm-rerank", "default-hashing"]
+HEADLINE = ["keyword", "bm25", "minilm-dense", "hybrid-minilm", "default-minilm-noexpand", "default-minilm", "default-minilm-rerank", "default-hashing"]
 GROUPS: Dict[str, List[str]] = {
     "headline": HEADLINE,
     "ablations": ["minilm-dense"] + [
@@ -263,6 +270,7 @@ def make_engine(store_dir: Path, config: Config, embedder) -> RAGEngine:
     engine.retrieval_mode = config.retrieval
     if config.retrieval in {"keyword", "bm25"}:
         engine.use_embeddings = False
+    engine.query_expansion = config.expand
     engine._reranker = Reranker() if config.rerank else None
     if config.rerank:
         engine.rerank = True

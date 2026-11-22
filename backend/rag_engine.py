@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from .embeddings import DEFAULT_MODEL, Embedder, get_embedder_by_name
 from .lexical import BM25Index, reciprocal_rank_fusion
+from .query_expansion import expand_query
 from .rerank import Reranker, get_reranker
 from .vector_store import VectorStore
 
@@ -66,6 +67,8 @@ class RAGEngine:
         # Override with the RETRIEVAL_MODE environment variable.
         self.retrieval_mode = retrieval_mode or os.getenv("RETRIEVAL_MODE", "auto")
         self._lexical_cache: Optional[tuple] = None
+        # Spell out CS acronyms in the query (BFS -> breadth-first search; DFS by context). QUERY_EXPANSION=0 disables.
+        self.query_expansion = os.getenv("QUERY_EXPANSION", "1").strip().lower() not in {"0", "off", "false", "no"}
         self._reranker: Optional[Reranker] = get_reranker(os.getenv("RERANKER"))
         self.store = VectorStore.load(self.store_dir)
         if auto_embeddings:
@@ -256,8 +259,10 @@ class RAGEngine:
         """Top-k chunks for a query, best first. `score` is each chunk's own relevance in 0..1: cosine
         similarity when embeddings are in use, normalized BM25 otherwise."""
         mode = self.retrieval_mode
-        if mode == "keyword":
+        if mode == "keyword":  # the original scorer, kept unchanged as an evaluation baseline
             return self._keyword_retrieve(query, k)
+        if self.query_expansion:
+            query = expand_query(query)  # used by every ranker below (BM25, embedding, reranker)
         embedder = None if mode == "bm25" else self._get_embedder()
         if mode == "auto":
             # Fusing in a non-semantic (hashing) ranker is worse than BM25 alone (see eval/reports), so
