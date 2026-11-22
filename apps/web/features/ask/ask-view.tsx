@@ -662,7 +662,7 @@ export function AskView() {
                     </label>
                     <div>
                       <Label htmlFor="temperature">Temperature: {temperature.toFixed(2)}</Label>
-                      <input id="temperature" type="range" min={0} max={1} step={0.05} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} className="w-full accent-[var(--color-accent)]" />
+                      <input id="temperature" type="range" min={0} max={1} step={0.05} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} className="w-full accent-[var(--color-accent)] pointer-coarse:h-11" />
                     </div>
                     {demo ? null : (
                       <div>
