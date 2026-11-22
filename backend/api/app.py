@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
@@ -94,6 +95,12 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type", "X-API-Key"],
     )
     install_error_handlers(app)
+
+    @app.middleware("http")
+    async def note_arrival(request: Request, call_next):
+        # Streams with a deadline count from here, so time spent waiting for a cold start is included.
+        request.state.received_at = time.monotonic()
+        return await call_next(request)
 
     @app.middleware("http")
     async def save_changes_to_s3(request: Request, call_next):

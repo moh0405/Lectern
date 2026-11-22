@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { idle, runReducer, stepLabel, type RunState } from "./trace";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { IDLE_TIMEOUT, IDLE_TIMEOUT_MS, STREAM_ENDED, idle, idleWatchdog, runReducer, stepLabel, type RunState } from "./trace";
 
 const ev = (event: string, data: object) => ({ type: "event", event: { event, data } }) as never;
 const apply = (...actions: unknown[]) => actions.reduce<RunState>((s, a) => runReducer(s, a as never), idle);
@@ -84,5 +84,59 @@ describe("stepLabel", () => {
   });
   it("shortens very long arguments", () => {
     expect(stepLabel("search_documents", { query: "x".repeat(200) }).length).toBeLessThan(110);
+  });
+});
+
+describe("a run always ends visibly", () => {
+  it("a stream that closes without done or error becomes an error, with Run enabled again", () => {
+    const s = apply(start, ev("tool_call", { name: "search_documents", arguments: { query: "heap" } }), { type: "end" });
+    expect(s.status).toBe("error");
+    expect(s.error).toEqual(STREAM_ENDED);
+    expect(s.trace[0]).toMatchObject({ status: "failed", summary: "did not finish" }); // no spinner left behind
+  });
+
+  it("end after done or a server error changes nothing", () => {
+    const done = apply(start, ev("done", { steps: 1, tool_calls: 0, llm_calls: 1, citations: [], unverified_citations: 0, uncited: false, wrapped_up: false }), { type: "end" });
+    expect(done.status).toBe("done");
+    const err = apply(start, ev("error", { code: "timeout", message: "took too long" }), { type: "end" });
+    expect(err.error).toEqual({ code: "timeout", message: "took too long" });
+  });
+
+  it("a server error settles tool steps that never got a result", () => {
+    const s = apply(start, ev("tool_call", { name: "search_documents", arguments: {} }), ev("error", { code: "quota_exhausted", message: "Out of quota" }));
+    expect(s).toMatchObject({ status: "error", error: { code: "quota_exhausted" } });
+    expect(s.trace[0]).toMatchObject({ status: "failed" });
+  });
+
+  it("the client timeout is reported as an error that says how long it waited", () => {
+    const s = apply(start, { type: "fail", ...IDLE_TIMEOUT });
+    expect(s.status).toBe("error");
+    expect(s.error?.message).toContain(`${IDLE_TIMEOUT_MS / 1000} seconds`);
+    expect(IDLE_TIMEOUT_MS).toBeGreaterThan(145_000); // longer than the server's 100 s deadline plus a cold start
+  });
+});
+
+describe("idleWatchdog", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("fires once after the quiet period, and each event restarts the clock", () => {
+    const onIdle = vi.fn();
+    const w = idleWatchdog(1000, onIdle);
+    vi.advanceTimersByTime(900);
+    w.poke();
+    vi.advanceTimersByTime(900);
+    expect(onIdle).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(200);
+    expect(onIdle).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(5000);
+    expect(onIdle).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancel disarms it", () => {
+    const onIdle = vi.fn();
+    idleWatchdog(1000, onIdle).cancel();
+    vi.advanceTimersByTime(5000);
+    expect(onIdle).not.toHaveBeenCalled();
   });
 });

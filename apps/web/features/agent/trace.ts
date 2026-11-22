@@ -23,7 +23,45 @@ export interface RunState {
 
 export const idle: RunState = { status: "idle", task: "", trace: [], answer: "", chunks: [] };
 
-export type RunAction = { type: "start"; task: string } | { type: "event"; event: AgentRunEvent } | { type: "stop" } | { type: "fail"; code: string; message: string } | { type: "reset" };
+export type RunAction =
+  | { type: "start"; task: string }
+  | { type: "event"; event: AgentRunEvent }
+  | { type: "stop" }
+  | { type: "fail"; code: string; message: string }
+  /** The response ended. If no `done` or `error` came first, the run did not finish. */
+  | { type: "end" }
+  | { type: "reset" };
+
+/** The server always ends a run with `done` or `error`; a stream that closes without either was cut off on the way. */
+export const STREAM_ENDED = {
+  code: "stream_ended",
+  message: "The connection closed before the agent finished, so there is no answer. Run it again, perhaps with fewer steps.",
+};
+
+/** Nothing at all arrived for this long. The server gives up after 100 s and a cold start adds up to 45 s more. */
+export const IDLE_TIMEOUT_MS = 150_000;
+export const IDLE_TIMEOUT = {
+  code: "client_timeout",
+  message: `Nothing arrived from the agent for ${IDLE_TIMEOUT_MS / 1000} seconds, so the page stopped waiting. Run it again, perhaps with fewer steps.`,
+};
+
+/** Calls `onIdle` once if `poke` is not called for `ms`. `cancel` disarms it. */
+export function idleWatchdog(ms: number, onIdle: () => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const poke = () => {
+    clearTimeout(timer);
+    timer = setTimeout(onIdle, ms);
+  };
+  const cancel = () => clearTimeout(timer);
+  poke();
+  return { poke, cancel };
+}
+
+/** Steps still spinning when a run stops will never get a result. */
+const settle = (trace: TraceItem[]): TraceItem[] =>
+  trace.map((t) => (t.kind === "tool" && t.status === "running" ? { ...t, status: "failed" as const, summary: "did not finish" } : t));
+
+const failed = (state: RunState, error: { code: string; message: string }): RunState => ({ ...state, status: "error", error, trace: settle(state.trace) });
 
 const quote = (v: unknown, max = 80) => {
   const s = String(v ?? "").replace(/\s+/g, " ").trim();
@@ -64,9 +102,11 @@ export function runReducer(state: RunState, action: RunAction): RunState {
     case "reset":
       return idle;
     case "stop":
-      return state.status === "running" ? { ...state, status: "stopped" } : state;
+      return state.status === "running" ? { ...state, status: "stopped", trace: settle(state.trace) } : state;
     case "fail":
-      return { ...state, status: "error", error: { code: action.code, message: action.message } };
+      return failed(state, { code: action.code, message: action.message });
+    case "end":
+      return state.status === "running" ? failed(state, STREAM_ENDED) : state;
     case "event": {
       const ev = action.event;
       switch (ev.event) {
@@ -88,7 +128,7 @@ export function runReducer(state: RunState, action: RunAction): RunState {
         case "done":
           return { ...state, status: "done", done: ev.data };
         case "error":
-          return { ...state, status: "error", error: { code: ev.data.code, message: ev.data.message } };
+          return failed(state, { code: ev.data.code, message: ev.data.message });
       }
     }
   }
