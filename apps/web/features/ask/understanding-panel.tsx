@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Layers, NotebookPen, PenLine, RefreshCw, Shuffle } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Label, Select, Textarea } from "@/components/ui/field";
@@ -171,22 +171,30 @@ export function UnderstandingTools({ turn, busy, onSaveNote, onSimilar, onExplan
   const grounded = turn.chunks.length > 0;
   return (
     <div className={styles.tools}>
-      <details className={styles.tool}>
-        <summary>In your own words{turn.note ? <span className={styles.toolState}>saved</span> : null}</summary>
+      <Tool title="In your own words" state={turn.note ? "saved" : undefined}>
         <OwnWords turn={turn} onSaveNote={onSaveNote} announce={announce} />
-      </details>
+      </Tool>
       {grounded ? (
-        <details className={styles.tool}>
-          <summary>Similar example{turn.similar?.length ? <span className={styles.toolState}>ready</span> : null}</summary>
+        <Tool title="Similar example" state={turn.similar?.length ? "ready" : undefined}>
           <Similar turn={turn} busy={busy} onSimilar={onSimilar} onPractise={onPractise} announce={announce} />
-        </details>
+        </Tool>
       ) : null}
       {grounded ? (
-        <details className={styles.tool}>
-          <summary>Different explanation</summary>
+        <Tool title="Different explanation">
           <Different turn={turn} onExplanation={onExplanation} announce={announce} />
-        </details>
+        </Tool>
       ) : null}
     </div>
+  );
+}
+
+/** A closed row. Its body is mounted the first time it opens and then kept, so a draft survives closing it. */
+function Tool({ title, state, children }: { title: string; state?: string; children: ReactNode }) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <details className={styles.tool} onToggle={(e) => { if (e.currentTarget.open) setOpened(true); }}>
+      <summary>{title}{state ? <span className={styles.toolState}>{state}</span> : null}</summary>
+      {opened ? children : null}
+    </details>
   );
 }

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
-import { API, indexFixture } from "./helpers";
+import { API, indexFixture, removeFixture } from "./helpers";
 
 /** The Understanding step end to end against the real API with the scripted model (tests/fake_gemini.py). */
 const QUESTION = "Why is a binary heap fast?";
@@ -39,6 +39,7 @@ async function audit(page: Page) {
 }
 
 test.beforeAll(async ({ request }) => { await indexFixture(request); });
+test.afterAll(async ({ request }) => { await removeFixture(request); });
 
 test("the whole loop: note, flashcard, similar question through Try first, different explanation", async ({ page, request }) => {
   const n = count(page);
