@@ -285,6 +285,7 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
 | `RETRIEVAL_MODE` | No | `auto` | `auto` (hybrid with a semantic index, else BM25), `hybrid`, `dense` or `bm25` |
 | `RERANKER` | No | off | `cross-encoder` to rerank the top candidates (slower, see Retrieval quality) |
+| `QUERY_EXPANSION` | No | on | `0` turns off spelling out CS acronyms in queries (BFS -> breadth-first search, DFS by context) |
 | `VECTOR_BACKEND` | No | `numpy` | `numpy` or `faiss` (see "Search backend") |
 | `CORS_ORIGINS` | No | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed by CORS |
 | `API_KEY` | No | none | If set, `/api/v1` requires this value in `X-API-Key` |
@@ -428,11 +429,12 @@ What was decided from this, and what was not:
 
 - **Hybrid search with structure-aware chunks is the default** (+12 points at hit@3, 95% interval +3 to +24). Each half helps little alone.
 - **Hybrid is only used with a semantic index.** With the non-semantic fallback embedder, fusing is worse than BM25 alone, so `RETRIEVAL_MODE=auto` picks BM25 there.
+- **CS acronyms are spelled out in the query** (BFS, DFS by context, BST, DP, ...): the production default goes from 67% to 72% hit@1 (MRR 0.795 to 0.821) with no question worse; "BFS vs DFS" no longer retrieves distributed-file-system passages. `QUERY_EXPANSION=0` disables it.
 - **The cross-encoder reranker is off by default** (`RERANKER=cross-encoder`): it improves the top-1 passage but not the top 3 that the prompt uses, at about 100 times the latency.
 - **Still failing:** 2 of 33 questions, both paraphrases where first-in/last-out style wording confuses the embedder. Citation checking catches invented sources, not a wrong claim attributed to a real one.
 - **Not measured:** answer faithfulness (needs a model and a key). A "no good match" cut-off looks possible (unanswerable questions score far lower) but 6 examples are too few to choose a threshold.
 
-Environment: `RETRIEVAL_MODE=auto|hybrid|dense|bm25`, `RERANKER=cross-encoder`. After upgrading, the next index run re-chunks existing sources automatically (each source records which chunker made it).
+Environment: `RETRIEVAL_MODE=auto|hybrid|dense|bm25`, `RERANKER=cross-encoder`, `QUERY_EXPANSION=0`. After upgrading, the next index run re-chunks existing sources automatically (each source records which chunker made it).
 
 ---
 

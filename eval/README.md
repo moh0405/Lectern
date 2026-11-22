@@ -13,6 +13,39 @@ python -m eval.run --configs keyword,bm25   # specific configurations
 
 Reports (committed): `reports/synthetic.md`, `reports/real.md` (headline) and `reports/*-ablations.md`.
 
+## Acronym query expansion (November 2026)
+
+On the live site "Difference between BFS and DFS" retrieved two passages about *distributed file systems*
+(Introduction to CS p.292) out of three. `backend/query_expansion.py` now spells CS acronyms out before every
+ranker, picking the sense the question points to (BFS next to DFS, or graph words, mean depth-first search; file,
+server and storage words mean distributed file system) and keeping both senses for a bare "DFS". It is
+deterministic and costs nothing at Lambda init. `QUERY_EXPANSION=0` turns it off; the `default-*-noexpand` configs
+measure it. Seven real and seven synthetic questions were added for these cases (`r40`–`r46`, `s51`–`s57`).
+
+| real textbooks, 40 answerable | hit@1 | hit@3 | MRR | strict hit@3 | cov@5 |
+|---|---:|---:|---:|---:|---:|
+| production default (hybrid MiniLM, v2), before | 67% | 95% | 0.795 | 85% | 76% |
+| **after** | **72%** | 95% | **0.821** | **90%** | **80%** |
+| BM25 fallback (hashing), before | 54% | 87% | 0.716 | 74% | 76% |
+| BM25 fallback, after | 49% | 87% | 0.690 | 82% | 81% |
+
+- **Production config: 2 questions better, none worse.** "Difference between BFS and DFS?" and "BFS vs DFS?" go from
+  rank 2 to rank 1, and their top 3 changes from one graph passage plus two distributed-file-system passages to three
+  graph-traversal passages. No original question changed rank. The synthetic corpus is unchanged (its passages
+  already spell the acronyms out).
+- **BM25 fallback:** better coverage (cov@5 +5, strict hit@3 +8), but hit@1 drops by 2 questions: for a bare
+  "What is DFS?" / "DFS?" both senses are added and the first result is a second distributed-file-system page
+  instead of the expected one (still in the top 3).
+- **"How do hash tables handle collisions?"** is not a retrieval failure: the textbooks never name a collision
+  strategy (no "chaining", "open addressing" or "probing" anywhere), and the passage that says collisions are
+  inevitable (Intro CS p.133) is retrieved. The live answer saying the text does not specify the mechanism was right.
+  "How does open addressing ...?" is therefore labelled unanswerable for the real corpus.
+- **Tried and not shipped:** synonym expansion for concepts (hash collision -> chaining, open addressing) measured no
+  gain on either corpus and moved a separate-chaining question from rank 1 to 3; MMR diversification of the top 10
+  changed nothing with MiniLM at lambda 0.7 and cost a point of hit@3 at 0.5.
+
+The tables below predate this change (33 real questions); the committed reports are current.
+
 ## What it found (real textbooks, 33 answerable questions)
 
 | | hit@3 | strict hit@3 | MRR | ms/query |
@@ -36,8 +69,8 @@ Reports (committed): `reports/synthetic.md`, `reports/real.md` (headline) and `r
 
 | | What | Questions |
 |---|---|---|
-| **synthetic** | 12 short Markdown notes written for this repo (algorithms, memory, file systems, databases, networking, Python). Committed, so anyone can run it, and CI uses it. 45 passages. | 50 (44 answerable, 6 not) |
-| **real** | The three textbooks the project was developed with: *Data Structures Using Python*, *Dsa*, *Introduction to Computer Science*. About 4,700 passages. They are not redistributed: place them in `data/uploaded_files/` to run this corpus. | 39 (33 answerable, 6 not) |
+| **synthetic** | 12 short Markdown notes written for this repo (algorithms, memory, file systems, databases, networking, Python). Committed, so anyone can run it, and CI uses it. 45 passages. | 57 (51 answerable, 6 not) |
+| **real** | The three textbooks the project was developed with: *Data Structures Using Python*, *Dsa*, *Introduction to Computer Science*. About 4,700 passages. They are not redistributed: place them in `data/uploaded_files/` to run this corpus. | 46 (39 answerable, 7 not) |
 
 The synthetic corpus is a regression test, not a benchmark: its questions share words with their
 passages, so lexical search does well on it (it beat the neural embedder at first). The **real corpus
