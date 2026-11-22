@@ -19,6 +19,8 @@ const ALLOWED: Array<[method: string, pattern: RegExp]> = [
   ["GET", /^leetcode\/problems\/[^/]+$/],
   ["POST", /^leetcode\/problems\/[^/]+\/explain$/],
   ["POST", /^(ask|ask\/stream|ask\/agent\/stream|agent\/run\/stream|adaptive|concept-map|math|socratic|synthesis)$/],
+  // Try first: judged against the shared index or passages the browser sends; read-only, nothing is stored.
+  ["POST", /^attempt\/feedback$/],
 ];
 
 export interface ProxyConfig {
