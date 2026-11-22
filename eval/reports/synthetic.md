@@ -1,6 +1,6 @@
 # Retrieval evaluation: synthetic corpus
 
-44 answerable questions and 6 unanswerable ones. A retrieved passage counts as relevant when it comes from the expected document and contains a key phrase of the answer, so the ground truth does not depend on chunk boundaries.
+51 answerable questions and 6 unanswerable ones. A retrieved passage counts as relevant when it comes from the expected document and contains a key phrase of the answer, so the ground truth does not depend on chunk boundaries.
 
 - **hit@k**: share of answerable questions with a relevant passage in the top k.
 - **MRR**: mean of 1 / rank of the first relevant passage.
@@ -11,13 +11,14 @@
 
 | config | setup | chunks | hit@1 | hit@3 | hit@5 | MRR | cov@5 | strict hit@3 | AUROC | ms/query |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **keyword** | hashing-512, chunks v1, keyword | 45 | 82% | 95% | 95% | 0.883 | 94% | 95% | 1.00 | 0.6 |
-| **bm25** | hashing-512, chunks v1, bm25 | 45 | 91% | 98% | 98% | 0.939 | 97% | 98% | 1.00 | 0.1 |
-| **minilm-dense** | all-MiniLM-L6-v2, chunks v1, dense | 45 | 73% | 91% | 98% | 0.829 | 97% | 91% | 1.00 | 2.8 |
-| **hybrid-minilm** | all-MiniLM-L6-v2, chunks v1, hybrid | 45 | 91% | 98% | 100% | 0.948 | 99% | 98% | 1.00 | 2.8 |
-| **default-minilm** | all-MiniLM-L6-v2, chunks v2, auto | 70 | 93% | 98% | 100% | 0.956 | 99% | 98% | 1.00 | 2.8 |
-| **default-minilm-rerank** | all-MiniLM-L6-v2, chunks v2, auto, rerank | 70 | 91% | 98% | 98% | 0.943 | 98% | 98% | 1.00 | 143.2 |
-| **default-hashing** | hashing-512, chunks v2, auto | 70 | 84% | 95% | 98% | 0.903 | 98% | 95% | 1.00 | 0.0 |
+| **keyword** | hashing-512, chunks v1, keyword | 45 | 82% | 96% | 96% | 0.889 | 95% | 96% | 1.00 | 0.9 |
+| **bm25** | hashing-512, chunks v1, bm25 | 45 | 92% | 98% | 98% | 0.948 | 97% | 98% | 1.00 | 0.1 |
+| **minilm-dense** | all-MiniLM-L6-v2, chunks v1, dense | 45 | 75% | 92% | 98% | 0.843 | 97% | 92% | 1.00 | 2.9 |
+| **hybrid-minilm** | all-MiniLM-L6-v2, chunks v1, hybrid | 45 | 92% | 98% | 100% | 0.955 | 99% | 98% | 1.00 | 2.8 |
+| **default-minilm-noexpand** | all-MiniLM-L6-v2, chunks v2, auto, no expansion | 70 | 94% | 98% | 100% | 0.962 | 99% | 98% | 1.00 | 2.7 |
+| **default-minilm** | all-MiniLM-L6-v2, chunks v2, auto | 70 | 94% | 98% | 100% | 0.962 | 99% | 98% | 1.00 | 2.7 |
+| **default-minilm-rerank** | all-MiniLM-L6-v2, chunks v2, auto, rerank | 70 | 92% | 98% | 98% | 0.951 | 98% | 98% | 1.00 | 138.9 |
+| **default-hashing** | hashing-512, chunks v2, auto | 70 | 88% | 96% | 98% | 0.926 | 98% | 96% | 1.00 | 0.1 |
 
 ## Change versus `minilm-dense` (paired bootstrap over questions, 95% interval)
 
@@ -25,21 +26,23 @@ An interval that contains 0 means the data do not show a real difference.
 
 | config | Δ hit@3 | 95% interval | P(better) | Δ MRR | 95% interval |
 |---|---:|---:|---:|---:|---:|
-| **keyword** | +5 pts | [-5, +14] | 0.78 | +0.054 | [-0.034, +0.141] |
-| **bm25** | +7 pts | [+0, +16] | 0.96 | +0.110 | [+0.030, +0.197] |
-| **hybrid-minilm** | +7 pts | [+0, +16] | 0.96 | +0.119 | [+0.058, +0.186] |
-| **default-minilm** | +7 pts | [-2, +16] | 0.88 | +0.127 | [+0.047, +0.218] |
-| **default-minilm-rerank** | +7 pts | [-2, +16] | 0.88 | +0.114 | [+0.025, +0.210] |
-| **default-hashing** | +5 pts | [-5, +14] | 0.77 | +0.074 | [-0.009, +0.161] |
+| **keyword** | +4 pts | [-4, +12] | 0.78 | +0.046 | [-0.035, +0.125] |
+| **bm25** | +6 pts | [+0, +14] | 0.96 | +0.105 | [+0.033, +0.181] |
+| **hybrid-minilm** | +6 pts | [+0, +14] | 0.96 | +0.112 | [+0.057, +0.175] |
+| **default-minilm-noexpand** | +6 pts | [-2, +16] | 0.88 | +0.120 | [+0.044, +0.200] |
+| **default-minilm** | +6 pts | [-2, +16] | 0.88 | +0.120 | [+0.044, +0.200] |
+| **default-minilm-rerank** | +6 pts | [-2, +16] | 0.88 | +0.108 | [+0.029, +0.193] |
+| **default-hashing** | +4 pts | [-4, +12] | 0.77 | +0.084 | [+0.010, +0.157] |
 
 ## hit@3 by question type
 
-| config | ambiguity (n=8) | comparison (n=6) | complexity (n=4) | direct (n=16) | paraphrase (n=10) |
+| config | ambiguity (n=12) | comparison (n=6) | complexity (n=4) | direct (n=19) | paraphrase (n=10) |
 |---|---:|---:|---:|---:|---:|
 | **keyword** | 100% | 100% | 100% | 100% | 80% |
 | **bm25** | 100% | 100% | 100% | 100% | 90% |
-| **minilm-dense** | 100% | 100% | 100% | 94% | 70% |
+| **minilm-dense** | 100% | 100% | 100% | 95% | 70% |
 | **hybrid-minilm** | 100% | 100% | 100% | 100% | 90% |
+| **default-minilm-noexpand** | 100% | 100% | 100% | 100% | 90% |
 | **default-minilm** | 100% | 100% | 100% | 100% | 90% |
 | **default-minilm-rerank** | 100% | 100% | 100% | 100% | 90% |
 | **default-hashing** | 100% | 100% | 100% | 100% | 80% |
@@ -64,12 +67,12 @@ An interval that contains 0 means the data do not show a real difference.
 
 ## Unanswerable questions: top score
 
-| question | keyword | bm25 | minilm-dense | hybrid-minilm | default-minilm | default-minilm-rerank | default-hashing |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| What is the capital of France? | 0.00 | 0.00 | 0.09 | 0.09 | 0.12 | 0.05 | 0.00 |
-| How do I train a neural network with backpropagation? | 0.25 | 0.11 | 0.12 | 0.09 | 0.19 | -0.02 | 0.09 |
-| Explain quantum entanglement. | 0.00 | 0.09 | 0.14 | 0.10 | 0.05 | 0.10 | 0.09 |
-| What is a good recipe for sourdough bread? | 0.25 | 0.07 | 0.13 | 0.07 | 0.16 | -0.04 | 0.09 |
-| Who won the 2018 football world cup? | 0.00 | 0.00 | 0.07 | 0.07 | 0.06 | -0.01 | 0.00 |
-| How do I configure a Kubernetes ingress controller? | 0.00 | 0.00 | 0.05 | 0.05 | 0.05 | 0.01 | 0.00 |
-| *median of answerable questions* | 0.75 | 0.45 | 0.53 | 0.52 | 0.61 | 0.61 | 0.40 |
+| question | keyword | bm25 | minilm-dense | hybrid-minilm | default-minilm-noexpand | default-minilm | default-minilm-rerank | default-hashing |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| What is the capital of France? | 0.00 | 0.00 | 0.09 | 0.09 | 0.12 | 0.12 | 0.05 | 0.00 |
+| How do I train a neural network with backpropagation? | 0.25 | 0.11 | 0.12 | 0.09 | 0.19 | 0.19 | -0.02 | 0.09 |
+| Explain quantum entanglement. | 0.00 | 0.09 | 0.14 | 0.10 | 0.05 | 0.05 | 0.10 | 0.09 |
+| What is a good recipe for sourdough bread? | 0.25 | 0.07 | 0.13 | 0.07 | 0.16 | 0.16 | -0.04 | 0.09 |
+| Who won the 2018 football world cup? | 0.00 | 0.00 | 0.07 | 0.07 | 0.06 | 0.06 | -0.01 | 0.00 |
+| How do I configure a Kubernetes ingress controller? | 0.00 | 0.00 | 0.05 | 0.05 | 0.05 | 0.05 | 0.01 | 0.00 |
+| *median of answerable questions* | 0.75 | 0.44 | 0.55 | 0.55 | 0.59 | 0.62 | 0.61 | 0.40 |

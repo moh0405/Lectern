@@ -1,6 +1,6 @@
 # Retrieval evaluation: synthetic corpus
 
-44 answerable questions and 6 unanswerable ones. A retrieved passage counts as relevant when it comes from the expected document and contains a key phrase of the answer, so the ground truth does not depend on chunk boundaries.
+51 answerable questions and 6 unanswerable ones. A retrieved passage counts as relevant when it comes from the expected document and contains a key phrase of the answer, so the ground truth does not depend on chunk boundaries.
 
 - **hit@k**: share of answerable questions with a relevant passage in the top k.
 - **MRR**: mean of 1 / rank of the first relevant passage.
@@ -11,23 +11,25 @@
 
 | config | setup | chunks | hit@1 | hit@3 | hit@5 | MRR | cov@5 | strict hit@3 | AUROC | ms/query |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **minilm-dense** | all-MiniLM-L6-v2, chunks v1, dense | 45 | 73% | 91% | 98% | 0.829 | 97% | 91% | 1.00 | 2.7 |
-| **hashing-dense** | hashing-512, chunks v1, dense | 45 | 52% | 68% | 80% | 0.627 | 77% | 68% | 0.81 | 0.1 |
-| **hybrid-hashing** | hashing-512, chunks v1, hybrid | 45 | 68% | 89% | 89% | 0.781 | 86% | 89% | 0.78 | 0.1 |
-| **hybrid-hashing-v2** | hashing-512, chunks v2, hybrid | 70 | 70% | 82% | 84% | 0.769 | 82% | 82% | 0.81 | 0.1 |
-| **bm25-v2** | hashing-512, chunks v2, bm25 | 70 | 84% | 95% | 98% | 0.903 | 98% | 95% | 1.00 | 0.0 |
-| **hybrid-minilm-v2** | all-MiniLM-L6-v2, chunks v2, hybrid | 70 | 93% | 98% | 100% | 0.956 | 99% | 98% | 1.00 | 2.7 |
-| **hybrid-minilm-v2-perpage** | all-MiniLM-L6-v2, chunks v2-perpage, hybrid | 70 | 93% | 98% | 100% | 0.956 | 99% | 98% | 1.00 | 2.7 |
-| **hybrid-minilm-rerank** | all-MiniLM-L6-v2, chunks v1, hybrid, rerank | 45 | 91% | 100% | 100% | 0.955 | 100% | 100% | 1.00 | 232.5 |
-| **hybrid-minilm-v2-rerank** | all-MiniLM-L6-v2, chunks v2, hybrid, rerank | 70 | 91% | 98% | 98% | 0.943 | 98% | 98% | 1.00 | 136.8 |
-| **keyword-v2** | hashing-512, chunks v2, keyword | 70 | 66% | 82% | 89% | 0.759 | 86% | 82% | 0.99 | 0.6 |
-| **hashing-dense-v2** | hashing-512, chunks v2, dense | 70 | 57% | 64% | 70% | 0.627 | 68% | 64% | 0.82 | 0.1 |
-| **minilm-dense-v2** | all-MiniLM-L6-v2, chunks v2, dense | 70 | 77% | 91% | 100% | 0.861 | 98% | 91% | 1.00 | 2.7 |
-| **minilm-dense-v2-perpage** | all-MiniLM-L6-v2, chunks v2-perpage, dense | 70 | 77% | 91% | 100% | 0.861 | 98% | 91% | 1.00 | 2.7 |
-| **keyword-v2-600** | hashing-512, chunks v2-600, keyword | 70 | 66% | 82% | 89% | 0.759 | 86% | 82% | 0.99 | 0.6 |
-| **minilm-dense-v2-600** | all-MiniLM-L6-v2, chunks v2-600, dense | 70 | 77% | 91% | 100% | 0.861 | 98% | 91% | 1.00 | 2.7 |
-| **keyword-v2-400** | hashing-512, chunks v2-400, keyword | 84 | 66% | 82% | 84% | 0.746 | 82% | 82% | 0.99 | 0.6 |
-| **minilm-dense-v2-400** | all-MiniLM-L6-v2, chunks v2-400, dense | 84 | 70% | 89% | 95% | 0.811 | 93% | 89% | 1.00 | 2.7 |
+| **minilm-dense** | all-MiniLM-L6-v2, chunks v1, dense | 45 | 75% | 92% | 98% | 0.843 | 97% | 92% | 1.00 | 2.7 |
+| **hashing-dense** | hashing-512, chunks v1, dense | 45 | 55% | 75% | 84% | 0.666 | 82% | 75% | 0.81 | 0.1 |
+| **hybrid-hashing** | hashing-512, chunks v1, hybrid | 45 | 75% | 90% | 90% | 0.824 | 88% | 90% | 0.79 | 0.1 |
+| **hybrid-hashing-v2** | hashing-512, chunks v2, hybrid | 70 | 76% | 86% | 88% | 0.820 | 86% | 86% | 0.84 | 0.1 |
+| **bm25-v2** | hashing-512, chunks v2, bm25 | 70 | 88% | 96% | 98% | 0.926 | 98% | 96% | 1.00 | 0.1 |
+| **hybrid-minilm-v2** | all-MiniLM-L6-v2, chunks v2, hybrid | 70 | 94% | 98% | 100% | 0.962 | 99% | 98% | 1.00 | 2.8 |
+| **hybrid-minilm-v2-perpage** | all-MiniLM-L6-v2, chunks v2-perpage, hybrid | 70 | 94% | 98% | 100% | 0.962 | 99% | 98% | 1.00 | 2.8 |
+| **hybrid-minilm-rerank** | all-MiniLM-L6-v2, chunks v1, hybrid, rerank | 45 | 90% | 100% | 100% | 0.951 | 100% | 100% | 1.00 | 233.3 |
+| **hybrid-minilm-v2-rerank** | all-MiniLM-L6-v2, chunks v2, hybrid, rerank | 70 | 92% | 98% | 98% | 0.951 | 98% | 98% | 1.00 | 143.6 |
+| **keyword-v2** | hashing-512, chunks v2, keyword | 70 | 69% | 84% | 90% | 0.782 | 88% | 84% | 0.99 | 0.7 |
+| **hashing-dense-v2** | hashing-512, chunks v2, dense | 70 | 63% | 73% | 78% | 0.696 | 76% | 73% | 0.85 | 0.1 |
+| **minilm-dense-v2** | all-MiniLM-L6-v2, chunks v2, dense | 70 | 80% | 92% | 100% | 0.880 | 98% | 92% | 1.00 | 2.9 |
+| **minilm-dense-v2-perpage** | all-MiniLM-L6-v2, chunks v2-perpage, dense | 70 | 80% | 92% | 100% | 0.880 | 98% | 92% | 1.00 | 5.0 |
+| **keyword-v2-600** | hashing-512, chunks v2-600, keyword | 70 | 69% | 84% | 90% | 0.782 | 88% | 84% | 0.99 | 0.6 |
+| **minilm-dense-v2-600** | all-MiniLM-L6-v2, chunks v2-600, dense | 70 | 80% | 92% | 100% | 0.880 | 98% | 92% | 1.00 | 2.8 |
+| **keyword-v2-400** | hashing-512, chunks v2-400, keyword | 84 | 67% | 84% | 86% | 0.761 | 84% | 84% | 0.99 | 0.7 |
+| **minilm-dense-v2-400** | all-MiniLM-L6-v2, chunks v2-400, dense | 84 | 75% | 90% | 96% | 0.837 | 94% | 90% | 1.00 | 2.8 |
+| **default-hashing-noexpand** | hashing-512, chunks v2, auto, no expansion | 70 | 86% | 96% | 98% | 0.917 | 98% | 96% | 1.00 | 0.0 |
+| **default-minilm-rerank-noexpand** | all-MiniLM-L6-v2, chunks v2, auto, rerank, no expansion | 70 | 92% | 98% | 98% | 0.951 | 98% | 98% | 1.00 | 137.6 |
 
 ## Change versus `minilm-dense` (paired bootstrap over questions, 95% interval)
 
@@ -35,52 +37,55 @@ An interval that contains 0 means the data do not show a real difference.
 
 | config | Δ hit@3 | 95% interval | P(better) | Δ MRR | 95% interval |
 |---|---:|---:|---:|---:|---:|
-| **hashing-dense** | -23 pts | [-36, -9] | 0.00 | -0.202 | [-0.328, -0.067] |
-| **hybrid-hashing** | -2 pts | [-16, +11] | 0.30 | -0.048 | [-0.164, +0.068] |
-| **hybrid-hashing-v2** | -9 pts | [-25, +7] | 0.09 | -0.060 | [-0.191, +0.069] |
-| **bm25-v2** | +5 pts | [-5, +14] | 0.77 | +0.074 | [-0.009, +0.161] |
-| **hybrid-minilm-v2** | +7 pts | [-2, +16] | 0.88 | +0.127 | [+0.047, +0.218] |
-| **hybrid-minilm-v2-perpage** | +7 pts | [-2, +16] | 0.88 | +0.127 | [+0.047, +0.218] |
-| **hybrid-minilm-rerank** | +9 pts | [+2, +18] | 0.98 | +0.126 | [+0.038, +0.220] |
-| **hybrid-minilm-v2-rerank** | +7 pts | [-2, +16] | 0.88 | +0.114 | [+0.025, +0.210] |
-| **keyword-v2** | -9 pts | [-23, +5] | 0.07 | -0.070 | [-0.185, +0.040] |
-| **hashing-dense-v2** | -27 pts | [-43, -11] | 0.00 | -0.202 | [-0.348, -0.058] |
-| **minilm-dense-v2** | +0 pts | [-11, +11] | 0.42 | +0.032 | [-0.035, +0.105] |
-| **minilm-dense-v2-perpage** | +0 pts | [-11, +11] | 0.42 | +0.032 | [-0.035, +0.105] |
-| **keyword-v2-600** | -9 pts | [-23, +5] | 0.07 | -0.070 | [-0.185, +0.040] |
-| **minilm-dense-v2-600** | +0 pts | [-11, +11] | 0.42 | +0.032 | [-0.035, +0.105] |
-| **keyword-v2-400** | -9 pts | [-23, +2] | 0.05 | -0.083 | [-0.195, +0.026] |
-| **minilm-dense-v2-400** | -2 pts | [-14, +9] | 0.28 | -0.018 | [-0.102, +0.070] |
+| **hashing-dense** | -18 pts | [-29, -6] | 0.00 | -0.177 | [-0.290, -0.067] |
+| **hybrid-hashing** | -2 pts | [-14, +10] | 0.30 | -0.019 | [-0.121, +0.077] |
+| **hybrid-hashing-v2** | -6 pts | [-20, +8] | 0.14 | -0.023 | [-0.132, +0.083] |
+| **bm25-v2** | +4 pts | [-4, +12] | 0.77 | +0.084 | [+0.010, +0.157] |
+| **hybrid-minilm-v2** | +6 pts | [-2, +16] | 0.88 | +0.120 | [+0.044, +0.200] |
+| **hybrid-minilm-v2-perpage** | +6 pts | [-2, +16] | 0.88 | +0.120 | [+0.044, +0.200] |
+| **hybrid-minilm-rerank** | +8 pts | [+2, +16] | 0.99 | +0.108 | [+0.028, +0.194] |
+| **hybrid-minilm-v2-rerank** | +6 pts | [-2, +16] | 0.88 | +0.108 | [+0.029, +0.193] |
+| **keyword-v2** | -8 pts | [-20, +4] | 0.07 | -0.060 | [-0.161, +0.038] |
+| **hashing-dense-v2** | -20 pts | [-33, -6] | 0.00 | -0.147 | [-0.275, -0.027] |
+| **minilm-dense-v2** | +0 pts | [-10, +10] | 0.41 | +0.038 | [-0.025, +0.103] |
+| **minilm-dense-v2-perpage** | +0 pts | [-10, +10] | 0.41 | +0.038 | [-0.025, +0.103] |
+| **keyword-v2-600** | -8 pts | [-20, +4] | 0.07 | -0.060 | [-0.161, +0.038] |
+| **minilm-dense-v2-600** | +0 pts | [-10, +10] | 0.41 | +0.038 | [-0.025, +0.103] |
+| **keyword-v2-400** | -8 pts | [-20, +2] | 0.05 | -0.081 | [-0.183, +0.018] |
+| **minilm-dense-v2-400** | -2 pts | [-12, +8] | 0.28 | -0.005 | [-0.082, +0.071] |
+| **default-hashing-noexpand** | +4 pts | [-4, +12] | 0.77 | +0.074 | [-0.003, +0.151] |
+| **default-minilm-rerank-noexpand** | +6 pts | [-2, +16] | 0.88 | +0.108 | [+0.029, +0.193] |
 
 ## hit@3 by question type
 
-| config | ambiguity (n=8) | comparison (n=6) | complexity (n=4) | direct (n=16) | paraphrase (n=10) |
+| config | ambiguity (n=12) | comparison (n=6) | complexity (n=4) | direct (n=19) | paraphrase (n=10) |
 |---|---:|---:|---:|---:|---:|
-| **minilm-dense** | 100% | 100% | 100% | 94% | 70% |
-| **hashing-dense** | 100% | 83% | 50% | 69% | 40% |
-| **hybrid-hashing** | 100% | 100% | 75% | 94% | 70% |
-| **hybrid-hashing-v2** | 100% | 83% | 75% | 88% | 60% |
+| **minilm-dense** | 100% | 100% | 100% | 95% | 70% |
+| **hashing-dense** | 100% | 83% | 50% | 79% | 40% |
+| **hybrid-hashing** | 100% | 100% | 75% | 95% | 70% |
+| **hybrid-hashing-v2** | 100% | 100% | 75% | 89% | 60% |
 | **bm25-v2** | 100% | 100% | 100% | 100% | 80% |
 | **hybrid-minilm-v2** | 100% | 100% | 100% | 100% | 90% |
 | **hybrid-minilm-v2-perpage** | 100% | 100% | 100% | 100% | 90% |
 | **hybrid-minilm-rerank** | 100% | 100% | 100% | 100% | 100% |
 | **hybrid-minilm-v2-rerank** | 100% | 100% | 100% | 100% | 90% |
-| **keyword-v2** | 100% | 67% | 75% | 94% | 60% |
-| **hashing-dense-v2** | 100% | 67% | 50% | 62% | 40% |
+| **keyword-v2** | 100% | 67% | 75% | 95% | 60% |
+| **hashing-dense-v2** | 100% | 83% | 50% | 74% | 40% |
 | **minilm-dense-v2** | 100% | 100% | 100% | 100% | 60% |
 | **minilm-dense-v2-perpage** | 100% | 100% | 100% | 100% | 60% |
-| **keyword-v2-600** | 100% | 67% | 75% | 94% | 60% |
+| **keyword-v2-600** | 100% | 67% | 75% | 95% | 60% |
 | **minilm-dense-v2-600** | 100% | 100% | 100% | 100% | 60% |
-| **keyword-v2-400** | 100% | 67% | 75% | 94% | 60% |
-| **minilm-dense-v2-400** | 88% | 100% | 100% | 100% | 60% |
+| **keyword-v2-400** | 100% | 67% | 75% | 95% | 60% |
+| **minilm-dense-v2-400** | 92% | 100% | 100% | 100% | 60% |
+| **default-hashing-noexpand** | 100% | 100% | 100% | 100% | 80% |
+| **default-minilm-rerank-noexpand** | 100% | 100% | 100% | 100% | 90% |
 
 ## Questions with no relevant passage in the top 5
 
 **minilm-dense** (1):
 - `s17` [paraphrase] Which data structure lets me look up values in constant time on average? → got dp-greedy.md (0.365), databases.md (0.339), dp-greedy.md (0.322)
 
-**hashing-dense** (9):
-- `s06` [direct] What are the ACID properties of a transaction? → got trees.md (0.245), trees.md (0.245), trees.md (0.227)
+**hashing-dense** (8):
 - `s08` [direct] What is a trie used for? → got arrays-lists.md (0.235), hashing.md (0.207), arrays-lists.md (0.191)
 - `s15` [direct] How does Timsort work? → got graphs.md (0.085), graphs.md (0.066), trees.md (0.054)
 - `s19` [paraphrase] How can I order tasks so that prerequisites always come before the tasks that need them? → got file-systems.md (0.172), trees.md (0.121), complexity.md (0.112)
@@ -97,13 +102,12 @@ An interval that contains 0 means the data do not show a real difference.
 - `s24` [paraphrase] How does a networked storage system survive a server dying? → got file-systems.md (0.117), graphs.md (0.134), databases.md (0.112)
 - `s41` [complexity] What is the best possible speed of a comparison-based sort? → got dp-greedy.md (0.207), python-notes.md (0.173), sorting.md (0.145)
 
-**hybrid-hashing-v2** (7):
+**hybrid-hashing-v2** (6):
 - `s05` [direct] Why is merge sort a stable sort? → got sorting.md (0.213), sorting.md (0.222), complexity.md (0.225)
 - `s08` [direct] What is a trie used for? → got arrays-lists.md (0.303), sorting.md (0.208), python-notes.md (0.196)
 - `s20` [paraphrase] How can a program crash because functions keep calling themselves too many times? → got python-notes.md (0.102), python-notes.md (0.099), hashing.md (0.096)
 - `s23` [paraphrase] How do website names get converted into numeric machine addresses? → got hashing.md (0.073), arrays-lists.md (0.054), file-systems.md (0.026)
 - `s24` [paraphrase] How does a networked storage system survive a server dying? → got file-systems.md (0.16), networking.md (0.126), databases.md (0.176)
-- `s37` [comparison] When is BFS enough instead of Dijkstra's algorithm? → got graphs.md (0.155), dp-greedy.md (0.143), graphs.md (0.082)
 - `s41` [complexity] What is the best possible speed of a comparison-based sort? → got dp-greedy.md (0.224), sorting.md (0.162), dp-greedy.md (0.149)
 
 **bm25-v2** (1):
@@ -119,9 +123,8 @@ An interval that contains 0 means the data do not show a real difference.
 - `s25` [paraphrase] How do I stop my search tree from becoming a long chain? → got hashing.md (0.286), trees.md (0.286), databases.md (0.286)
 - `s37` [comparison] When is BFS enough instead of Dijkstra's algorithm? → got graphs.md (0.5), graphs.md (0.333), graphs.md (0.333)
 
-**hashing-dense-v2** (13):
+**hashing-dense-v2** (11):
 - `s05` [direct] Why is merge sort a stable sort? → got python-notes.md (0.244), sorting.md (0.239), arrays-lists.md (0.226)
-- `s06` [direct] What are the ACID properties of a transaction? → got trees.md (0.245), hashing.md (0.228), complexity.md (0.219)
 - `s08` [direct] What is a trie used for? → got arrays-lists.md (0.303), sorting.md (0.208), python-notes.md (0.208)
 - `s15` [direct] How does Timsort work? → got sorting.md (0.067), graphs.md (0.067), memory.md (0.062)
 - `s19` [paraphrase] How can I order tasks so that prerequisites always come before the tasks that need them? → got trees.md (0.144), file-systems.md (0.14), dp-greedy.md (0.138)
@@ -131,7 +134,6 @@ An interval that contains 0 means the data do not show a real difference.
 - `s24` [paraphrase] How does a networked storage system survive a server dying? → got databases.md (0.176), file-systems.md (0.16), python-notes.md (0.14)
 - `s25` [paraphrase] How do I stop my search tree from becoming a long chain? → got hashing.md (0.17), trees.md (0.165), arrays-lists.md (0.145)
 - `s35` [comparison] Compare quicksort and merge sort. → got sorting.md (0.232), complexity.md (0.185), python-notes.md (0.183)
-- `s37` [comparison] When is BFS enough instead of Dijkstra's algorithm? → got python-notes.md (0.181), graphs.md (0.155), complexity.md (0.148)
 - `s41` [complexity] What is the best possible speed of a comparison-based sort? → got dp-greedy.md (0.224), memory.md (0.193), trees.md (0.186)
 
 **keyword-v2-600** (5):
@@ -154,14 +156,20 @@ An interval that contains 0 means the data do not show a real difference.
 - `s21` [paraphrase] Which tree keeps the smallest element instantly accessible? → got trees.md (0.527), trees.md (0.514), trees.md (0.51)
 - `s25` [paraphrase] How do I stop my search tree from becoming a long chain? → got trees.md (0.415), databases.md (0.377), trees.md (0.365)
 
+**default-hashing-noexpand** (1):
+- `s25` [paraphrase] How do I stop my search tree from becoming a long chain? → got trees.md (0.182), hashing.md (0.093), hashing.md (0.088)
+
+**default-minilm-rerank-noexpand** (1):
+- `s25` [paraphrase] How do I stop my search tree from becoming a long chain? → got trees.md (0.412), arrays-lists.md (0.211), databases.md (0.351)
+
 ## Unanswerable questions: top score
 
-| question | minilm-dense | hashing-dense | hybrid-hashing | hybrid-hashing-v2 | bm25-v2 | hybrid-minilm-v2 | hybrid-minilm-v2-perpage | hybrid-minilm-rerank | hybrid-minilm-v2-rerank | keyword-v2 | hashing-dense-v2 | minilm-dense-v2 | minilm-dense-v2-perpage | keyword-v2-600 | minilm-dense-v2-600 | keyword-v2-400 | minilm-dense-v2-400 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| What is the capital of France? | 0.09 | 0.18 | 0.18 | 0.20 | 0.00 | 0.12 | 0.12 | -0.04 | 0.05 | 0.00 | 0.20 | 0.12 | 0.12 | 0.00 | 0.12 | 0.00 | 0.12 |
-| How do I train a neural network with backpropagation? | 0.12 | 0.16 | 0.13 | 0.14 | 0.09 | 0.19 | 0.19 | 0.05 | -0.02 | 0.25 | 0.14 | 0.19 | 0.19 | 0.25 | 0.19 | 0.25 | 0.19 |
-| Explain quantum entanglement. | 0.14 | 0.08 | -0.02 | -0.03 | 0.09 | 0.05 | 0.05 | 0.11 | 0.10 | 0.00 | 0.07 | 0.21 | 0.21 | 0.00 | 0.21 | 0.00 | 0.21 |
-| What is a good recipe for sourdough bread? | 0.13 | 0.19 | 0.18 | 0.20 | 0.09 | 0.16 | 0.16 | -0.01 | -0.04 | 0.25 | 0.22 | 0.16 | 0.16 | 0.25 | 0.16 | 0.25 | 0.16 |
-| Who won the 2018 football world cup? | 0.07 | 0.14 | 0.14 | 0.14 | 0.00 | 0.06 | 0.06 | -0.04 | -0.01 | 0.00 | 0.14 | 0.06 | 0.06 | 0.00 | 0.06 | 0.00 | 0.06 |
-| How do I configure a Kubernetes ingress controller? | 0.05 | 0.16 | 0.16 | 0.16 | 0.00 | 0.05 | 0.05 | -0.11 | 0.01 | 0.00 | 0.16 | 0.05 | 0.05 | 0.00 | 0.05 | 0.00 | 0.05 |
-| *median of answerable questions* | 0.53 | 0.22 | 0.22 | 0.25 | 0.40 | 0.61 | 0.61 | 0.52 | 0.61 | 0.67 | 0.25 | 0.63 | 0.63 | 0.67 | 0.63 | 0.67 | 0.64 |
+| question | minilm-dense | hashing-dense | hybrid-hashing | hybrid-hashing-v2 | bm25-v2 | hybrid-minilm-v2 | hybrid-minilm-v2-perpage | hybrid-minilm-rerank | hybrid-minilm-v2-rerank | keyword-v2 | hashing-dense-v2 | minilm-dense-v2 | minilm-dense-v2-perpage | keyword-v2-600 | minilm-dense-v2-600 | keyword-v2-400 | minilm-dense-v2-400 | default-hashing-noexpand | default-minilm-rerank-noexpand |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| What is the capital of France? | 0.09 | 0.18 | 0.18 | 0.20 | 0.00 | 0.12 | 0.12 | -0.04 | 0.05 | 0.00 | 0.20 | 0.12 | 0.12 | 0.00 | 0.12 | 0.00 | 0.12 | 0.00 | 0.05 |
+| How do I train a neural network with backpropagation? | 0.12 | 0.16 | 0.13 | 0.14 | 0.09 | 0.19 | 0.19 | 0.05 | -0.02 | 0.25 | 0.14 | 0.19 | 0.19 | 0.25 | 0.19 | 0.25 | 0.19 | 0.09 | -0.02 |
+| Explain quantum entanglement. | 0.14 | 0.08 | -0.02 | -0.03 | 0.09 | 0.05 | 0.05 | 0.11 | 0.10 | 0.00 | 0.07 | 0.21 | 0.21 | 0.00 | 0.21 | 0.00 | 0.21 | 0.09 | 0.10 |
+| What is a good recipe for sourdough bread? | 0.13 | 0.19 | 0.18 | 0.20 | 0.09 | 0.16 | 0.16 | -0.01 | -0.04 | 0.25 | 0.22 | 0.16 | 0.16 | 0.25 | 0.16 | 0.25 | 0.16 | 0.09 | -0.04 |
+| Who won the 2018 football world cup? | 0.07 | 0.14 | 0.14 | 0.14 | 0.00 | 0.06 | 0.06 | -0.04 | -0.01 | 0.00 | 0.14 | 0.06 | 0.06 | 0.00 | 0.06 | 0.00 | 0.06 | 0.00 | -0.01 |
+| How do I configure a Kubernetes ingress controller? | 0.05 | 0.16 | 0.16 | 0.16 | 0.00 | 0.05 | 0.05 | -0.11 | 0.01 | 0.00 | 0.16 | 0.05 | 0.05 | 0.00 | 0.05 | 0.00 | 0.05 | 0.00 | 0.01 |
+| *median of answerable questions* | 0.55 | 0.22 | 0.21 | 0.25 | 0.40 | 0.62 | 0.62 | 0.54 | 0.61 | 0.71 | 0.25 | 0.64 | 0.64 | 0.71 | 0.64 | 0.71 | 0.66 | 0.40 | 0.59 |

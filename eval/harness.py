@@ -80,7 +80,7 @@ CONFIGS: Dict[str, Config] = {
 
 
 # `python -m eval.run --configs headline` is what the committed reports show; `ablations` explains the decisions.
-HEADLINE = ["keyword", "bm25", "minilm-dense", "hybrid-minilm", "default-minilm", "default-minilm-rerank", "default-hashing"]
+HEADLINE = ["keyword", "bm25", "minilm-dense", "hybrid-minilm", "default-minilm-noexpand", "default-minilm", "default-minilm-rerank", "default-hashing"]
 GROUPS: Dict[str, List[str]] = {
     "headline": HEADLINE,
     "ablations": ["minilm-dense"] + [
