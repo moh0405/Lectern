@@ -1,17 +1,21 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "@ai-study-mentor/api-client";
 import { BookOpen, Clock, Moon, Sun, X, Unplug } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { SECTIONS, pagesOf, sectionCurrent, sectionFor, type Section } from "@/lib/sections";
-import { api, ApiError, unwrap } from "@/lib/api";
+import { api, unwrap } from "@/lib/api";
+import { apiStateOf, nextCheckDelay, outcomeOfError, recordHealth, type ApiState, type HealthOutcome, type HealthStreak } from "@/lib/api-status";
 import { useDemo } from "@/lib/demo";
 import { plural } from "@/lib/format";
 import { toggleTheme, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+
+type Health = components["schemas"]["Health"];
 
 export const REPO_URL = "https://github.com/moh0405/Lectern";
 /** Remembered by the inline script in app/layout.tsx, which hides the strip before the first paint. */
@@ -25,7 +29,6 @@ function ReadingTheme() {
   </button>;
 }
 
-type ApiState = "checking" | "starting" | "online" | "busy" | "offline";
 const ANNOUNCE: Record<Exclude<ApiState, "checking">, string> = {
   starting: "The study service is starting up. This can take a few seconds.",
   online: "Connected to the study service again.",
@@ -33,19 +36,64 @@ const ANNOUNCE: Record<Exclude<ApiState, "checking">, string> = {
   offline: "Offline: the study service cannot be reached.",
 };
 
-function ApiStatus() {
-  const { data, isError, isPending, error, failureCount } = useQuery({
+/** Queries that show what the service holds; refetched when it comes back, so pages do not keep a stale or failed answer. */
+const METADATA_KEYS = new Set(["documents", "stats", "suggestions"]);
+
+/** The latest health report (kept through failed checks), the streak of checks, and the light it means. */
+interface HealthCheck { health: Health | null; streak: HealthStreak; state: ApiState }
+
+function useHealth(): HealthCheck | undefined {
+  const qc = useQueryClient();
+  const { data, refetch } = useQuery({
     queryKey: ["health"],
-    queryFn: async () => unwrap(await api.http.GET("/health")),
-    refetchInterval: (query) => query.state.data?.status === "starting" ? 2_000 : 30_000,
-    // A service waking up can fail a request or two; a 4xx such as "busy" is a real answer.
-    retry: (count, e) => !(e instanceof ApiError && e.status < 500) && count < 2,
-    retryDelay: (attempt) => 1_000 * 2 ** attempt,
+    // Never throws: a failed check is a result ("starting", "busy" or eventually "offline"), and the schedule below
+    // re-checks quickly while the service wakes up instead of retrying inside one query.
+    queryFn: async (): Promise<HealthCheck> => {
+      const prev = qc.getQueryData<HealthCheck>(["health"]);
+      let health: Health | null = prev?.health ?? null;
+      let outcome: HealthOutcome;
+      try {
+        health = unwrap(await api.http.GET("/health"));
+        outcome = health.status === "starting" ? "starting" : "ok";
+      } catch (e) {
+        outcome = outcomeOfError(e);
+      }
+      const now = Date.now();
+      const streak = recordHealth(prev?.streak, outcome, now);
+      return { health, streak, state: apiStateOf(streak, now) };
+    },
+    retry: false,
+    refetchInterval: (query) => nextCheckDelay(query.state.data?.streak, Date.now()),
   });
-  const state: ApiState = error instanceof ApiError && error.status === 429 ? "busy"
-    : isError ? "offline"
-    : isPending ? (failureCount > 0 ? "starting" : "checking")
-    : data?.status === "starting" ? "starting" : "online";
+  const state = data?.state;
+  // A returning tab or network may find the service back (or gone): look now rather than at the next scheduled check.
+  useEffect(() => {
+    const now = () => void refetch();
+    const back = () => { if (document.visibilityState === "visible" && state !== "online") void refetch(); };
+    window.addEventListener("online", now);
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("online", now);
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [refetch, state]);
+  // Back online after a wait: refresh what pages read from the service (counts, document lists, failed loads).
+  const previous = useRef(state);
+  useEffect(() => {
+    const was = previous.current;
+    previous.current = state;
+    if (state !== "online" || was === undefined || was === "online" || was === "checking") return;
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "health" && (q.state.status === "error" || METADATA_KEYS.has(String(q.queryKey[0]))) });
+  }, [qc, state]);
+  return data;
+}
+
+function ApiStatus() {
+  const check = useHealth();
+  const state: ApiState = check?.state ?? "checking";
+  const data = state === "online" ? check?.health : null;
   // Announce changes of state only (not every 30 s poll): busy or offline whenever they start, online only on recovery.
   const [seen, setSeen] = useState<{ state: ApiState; announce: string }>({ state: "checking", announce: "" });
   if (state !== "checking" && state !== seen.state) {
@@ -57,7 +105,10 @@ function ApiStatus() {
   // Mid-width headers show this instead; the full text stays in the accessibility tree and the tooltip.
   const short = state === "online" && data ? `${plural(data.chunks ?? 0, "passage")} indexed` : state === "busy" ? "Service busy" : text;
   const Icon = state === "busy" ? Clock : state === "offline" ? Unplug : null;
-  return <div className="api-status" title={state === "starting" ? "The study service is waking up. This usually takes a few seconds." : data ? `Lectern API v${data.version} · ${text}` : text} data-state={state}>
+  const title = state === "starting" ? "The study service is waking up. This usually takes a few seconds."
+    : state === "offline" ? "The study service cannot be reached. Lectern keeps checking and reconnects by itself."
+    : data ? `Lectern API v${data.version} · ${text}` : text;
+  return <div className="api-status" title={title} data-state={state}>
     {Icon ? <Icon aria-hidden="true" className={cn("api-status-icon", state)} strokeWidth={2.2} /> : <span aria-hidden="true" className={cn("api-status-dot", state)} />}
     <span className="api-status-text">{text}</span>
     {short !== text ? <span aria-hidden="true" className="api-status-short">{short}</span> : null}
