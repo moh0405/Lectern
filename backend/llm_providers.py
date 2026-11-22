@@ -24,7 +24,8 @@ import os
 import time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, runtime_checkable
 
-from .llm_config import RETRY_ATTEMPTS, GeminiClient, _backoff_seconds, _is_transient
+from .llm_config import RETRY_ATTEMPTS, AttemptMeter, GeminiClient, _backoff_seconds, _is_transient
+from .spend_cap import DailyLimitReached
 
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -65,6 +66,7 @@ class OpenAICompatClient:
         self._client = client
         self.model = model or os.getenv("OPENAI_MODEL", OPENAI_DEFAULT_MODEL)
         self.temperature = temperature
+        self.attempt_guard: Optional[Callable[[], Any]] = None  # set by spend_cap.CappedLLM
 
     def _kwargs(self, prompt: str, temperature: Optional[float], json_mode: bool) -> Dict[str, Any]:
         kwargs: Dict[str, Any] = {
@@ -78,10 +80,16 @@ class OpenAICompatClient:
 
     def generate(self, prompt: str, temperature: Optional[float] = None, json_mode: bool = False) -> Dict[str, Any]:
         last_err: Optional[str] = None
+        meter = AttemptMeter(self.attempt_guard)
         for attempt in range(RETRY_ATTEMPTS):
+            try:
+                meter.before_attempt()
+            except DailyLimitReached as e:
+                return {"ok": False, "error": str(e)}
             try:
                 resp = self._client.chat.completions.create(**self._kwargs(prompt, temperature, json_mode))
             except Exception as e:
+                meter.after_failure(e)
                 last_err = str(e)
                 if _is_transient(e) and attempt < RETRY_ATTEMPTS - 1:
                     time.sleep(_backoff_seconds(e, attempt))
@@ -99,7 +107,9 @@ class OpenAICompatClient:
 
     def stream(self, prompt: str, temperature: Optional[float] = None, json_mode: bool = False) -> Iterator[str]:
         """Retries only before the first piece; after that, errors propagate."""
+        meter = AttemptMeter(self.attempt_guard)
         for attempt in range(RETRY_ATTEMPTS):
+            meter.before_attempt()
             started = False
             try:
                 for chunk in self._client.chat.completions.create(**self._kwargs(prompt, temperature, json_mode), stream=True):
@@ -114,6 +124,7 @@ class OpenAICompatClient:
             except Exception as e:
                 if started or not _is_transient(e) or attempt == RETRY_ATTEMPTS - 1:
                     raise
+                meter.after_failure(e)
                 time.sleep(_backoff_seconds(e, attempt))
 
     def start_tool_chat(self, system: str, tools: List[Any], temperature: Optional[float] = None) -> Any:

@@ -125,18 +125,21 @@ class GeminiToolChat:
         return [self._types.Part.from_function_response(name=r.name, response=r.payload) for r in message]
 
     def send(self, message: Union[str, List[ToolResult]]) -> TurnResult:
-        from .llm_config import logger
+        from .llm_config import AttemptMeter, logger
 
         attempts, is_transient, backoff = self._retry
         attempt = 0
         started_at = time.monotonic()
         replay = False
         first_turn = not self.turn_models
+        meter = AttemptMeter(getattr(self._owner, "attempt_guard", None))
         while True:
+            meter.before_attempt()  # outside the try: reaching the daily cap must end the run, not trigger a failover
             try:
                 resp = self._chat.send_message(self._payload(message, replay and not first_turn))
                 break
             except Exception as e:
+                meter.after_failure(e)
                 note = getattr(self._owner, "note_failure", None)
                 if note is not None:
                     note(self.model, e)
