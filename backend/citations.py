@@ -38,6 +38,7 @@ _PAGE_LIST = re.compile(rf"^(?P<doc>.+?)\s*(?:\(\s*(?P<p1>{_PAGES})\s*\)|[,;:Â·â
 # level of nested parentheses allowed ("(doc.pdf (page 3))"), and never a Markdown link target "](...)".
 _PAREN = re.compile(r"(?<![\]\w])\(((?:[^()\[\]\n]|\([^()\[\]\n]*\)){3,300})\)")
 _CODE = re.compile(r"```[\s\S]*?```|`[^`\n]*`")
+_CODED_PAREN = re.compile(r"^`\s*\((?:[^()\[\]\n]|\([^()\[\]\n]*\)){3,300}\)\s*`$")
 _EMPHASIS = re.compile(r"\*+|(?<!\w)_+|_+(?!\w)|`")
 _LEAD = re.compile(r"^(?:see(?:\s+also)?|cf\.?|source:|sources:|from)\s+", re.I)
 _EXTENSION = re.compile(r"\.(pdf|md|txt|py|rst|docx?|pptx?|mp3|mp4|wav|m4a|html?)\b", re.I)
@@ -139,7 +140,9 @@ def _paren_parts(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]
 def citation_spans(answer: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[tuple]:
     """(start, end, labels) for every bracket and prose-parenthesis citation in `answer`, in order."""
     spans = [(m.start(), m.end(), _split_multi(m.group(1).strip(), docs)) for m in _BRACKET.finditer(answer or "")]
-    prose = _CODE.sub(lambda m: " " * len(m.group(0)), answer or "")  # never read citations out of code
+    # Never read citations out of code, except an inline span that is exactly one parenthesis ("`(doc.pdf, page 3)`"):
+    # some models wrap their citations in backticks. Offsets are kept so spans still index into `answer`.
+    prose = _CODE.sub(lambda m: (" " + m.group(0)[1:-1] + " ") if _CODED_PAREN.match(m.group(0)) else " " * len(m.group(0)), answer or "")
     for m in _PAREN.finditer(prose):
         if any(s <= m.start() < e or m.start() <= s < m.end() for s, e, _ in spans):
             continue

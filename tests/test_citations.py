@@ -206,6 +206,8 @@ def prose(answer):
         ("Nested (heaps.pdf (page 1)).", [("heaps.pdf (page 1)", "heaps.pdf", 1, "ok")]),
         ("With see (see heaps.pdf, page 1).", [("heaps.pdf, page 1", "heaps.pdf", 1, "ok")]),
         ("A titled source (Intro to Heaps).", [("Intro to Heaps", "Intro to Heaps", None, "ok")]),
+        ("Wrapped in backticks `(heaps.pdf, page 1)`.", [("heaps.pdf, page 1", "heaps.pdf", 1, "ok")]),
+        ("Bracket in backticks `[heaps.pdf (page 1)]`.", [("heaps.pdf (page 1)", "heaps.pdf", 1, "ok")]),
     ],
 )
 def test_prose_parenthesis_citations_are_recognised(answer, expected):

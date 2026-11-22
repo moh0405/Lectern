@@ -187,7 +187,7 @@ class RAGEngine:
     CITE_RULE = (
         "Cite every source you use in square brackets, copying its label from the context exactly, "
         "e.g. [Dsa.pdf (page 12)], one citation per pair of brackets. Never cite in parentheses or prose "
-        "such as (Dsa.pdf, page 12), and never cite a document or page that is not in the context"
+        "such as (Dsa.pdf, page 12), never wrap a citation in backticks or code formatting, and never cite a document or page that is not in the context"
     )
 
     def _create_prompt_template(self) -> str:
