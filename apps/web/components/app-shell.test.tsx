@@ -46,8 +46,9 @@ const statusText = () => document.querySelector(".api-status-text")?.textContent
 const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
 /** A page that reads the passage count, like Ask's source margin. */
-function StatsPage({ calls }: { calls: { n: number } }) {
-  const q = useQuery({ queryKey: ["stats"], queryFn: async () => { calls.n += 1; if (health.status !== 200) throw new Error("down"); return 1; } });
+const statsCalls = { n: 0 };
+function StatsPage() {
+  const q = useQuery({ queryKey: ["stats"], queryFn: async () => { statsCalls.n += 1; if (health.status !== 200) throw new Error("down"); return 1; } });
   return <p>{q.isError ? "stats failed" : q.isSuccess ? "stats loaded" : "stats loading"}</p>;
 }
 
@@ -58,8 +59,8 @@ describe("API status while the service wakes up", () => {
 
   it("keeps saying Starting up through a cold start, re-checks quickly, and refreshes pages once it is back", async () => {
     health.status = 503;
-    const stats = { n: 0 };
-    renderShell(false, <StatsPage calls={stats} />);
+    statsCalls.n = 0;
+    renderShell(false, <StatsPage />);
     await advance(100);
     expect(statusText()).toBe("Starting up…");
     expect(screen.getByText("stats failed")).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe("API status while the service wakes up", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Connected to the study service again");
     await advance(100);
     expect(screen.getByText("stats loaded")).toBeInTheDocument();
-    expect(stats.n).toBe(2);
+    expect(statsCalls.n).toBe(2);
   });
 
   it("says Offline only after the cold-start window, keeps checking, and recovers by itself", async () => {
