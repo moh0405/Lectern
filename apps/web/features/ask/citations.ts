@@ -9,6 +9,12 @@ import type { CitationCheck } from "./session";
  * and each chip remembers which passage it points to and the sentence that cited it. Only citations the
  * server reported are linked, so ordinary brackets such as `nums[0]` are left alone. A bracket is matched to the
  * server's citations by exact label, after splitting it the way the server does (backend/citations.py).
+ *
+ * Some models cite in prose parentheses instead, "(*Dsa.pdf*, pages 118–120)". The server reports those parts that
+ * name a retrieved document, labelled with emphasis and a leading "see" removed (`clean_paren`); here the whole
+ * parenthesis becomes chips, and any part the server did not report stays as text. A bracket citation the model
+ * wrapped in parentheses, "([Dsa.pdf (page 3)])", loses the parentheses, and a chip that repeats the passage of the
+ * chip right before it (or of another citation in the same bracket) is dropped.
  */
 
 export type CitationStatus = CitationCheck["status"];
@@ -37,10 +43,24 @@ export const CITE_PREFIX = "#cite-";
 
 // Same shape the server accepts as a citation (backend/citations.py `_BRACKET`).
 const BRACKET = /(?<![\w\])])\[([^[\]\n]{3,200})\](?!\()/g;
+// A prose parenthesis that may hold citations (server `_PAREN`): no brackets inside, one level of nesting, never a
+// Markdown link target. Matched together with brackets so references are numbered in reading order.
+const PAREN_SRC = String.raw`(?<![\]\w])\(((?:[^()[\]\n]|\([^()[\]\n]*\)){3,300})\)`;
+const CITATION = new RegExp(`${BRACKET.source}|${PAREN_SRC}`, "g");
+// Chips the model wrapped in parentheses, optionally after "see": "([doc (page 3)])" would render as "(01 )".
+const WRAPPED_CHIPS = /\(\s*(?:(?:see(?:\s+also)?|cf\.?)\s+)?((?:\[\d+\]\(#cite-\d+\)[\s,;]*)+)\)/gi;
 // Code is never rewritten: fenced blocks and inline code spans are kept as they are.
 const CODE = /(```[\s\S]*?```|`[^`\n]*`)/;
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+const EMPHASIS = /\*+|(?<!\w)_+|_+(?!\w)|`/g;
+const LEAD = /^(?:see(?:\s+also)?|cf\.?|source:|sources:|from)\s+/i;
+
+/** A prose parenthesis as a citation label: emphasis, a leading "see" and extra spaces removed (server `clean_paren`). */
+export function cleanParen(inner: string): string {
+  return inner.replace(EMPHASIS, "").replace(/\s+/g, " ").trim().replace(LEAD, "").trim();
+}
 
 /** The keys a document name is known by: as written, and without its file extension (server `_doc_keys`). */
 function docKeys(name: string): string[] {
@@ -185,6 +205,24 @@ function matching(inner: string, byLabel: Map<string, CitationCheck>, chunkDocs:
   return found;
 }
 
+/** The citations a prose parenthesis holds, and the parts of it that are not citations (kept as text). */
+function matchingParen(inner: string, byLabel: Map<string, CitationCheck>, chunkDocs: string[]): { found: CitationCheck[]; rest: string[] } {
+  const found: CitationCheck[] = [];
+  const rest: string[] = [];
+  for (const part of splitCitations(cleanParen(inner), chunkDocs)) {
+    const c = byLabel.get(norm(part));
+    if (!c) rest.push(part);
+    else if (!found.includes(c)) found.push(c);
+  }
+  return { found, rest };
+}
+
+// Marks a citation removed as a duplicate, so the separator before it goes too.
+const DROPPED = "\u0000";
+
+/** Two references show the same thing: the same passage, or (with no passage) the same citation. */
+const sameTarget = (a: CiteRef, b: CiteRef) => (a.chunk !== null ? a.chunk === b.chunk : b.chunk === null && a.status === b.status && norm(a.label) === norm(b.label));
+
 export function linkCitations(answer: string, citations: CitationCheck[] | undefined, chunks: Chunk[]): LinkedAnswer {
   const refs: CiteRef[] = [];
   if (!citations?.length) return { markdown: answer, refs };
@@ -195,18 +233,28 @@ export function linkCitations(answer: string, citations: CitationCheck[] | undef
   const markdown = parts
     .map((part, i) => {
       if (i % 2 === 1) return part; // code
-      return part.replace(BRACKET, (whole: string, inner: string, offset: number) => {
-        const found = matching(inner, byLabel, chunkDocs);
+      // The chips of the citation just before, while only spaces or punctuation separate it from the next one.
+      let previous: CiteRef[] = [];
+      let previousEnd = -1;
+      const linkedPart = part.replace(CITATION, (whole: string, inner: string | undefined, paren: string | undefined, offset: number) => {
+        const { found, rest } = inner !== undefined ? { found: matching(inner, byLabel, chunkDocs), rest: [] } : matchingParen(paren!, byLabel, chunkDocs);
         if (!found.length) return whole;
+        const adjacent = previousEnd >= 0 && /^[\s,;]*$/.test(part.slice(previousEnd, offset));
         const sentence = citingSentence(part.slice(0, offset));
-        return found
-          .map((c) => {
-            const ref: CiteRef = { id: refs.length, chunk: chunkForCitation(c, chunks, sentence), label: c.label, doc: c.doc, page: c.page ?? null, status: c.status, sentence };
-            refs.push(ref);
-            return `[${ref.id}](${CITE_PREFIX}${ref.id})`;
-          })
-          .join("");
+        const group: CiteRef[] = [];
+        for (const c of found) {
+          const ref: CiteRef = { id: refs.length, chunk: chunkForCitation(c, chunks, sentence), label: c.label, doc: c.doc, page: c.page ?? null, status: c.status, sentence };
+          if (group.some((g) => sameTarget(g, ref)) || (adjacent && previous.some((g) => sameTarget(g, ref)))) continue; // a duplicate chip
+          refs.push(ref);
+          group.push(ref);
+        }
+        previous = adjacent ? [...previous, ...group] : group;
+        previousEnd = offset + whole.length;
+        const chips = group.map((ref) => `[${ref.id}](${CITE_PREFIX}${ref.id})`).join("");
+        if (!group.length && !rest.length) return DROPPED; // every citation here repeats the chip just before it
+        return rest.length ? `${chips} (${rest.join("; ")})` : chips;
       });
+      return linkedPart.replace(/[\s,;]*\u0000/g, "").replace(WRAPPED_CHIPS, (_whole: string, chips: string) => chips.replace(/[\s,;]+/g, ""));
     })
     .join("");
   return { markdown, refs };

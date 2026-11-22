@@ -1,6 +1,6 @@
 import type { Chunk } from "@ai-study-mentor/api-client";
 import { describe, expect, it } from "vitest";
-import { chunkForCitation, closestSentence, excerpt, linkCitations } from "./citations";
+import { chunkForCitation, cleanParen, closestSentence, excerpt, linkCitations } from "./citations";
 import type { CitationCheck } from "./session";
 
 const chunk = (doc: string, page: number | null, text = "text", end_page: number | null = null): Chunk => ({ doc, page, end_page, text, score: 0.8 });
@@ -155,5 +155,91 @@ describe("excerpt", () => {
     expect(cut.text).toContain("TARGET sentence here.");
     expect(cut.clippedStart && cut.clippedEnd).toBe(true);
     expect(text.slice(cut.offset, cut.offset + cut.text.length)).toBe(cut.text);
+  });
+});
+
+// Labels exactly as backend/citations.py reports prose-parenthesis citations (live evaluation, defect 1).
+describe("prose-parenthesis citations", () => {
+  const book = "Data Structures Using Python.pdf";
+  const chunks = [chunk(book, 118, "t", 119), chunk(book, 120), chunk("heaps.pdf", 1)];
+
+  it("cleans a parenthesis the way the server labels it", () => {
+    expect(cleanParen(`*${book}*, pages 118–120`)).toBe(`${book}, pages 118–120`);
+    expect(cleanParen("see **heaps.pdf**,  p. 1")).toBe("heaps.pdf, p. 1");
+    expect(cleanParen("_my_notes.pdf_, page 2")).toBe("my_notes.pdf, page 2");
+  });
+
+  it("turns a parenthesis citation into a chip in place of the parenthesis", () => {
+    const answer = "A binary heap is used to implement a priority queue (heaps.pdf, page 1).";
+    const { markdown, refs } = linkCitations(answer, [ok("heaps.pdf, page 1", "heaps.pdf", 1)], chunks);
+    expect(markdown).toBe("A binary heap is used to implement a priority queue [0](#cite-0).");
+    expect(refs[0]).toMatchObject({ chunk: 2, status: "ok", sentence: "A binary heap is used to implement a priority queue" });
+  });
+
+  it("handles emphasis, page ranges and pp.", () => {
+    const answer = `Repeat until the queue is empty (*${book}*, pages 118–120). Then stop (_${book}_, pp. 120).`;
+    const cites = [ok(`${book}, pages 118–120`, book, 118), ok(`${book}, pp. 120`, book, 120)];
+    const { markdown, refs } = linkCitations(answer, cites, chunks);
+    expect(markdown).toBe("Repeat until the queue is empty [0](#cite-0). Then stop [1](#cite-1).");
+    expect(refs.map((r) => r.chunk)).toEqual([0, 1]);
+  });
+
+  it("splits several citations in one parenthesis and keeps parts that are not citations", () => {
+    const answer = `Both agree (heaps.pdf, p. 1; ${book}, page 120; see the lecture).`;
+    const { markdown, refs } = linkCitations(answer, [ok("heaps.pdf, p. 1", "heaps.pdf", 1), ok(`${book}, page 120`, book, 120)], chunks);
+    expect(markdown).toBe("Both agree [0](#cite-0)[1](#cite-1) (see the lecture).");
+    expect(refs.map((r) => r.chunk)).toEqual([2, 1]);
+  });
+
+  it("leaves ordinary and unreported parentheses alone", () => {
+    const answer = "Fast (O(log n)), explained later (see below), unlike (Cormen.pdf, page 3). Code: `f(heaps.pdf, page 1)`.";
+    const { markdown, refs } = linkCitations(answer, [ok("heaps.pdf, page 1", "heaps.pdf", 1)], chunks);
+    expect(markdown).toBe(answer);
+    expect(refs).toHaveLength(0);
+  });
+
+  it("numbers bracket and parenthesis citations in reading order", () => {
+    const answer = "Queues (heaps.pdf, page 1) and heaps [heaps.pdf (page 1)] differ. Books too (Data Structures Using Python.pdf, page 120).";
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1), ok("heaps.pdf, page 1", "heaps.pdf", 1), ok(`${book}, page 120`, book, 120)];
+    const { markdown } = linkCitations(answer, cites, chunks);
+    expect(markdown).toBe("Queues [0](#cite-0) and heaps [1](#cite-1) differ. Books too [2](#cite-2).");
+  });
+});
+
+// Live evaluation, defect 9: a chip shown as "(01 )" and two chips for the same passage.
+describe("chip glitches", () => {
+  const chunks = [chunk("heaps.pdf", 1, "t", 2), chunk("graphs.pdf", 3)];
+
+  it("drops the parentheses a model put around a bracket citation", () => {
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1), ok("graphs.pdf (page 3)", "graphs.pdf", 3)];
+    expect(linkCitations("A heap ([heaps.pdf (page 1)]).", cites, chunks).markdown).toBe("A heap [0](#cite-0).");
+    expect(linkCitations("A heap (see [heaps.pdf (page 1)]).", cites, chunks).markdown).toBe("A heap [0](#cite-0).");
+    expect(linkCitations("Both ([heaps.pdf (page 1)], [graphs.pdf (page 3)]).", cites, chunks).markdown).toBe("Both [0](#cite-0)[1](#cite-1).");
+  });
+
+  it("keeps parentheses that hold more than chips", () => {
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1)];
+    expect(linkCitations("A heap (a tree [heaps.pdf (page 1)]).", cites, chunks).markdown).toBe("A heap (a tree [0](#cite-0)).");
+  });
+
+  it("shows one chip when one bracket cites the same passage twice", () => {
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1), ok("heaps.pdf (page 2)", "heaps.pdf", 2)];
+    const { markdown, refs } = linkCitations("A heap [heaps.pdf (page 1); heaps.pdf (page 2)].", cites, chunks);
+    expect(markdown).toBe("A heap [0](#cite-0).");
+    expect(refs).toHaveLength(1);
+  });
+
+  it("shows one chip when adjacent citations point to the same passage", () => {
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1), ok("heaps.pdf, page 2", "heaps.pdf", 2)];
+    const { markdown, refs } = linkCitations("A heap [heaps.pdf (page 1)] (heaps.pdf, page 2).", cites, chunks);
+    expect(markdown).toBe("A heap [0](#cite-0).");
+    expect(refs).toHaveLength(1);
+  });
+
+  it("still links the same passage again from a later sentence", () => {
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1)];
+    const { markdown, refs } = linkCitations("A heap [heaps.pdf (page 1)]. Also a tree [heaps.pdf (page 1)].", cites, chunks);
+    expect(markdown).toBe("A heap [0](#cite-0). Also a tree [1](#cite-1).");
+    expect(refs.map((r) => r.chunk)).toEqual([0, 0]);
   });
 });

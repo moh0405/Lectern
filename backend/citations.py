@@ -12,6 +12,14 @@ is checked against the retrieved chunks:
 What counts as a citation is deliberately conservative, so ordinary text such as `nums[0]` or `[1]` is never
 flagged. A bracketed expression is a citation if it has a page suffix ("(page 3)", ", p. 3"), ends in a file
 extension (".pdf"), or names a retrieved document exactly (so video and web titles are verified too).
+
+Some models ignore the bracket format and cite in prose parentheses instead: "(*Dsa.pdf*, pages 118–120)",
+"(Dsa.pdf, p. 3; notes.md)". A parenthesis is only a citation when it names a document the model was actually given
+(so "(see below)", "(O(log n))" or "(heaps)" are left alone), and then it is checked like a bracket citation. A
+parenthesis that names an unknown document is ignored rather than flagged, because prose parentheses mention other
+things too. Markdown emphasis and a leading "see" are dropped from its label; the web app strips them the same way.
+
+A page range ("pages 118-120") is verified when any page in the range was retrieved; `page` is its first page.
 """
 
 from __future__ import annotations
@@ -26,6 +34,12 @@ _WITH_PAGE_PAREN = re.compile(rf"^(?P<doc>.+?)\s*\(\s*{_PAGE}\s*\)\s*$", re.I)
 _WITH_PAGE_COMMA = re.compile(rf"^(?P<doc>.+?)\s*[,;:·–-]\s*{_PAGE}\s*$", re.I)
 _PAGES = r"(?:pages?|pp?\.?)\s*\d+(?:\s*[,;&]\s*(?:(?:pages?|pp?\.?)\s*)?\d+)+"
 _PAGE_LIST = re.compile(rf"^(?P<doc>.+?)\s*(?:\(\s*(?P<p1>{_PAGES})\s*\)|[,;:·–-]\s*(?P<p2>{_PAGES}))\s*$", re.I)
+# A prose parenthesis that may hold citations: no brackets inside (a bracket citation is handled on its own), one
+# level of nested parentheses allowed ("(doc.pdf (page 3))"), and never a Markdown link target "](...)".
+_PAREN = re.compile(r"(?<![\]\w])\(((?:[^()\[\]\n]|\([^()\[\]\n]*\)){3,300})\)")
+_CODE = re.compile(r"```[\s\S]*?```|`[^`\n]*`")
+_EMPHASIS = re.compile(r"\*+|(?<!\w)_+|_+(?!\w)|`")
+_LEAD = re.compile(r"^(?:see(?:\s+also)?|cf\.?|source:|sources:|from)\s+", re.I)
 _EXTENSION = re.compile(r"\.(pdf|md|txt|py|rst|docx?|pptx?|mp3|mp4|wav|m4a|html?)\b", re.I)
 
 
@@ -99,18 +113,56 @@ def _parse(inner: str) -> Optional[Dict[str, Any]]:
     return {"doc": text, "page": None, "end": None, "suffix": False}
 
 
-def extract_citations(answer: str, chunks: Sequence[Dict[str, Any]]) -> List[Citation]:
-    """Citations found in `answer`, each checked against `chunks` (dicts with doc/page/end_page)."""
+def clean_paren(inner: str) -> str:
+    """The text of a prose parenthesis as a citation label: Markdown emphasis, a leading "see" and extra spaces dropped.
+    Mirrored by `cleanParen` in apps/web/features/ask/citations.ts."""
+    text = re.sub(r"\s+", " ", _EMPHASIS.sub("", inner)).strip()
+    return _LEAD.sub("", text).strip()
+
+
+def _paren_parts(inner: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+    """The citations a prose parenthesis holds: only parts that name a retrieved document count."""
+    text = clean_paren(inner)
+    parts = []
+    for raw in _split_multi(text, docs):
+        parsed = _parse(raw)
+        matches, doc_part = _match_doc(parsed["doc"], docs)
+        if matches is None:
+            continue
+        # A bare stem such as "(heaps)" for heaps.pdf is ordinary prose; a page, an extension or the full name is not.
+        named = parsed["suffix"] or bool(_EXTENSION.search(doc_part)) or any(_key(doc_part) == _key(c.get("doc") or "") for c in matches)
+        if named:
+            parts.append(raw)
+    return parts
+
+
+def citation_spans(answer: str, docs: Dict[str, List[Dict[str, Any]]]) -> List[tuple]:
+    """(start, end, labels) for every bracket and prose-parenthesis citation in `answer`, in order."""
+    spans = [(m.start(), m.end(), _split_multi(m.group(1).strip(), docs)) for m in _BRACKET.finditer(answer or "")]
+    prose = _CODE.sub(lambda m: " " * len(m.group(0)), answer or "")  # never read citations out of code
+    for m in _PAREN.finditer(prose):
+        if any(s <= m.start() < e or m.start() <= s < m.end() for s, e, _ in spans):
+            continue
+        parts = _paren_parts(m.group(1), docs)
+        if parts:
+            spans.append((m.start(), m.end(), parts))
+    return sorted(spans, key=lambda s: s[0])
+
+
+def _index(chunks: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     docs: Dict[str, List[Dict[str, Any]]] = {}
     for c in chunks:
         for k in _doc_keys(c.get("doc") or ""):
             docs.setdefault(k, []).append(c)
+    return docs
 
+
+def extract_citations(answer: str, chunks: Sequence[Dict[str, Any]]) -> List[Citation]:
+    """Citations found in `answer`, each checked against `chunks` (dicts with doc/page/end_page)."""
+    docs = _index(chunks)
     found: List[Citation] = []
     seen = set()
-    cited: List[str] = []
-    for m in _BRACKET.finditer(answer or ""):
-        cited.extend(_split_multi(m.group(1).strip(), docs))
+    cited: List[str] = [label for _s, _e, labels in citation_spans(answer, docs) for label in labels]
     for raw in cited:
         parsed = _parse(raw)
         if not parsed or not re.search(r"[A-Za-z]", parsed["doc"]):

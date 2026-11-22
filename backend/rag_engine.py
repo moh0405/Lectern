@@ -179,6 +179,14 @@ class RAGEngine:
             self.store.save()
         return removed
 
+    # How every answer prompt asks for citations. backend/citations.py also accepts prose parentheses that name a
+    # given source (some failover models write those), but brackets are the format the prompt insists on.
+    CITE_RULE = (
+        "Cite every source you use in square brackets, copying its label from the context exactly, "
+        "e.g. [Dsa.pdf (page 12)], one citation per pair of brackets. Never cite in parentheses or prose "
+        "such as (Dsa.pdf, page 12), and never cite a document or page that is not in the context"
+    )
+
     def _create_prompt_template(self) -> str:
         """Default prompt when no mode is specified."""
         return (
@@ -189,7 +197,7 @@ class RAGEngine:
             "1. Answer clearly and concisely\n"
             "2. Use ONLY information from the context\n"
             "3. If insufficient info, say so\n"
-            "4. Cite sources when possible\n\n"
+            "4. " + self.CITE_RULE + "\n\n"
             "Answer:"
         )
 
@@ -207,25 +215,25 @@ class RAGEngine:
             return (
                 "Explain like I'm 5 (ELI5). Use simple language and analogies.\n\n"
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Instructions:\n- Use short sentences\n- Avoid jargon\n- Include a friendly analogy\n- End with a one-sentence recap\n\nAnswer:"
+                "Instructions:\n- Use short sentences\n- Avoid jargon\n- Include a friendly analogy\n- End with a one-sentence recap\n- " + self.CITE_RULE + "\n\nAnswer:"
             )
         if m in {"technical", "detailed"}:
             return (
                 "Technical mode: provide a rigorous explanation using ONLY the context.\n\n"
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Instructions:\n- Define terms precisely\n- Include time/space complexity where relevant\n- Provide a short pseudocode or code example if present in context\n- Mention trade-offs and edge cases\n- Cite sources\n\nAnswer:"
+                "Instructions:\n- Define terms precisely\n- Include time/space complexity where relevant\n- Provide a short pseudocode or code example if present in context\n- Mention trade-offs and edge cases\n- " + self.CITE_RULE + "\n\nAnswer:"
             )
         if m in {"interview", "interview prep"}:
             return (
                 "Interview Prep mode: produce a concise, structured answer.\n\n"
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Instructions:\n- Start with a 2-sentence overview\n- Bullet points: approach, complexity, edge cases\n- Common pitfalls\n- Short example if in context\n- Cite sources\n\nAnswer:"
+                "Instructions:\n- Start with a 2-sentence overview\n- Bullet points: approach, complexity, edge cases\n- Common pitfalls\n- Short example if in context\n- " + self.CITE_RULE + "\n\nAnswer:"
             )
         if m in {"summary", "quick summary"}:
             return (
                 "Quick Summary mode: produce bullet points only from context.\n\n"
                 "Context:\n{context}\n\nQuestion: {question}\n\n"
-                "Instructions:\n- 5–8 bullets\n- Each bullet one sentence\n- No speculation beyond context\n- Cite sources if possible\n\nAnswer:"
+                "Instructions:\n- 5–8 bullets\n- Each bullet one sentence\n- No speculation beyond context\n- " + self.CITE_RULE + "\n\nAnswer:"
             )
         return self._create_prompt_template()
 
