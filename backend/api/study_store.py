@@ -44,6 +44,14 @@ class StudyStore:
         conn.row_factory = sqlite3.Row
         if not self._ready:
             conn.executescript(_SCHEMA)
+            # Databases created before own-words notes existed gain the column in place; existing rows are kept.
+            if "note" not in {r["name"] for r in conn.execute("PRAGMA table_info(history)")}:
+                try:
+                    conn.execute("ALTER TABLE history ADD COLUMN note TEXT")
+                    conn.commit()
+                except sqlite3.OperationalError as e:  # another process added it first
+                    if "duplicate column" not in str(e).lower():
+                        raise
             self._ready = True
         return conn
 
@@ -140,11 +148,11 @@ class StudyStore:
     def add_history(self, turn: Dict[str, Any], now: Optional[float] = None) -> Dict[str, Any]:
         now = time.time() if now is None else now
         hid = self._run(
-            "INSERT INTO history (ts, question, answer, mode, model, cached, chunks, citations, unverified, uncited)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO history (ts, question, answer, mode, model, cached, chunks, citations, unverified, uncited, note)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (now, turn["question"], turn["answer"], turn.get("mode"), turn.get("model"), int(bool(turn.get("cached"))),
              json.dumps(turn.get("chunks") or []), json.dumps(turn.get("citations") or []),
-             int(turn.get("unverified_citations") or 0), int(bool(turn.get("uncited")))))
+             int(turn.get("unverified_citations") or 0), int(bool(turn.get("uncited"))), turn.get("note") or None))
         self._run("DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT ?)", (MAX_HISTORY,))
         return self.get_history_item(hid)  # type: ignore[return-value]
 
@@ -161,6 +169,10 @@ class StudyStore:
 
     def list_history(self, limit: int = 100) -> List[Dict[str, Any]]:
         return [self._decode_history(r) for r in self._run("SELECT * FROM history ORDER BY id DESC LIMIT ?", (limit,), "all")]  # type: ignore[misc]
+
+    def set_history_note(self, hid: int, note: str) -> Optional[Dict[str, Any]]:
+        self._run("UPDATE history SET note=? WHERE id=?", (note.strip() or None, hid))
+        return self.get_history_item(hid)
 
     def delete_history(self, hid: Optional[int] = None) -> int:
         if hid is None:

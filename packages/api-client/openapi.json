@@ -58,6 +58,23 @@
       },
       "AdaptiveRequest": {
         "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContextPassage"
+                },
+                "maxItems": 20,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explain from these passages instead of the server index (for example the ones an answer was built from). Nothing is stored.",
+            "title": "Context"
+          },
           "level": {
             "default": "Undergrad",
             "enum": [
@@ -1489,6 +1506,21 @@
         "title": "HistoryItem",
         "type": "object"
       },
+      "HistoryNote": {
+        "properties": {
+          "note": {
+            "description": "The student's own-words note; empty clears it",
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "title": "HistoryNote",
+        "type": "object"
+      },
       "HistoryTurn": {
         "properties": {
           "answer": {
@@ -1539,6 +1571,19 @@
               }
             ],
             "title": "Model"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The student's own-words note on this turn",
+            "title": "Note"
           },
           "question": {
             "maxLength": 2000,
@@ -2377,6 +2422,19 @@
             ],
             "title": "Model"
           },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The student's own-words note on this turn",
+            "title": "Note"
+          },
           "question": {
             "maxLength": 2000,
             "title": "Question",
@@ -2419,6 +2477,96 @@
           "chunks"
         ],
         "title": "SearchResponse",
+        "type": "object"
+      },
+      "SimilarPractice": {
+        "properties": {
+          "citations": {
+            "description": "The verified passages the question is based on",
+            "items": {
+              "$ref": "#/components/schemas/CitationCheck"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "question": {
+            "description": "A new practice question. Its answer is never returned",
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "citations"
+        ],
+        "title": "SimilarPractice",
+        "type": "object"
+      },
+      "SimilarPracticeRequest": {
+        "properties": {
+          "context": {
+            "description": "The passages to write the new question from. Nothing is stored.",
+            "items": {
+              "$ref": "#/components/schemas/ContextPassage"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Context",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A model named here is used as is, never swapped for another",
+            "title": "Model"
+          },
+          "previous": {
+            "description": "Practice questions already offered, so a new one differs",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Previous",
+            "type": "array"
+          },
+          "question": {
+            "description": "The question the student just studied",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Question",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.4,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "question",
+          "context"
+        ],
+        "title": "SimilarPracticeRequest",
         "type": "object"
       },
       "Socratic": {
@@ -5673,6 +5821,128 @@
         ]
       }
     },
+    "/api/v1/history/{turn_id}/note": {
+      "put": {
+        "operationId": "save_turn_note_api_v1_history__turn_id__note_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistoryNote"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedTurn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save your own-words note on a saved turn",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
     "/api/v1/jobs/{job_id}": {
       "get": {
         "operationId": "get_job_api_v1_jobs__job_id__get",
@@ -7041,6 +7311,118 @@
         "summary": "Turn a Q&A history into Markdown study notes",
         "tags": [
           "study"
+        ]
+      }
+    },
+    "/api/v1/practice/similar": {
+      "post": {
+        "description": "Writes one question from the `context` passages. It is returned only if it cites one of them, shares content with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it with `/attempt/feedback`. One model call per request; nothing is cached or stored.",
+        "operationId": "similar_api_v1_practice_similar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarPracticeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarPractice"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "One new practice question on the same concept, from the same passages (answer never returned)",
+        "tags": [
+          "tutor"
         ]
       }
     },

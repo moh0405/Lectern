@@ -42,6 +42,19 @@ def scripted_attempt_feedback(prompt: str) -> dict:
     return {"answer_key": "", "summary": summary, "items": items}
 
 
+def scripted_similar_question(prompt: str) -> dict:
+    """A deterministic practice question built from the first passage's words; each one already asked shifts the words."""
+    passages = re.findall(r"^- \[(.+?)\] (.+)$", prompt, re.M)
+    if not passages:
+        return {"question": "", "answer_key": "", "citations": []}
+    label, body = passages[0]
+    words = list(dict.fromkeys(w for w in _WORD.findall(body.lower()) if len(w) > 4))
+    shift = len(re.findall(r"^\* ", prompt, re.M))
+    picked = (words[shift:shift + 3] or words[:3])
+    return {"question": f"Practice {shift + 1}: how do {', '.join(picked)} relate in a new example?",
+            "answer_key": "SCRIPTED-HIDDEN-ANSWER stays on the server.", "citations": [label]}
+
+
 class FakeGemini:
     """Stand-in for GeminiClient. Override `FakeGemini.handler` in a test to script replies."""
 
@@ -61,6 +74,8 @@ class FakeGemini:
     def default_reply(prompt: str, json_mode: bool) -> str:
         if "TASK: ATTEMPT_FEEDBACK" in prompt:
             return json.dumps(scripted_attempt_feedback(prompt))
+        if "TASK: SIMILAR_QUESTION" in prompt:
+            return json.dumps(scripted_similar_question(prompt))
         if "TASK: REWRITE_QUERY" in prompt:  # the agentic workflow's planning calls
             return json.dumps({"query": "binary heap priority queue data structure"})
         if "TASK: GRADE_PASSAGES" in prompt:

@@ -21,6 +21,8 @@ const ALLOWED: Array<[method: string, pattern: RegExp]> = [
   ["POST", /^(ask|ask\/stream|ask\/agent\/stream|agent\/run\/stream|adaptive|concept-map|math|socratic|synthesis)$/],
   // Try first: judged against the shared index or passages the browser sends; read-only, nothing is stored.
   ["POST", /^attempt\/feedback$/],
+  // Similar example: written from passages the browser sends; read-only, nothing is stored.
+  ["POST", /^practice\/similar$/],
 ];
 
 export interface ProxyConfig {

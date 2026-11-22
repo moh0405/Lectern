@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 StudyMode = Literal["eli5", "technical", "interview", "summary"]
 EliLevel = Literal["ELI5", "ELI10", "Undergrad", "Grad", "Expert"]
@@ -248,6 +248,27 @@ class AttemptFeedback(BaseModel):
     withheld: int = Field(0, description="Notes replaced by a neutral pointer because they gave the answer away")
 
 
+class SimilarPracticeRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=2000, description="The question the student just studied")
+    context: List[ContextPassage] = Field(..., min_length=1, max_length=10, description="The passages to write the new question from. Nothing is stored.")
+    previous: List[str] = Field(default_factory=list, max_length=5, description="Practice questions already offered, so a new one differs")
+    model: Optional[str] = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
+    temperature: float = Field(0.4, ge=0.0, le=1.0)
+
+    @field_validator("previous")
+    @classmethod
+    def _short_previous(cls, value: List[str]) -> List[str]:
+        if any(len(p) > 500 for p in value):
+            raise ValueError("Each previous question must be 500 characters or fewer")
+        return value
+
+
+class SimilarPractice(BaseModel):
+    question: str = Field(description="A new practice question. Its answer is never returned")
+    citations: List[CitationCheck] = Field(description="The verified passages the question is based on")
+    model: Optional[str] = None
+
+
 class SynthesisRequest(BaseModel):
     topic: str = Field(..., min_length=2, max_length=200)
     k_per_doc: int = Field(2, ge=1, le=5)
@@ -283,6 +304,10 @@ class AdaptiveRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
     level: EliLevel = "Undergrad"
     temperature: float = Field(0.2, ge=0.0, le=1.0)
+    context: Optional[List[ContextPassage]] = Field(
+        None, min_length=1, max_length=20,
+        description="Explain from these passages instead of the server index (for example the ones an answer was built from). Nothing is stored.",
+    )
 
 
 class Adaptive(BaseModel):
@@ -517,6 +542,11 @@ class HistoryTurn(BaseModel):
     citations: List[CitationCheck] = []
     unverified_citations: int = 0
     uncited: bool = False
+    note: Optional[str] = Field(None, max_length=2000, description="The student's own-words note on this turn")
+
+
+class HistoryNote(BaseModel):
+    note: str = Field(..., max_length=2000, description="The student's own-words note; empty clears it")
 
 
 class SavedTurn(HistoryTurn):
