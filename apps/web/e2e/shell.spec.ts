@@ -76,8 +76,12 @@ test("the section bar keeps the current page in view on a narrow phone", async (
 });
 
 test("shows when the API cannot be reached, with a hint rather than a blank page", async ({ page }) => {
+  await page.clock.install();
   await page.route(/127\.0\.0\.1:8100/, (route) => route.abort()); // every call to the API fails
   await page.goto("/sources");
+  // It could be a cold start, so the header says Starting up for a minute before it says Offline.
+  await expect(page.locator(".api-status-text")).toHaveText("Starting up…");
+  await page.clock.fastForward(65_000);
   await expect(page.locator(".api-status-text")).toHaveText("Offline");
   await expect(page.getByRole("status").filter({ hasText: "the study service cannot be reached" })).toBeAttached();
   // network failures are retried a couple of times before the error is shown

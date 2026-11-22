@@ -90,9 +90,67 @@ test("while the library is still loading, the page does not claim it is empty", 
   release();
 });
 
-test("a service that never comes up is reported as Offline", async ({ page }) => {
-  await coldApi(page, (route) => route.fulfill({ status: 502, json: { error: { code: "upstream_unreachable", message: "Could not reach the API." } } }));
+/** Record every state the status light passes through, however briefly. */
+async function recordStates(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __apiStates: string[] };
+    w.__apiStates = [];
+    new MutationObserver(() => {
+      const state = document.querySelector(".api-status")?.getAttribute("data-state");
+      if (state && w.__apiStates.at(-1) !== state) w.__apiStates.push(state);
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-state"] });
+  });
+  return () => page.evaluate(() => (window as unknown as { __apiStates: string[] }).__apiStates);
+}
+
+const UNAVAILABLE = { status: 503, json: { error: { code: "upstream_unavailable", message: "The API is starting." } } };
+
+test("an API that answers 503 for 8 s stays Starting up, never Offline, and shows the index soon after it is back", async ({ page }) => {
+  const problems = collectProblems(page);
+  const states = await recordStates(page);
+  const api = await coldApi(page, (route) => route.fulfill(UNAVAILABLE));
   await page.goto("/ask");
-  await expect(page.locator(".api-status")).toHaveAttribute("data-state", "offline", { timeout: 10_000 });
+  const status = page.locator(".api-status");
+  await expect(status).toHaveAttribute("data-state", "starting");
+  await page.waitForTimeout(8_000);
+  await expect(status).toHaveAttribute("data-state", "starting");
+  api.ready();
+  const back = Date.now();
+  await expect(page.locator(".api-status-text")).toHaveText("3,867 passages indexed · meaning search", { timeout: 4_000 });
+  expect(Date.now() - back).toBeLessThan(3_500);
+  expect(await states()).not.toContain("offline");
+  expect(api.calls()).toBeGreaterThanOrEqual(4); // quick re-checks, not one every 30 s
+  expect(problems).toEqual([]);
+});
+
+test("a service that stays down past the cold-start window is reported as Offline, then recovers by itself", async ({ page }) => {
+  await page.clock.install();
+  const states = await recordStates(page);
+  const api = await coldApi(page, (route) => route.fulfill(UNAVAILABLE));
+  await page.goto("/ask");
+  const status = page.locator(".api-status");
+  await expect(status).toHaveAttribute("data-state", "starting");
+  await page.clock.fastForward(30_000);
+  await page.clock.fastForward(10_000);
+  await expect(status).toHaveAttribute("data-state", "starting"); // 40 s in: still a plausible cold start
+  await page.clock.fastForward(25_000);
+  await expect(status).toHaveAttribute("data-state", "offline");
   await expect(page.locator(".api-status-text")).toHaveText("Offline");
+  expect((await states()).filter((s) => s !== "checking")).toEqual(["starting", "offline"]);
+  api.ready();
+  await page.clock.fastForward(15_000); // it keeps checking after showing Offline
+  await expect(status).toHaveAttribute("data-state", "online");
+  await expect(page.locator(".api-status-text")).toHaveText("3,867 passages indexed · meaning search");
+});
+
+test("Offline recovers at once when the window regains focus", async ({ page }) => {
+  await page.clock.install();
+  const api = await coldApi(page, (route) => route.fulfill(UNAVAILABLE));
+  await page.goto("/ask");
+  await expect(page.locator(".api-status")).toHaveAttribute("data-state", "starting");
+  await page.clock.fastForward(70_000);
+  await expect(page.locator(".api-status")).toHaveAttribute("data-state", "offline");
+  api.ready();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.locator(".api-status")).toHaveAttribute("data-state", "online");
 });
