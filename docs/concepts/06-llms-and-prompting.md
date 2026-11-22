@@ -58,6 +58,8 @@ Plus **`uncited`**: a long answer (≥200 characters) from a request that had pa
 
 It is deliberately conservative about what counts as a citation: a bracket is a citation only if it has a page suffix (`(page 3)`, `, p. 3`), a file extension (`.pdf`), or exactly names a retrieved document. So `nums[0]` or `[1]` in code are never flagged. It accepts page ranges (`pages 12-13`) and sources without pages (`(page None)` is stripped; a false warning fixed after Phase 4).
 
+Some models (the failover `gemini-3.1-flash-lite` in particular) ignore the bracket format and cite in prose, `(*Dsa.pdf*, pages 118–120)` or `(Dsa.pdf, p. 3; notes.md)`. A parenthesis counts as a citation only when it names a document the model was given (with a page, a file extension or the full name), so `(see below)`, `(O(log n))` or `(heaps)` are left alone, and a parenthesis naming an unknown document is ignored rather than flagged. Markdown emphasis and a leading "see" are dropped, `;` separates several citations, and a page range is verified when any page in it was retrieved. The web app turns these into the same chips as bracket citations. The prompts still insist on brackets.
+
 What it does **not** prove: that the cited passage *supports* the claim. It catches fabricated or misplaced sources, which are the most embarrassing failures, but faithfulness scoring (an NLI model or LLM judge) is future work.
 
 ## Reliability features
