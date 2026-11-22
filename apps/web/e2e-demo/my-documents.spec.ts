@@ -108,3 +108,26 @@ test("Guided hints use selected browser passages, then reveal evidence in the sa
   await expect(page.getByText("Sources (").first()).toContainText("In this browser");
   expect(uploads).toEqual([]);
 });
+
+test("an answer citing a browser document in prose parentheses shows chips and counts as cited", async ({ page }) => {
+  // Live evaluation, defect 1: "A binary heap is used to implement a priority queue (heaps.pdf, page 1)." on a
+  // browser-stored document showed no chips and "Not found in your material".
+  await page.goto("/sources");
+  await page.getByLabel("Add my documents").setInputFiles(PDF);
+  await expect(page.getByRole("list", { name: "Your documents" })).toContainText("graphs.pdf", { timeout: 60_000 });
+  await page.goto("/ask");
+  await expect(page.getByLabel("Search in")).toHaveValue("mine");
+  await page.getByLabel("Your question", { exact: true }).fill("How are graphs represented? Answer in prose");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const answer = page.locator(".md-body").first();
+  await expect(answer).toContainText("From your material", { timeout: 30_000 });
+  const chips = answer.getByRole("button", { name: /^Citation graphs\.pdf/ });
+  await expect(chips).toHaveCount(2);
+  await expect(chips.first()).toHaveText("01");
+  await expect(answer).not.toContainText("graphs.pdf");
+  await expect(answer).not.toContainText(/\(\s*01/);
+  await expect(page.getByText("does not cite any of the sources")).toHaveCount(0);
+  await expect(page.getByText("Not found in your material")).toHaveCount(0);
+  await expect(page.getByText("2 citations checked against your material")).toBeVisible();
+  await answer.screenshot({ path: test.info().outputPath("prose-citations-demo.png") });
+});

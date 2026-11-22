@@ -126,6 +126,28 @@ test("flags a citation the model invented, and reuses a repeated answer", async 
   await expect(page.getByRole("complementary", { name: "Source margin" }).getByText("This citation could not be checked")).toBeVisible();
 });
 
+test("citations written in prose parentheses become chips, and the answer counts as cited", async ({ page }) => {
+  // The failover model cites as "(*heaps.pdf*, page 1)" and wraps a bracket citation in parentheses (live evaluation,
+  // defects 1 and 9). Both become ordinary chips; "(see below)" and "(O(1) each)" stay as text.
+  await page.goto("/ask");
+  await page.getByLabel("Your question").fill("Explain what a binary heap is used for, in prose");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  const answer = page.locator(".md-body").first();
+  await expect(answer).toContainText("From your material", { timeout: 20_000 });
+  const chips = answer.getByRole("button", { name: /^Citation heaps\.pdf/ });
+  await expect(chips).toHaveCount(2);
+  await expect(chips.first()).toHaveText("01");
+  await expect(chips.first()).toHaveAccessibleName(/^Citation heaps\.pdf, page 1: show passage 1/);
+  await expect(answer).not.toContainText("heaps.pdf"); // the prose parentheses were replaced by the chips
+  await expect(answer).not.toContainText(/\(\s*01/); // no "(01 )"
+  await expect(answer).toContainText("(see below)");
+  await expect(answer).toContainText("(O(1) each)");
+  await expect(page.getByText("does not cite any of the sources")).toHaveCount(0);
+  await expect(page.getByText("Not found in your material")).toHaveCount(0);
+  await expect(page.getByText("2 citations checked against your material")).toBeVisible();
+  await answer.screenshot({ path: test.info().outputPath("prose-citations.png") });
+});
+
 test("a source can be deleted (with confirmation)", async ({ page }) => {
   await page.goto("/sources");
   await page.getByRole("button", { name: "Delete heaps.pdf" }).click();

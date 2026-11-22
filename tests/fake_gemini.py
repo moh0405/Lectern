@@ -57,6 +57,13 @@ class FakeGemini:
             if m:
                 if "previous answer cited sources" in prompt:  # the agentic workflow's corrective retry: behave this time
                     return f"From your material: {m.group(2)[:140]} [{m.group(1)}]"
+                if "in prose" in prompt.lower():  # e2e: a failover model that cites in parentheses, not brackets
+                    label = m.group(1)
+                    lm = re.match(r"(.+?) \((pages? [\d-]+)\)$", label)
+                    cite = f"(*{lm.group(1)}*, {lm.group(2).replace('-', '–')})" if lm else f"(*{label}*)"
+                    return (f"From your material: {m.group(2)[:140]} {cite}.\n\nInsertion and removal take O(log n) time "
+                            f"(see below), one swap per level (O(1) each). It is the usual way to implement a priority "
+                            f"queue ([{label}]).")
                 if "hallucinate" in prompt.lower():  # e2e: a model that invents a source
                     return f"From your material: {m.group(2)[:100]} [{m.group(1)}] and also [Invented Notes.pdf (page 9)]"
                 return f"From your material: {m.group(2)[:140]} [{m.group(1)}]"
