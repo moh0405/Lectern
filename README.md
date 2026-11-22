@@ -126,7 +126,7 @@ All under `/api/v1` except `/health`. Interactive docs at `/docs`. Full detail a
 | Health and corpus | `GET /health` · `GET /stats` · `GET /documents` · `DELETE /sources?key=` |
 | Ingestion | `POST /sources/files` · `POST /sources/urls` · `GET /jobs/{job_id}` |
 | Ask and search | `POST /ask` · `POST /ask/stream` (SSE) · `POST /ask/agent/stream` (SSE, agentic) · `POST /agent/run/stream` (SSE, tool-using agent) · `GET /search` · `GET /suggestions` · `GET /models` |
-| Tutor tools | `POST /concept-map` · `/socratic` · `/synthesis` · `/adaptive` · `/math` |
+| Tutor tools | `POST /concept-map` · `/socratic` · `/attempt/feedback` · `/synthesis` · `/adaptive` · `/math` |
 | LeetCode | `GET /leetcode/stats` · `/leetcode/search` · `/leetcode/problems/{pid}` · `POST /leetcode/problems/{pid}/explain` |
 | Flashcards | `GET` / `POST /cards` · `POST /cards/generate` · `GET /cards/export` · `POST /cards/{id}/review` · `DELETE /cards/{id}` |
 | LeetCode progress | `GET /leetcode/progress` · `PUT` / `DELETE /leetcode/progress/{pid}` · `GET /leetcode/plan` |
