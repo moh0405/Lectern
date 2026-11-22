@@ -173,7 +173,7 @@ def test_every_api_route_waits_for_startup():
     from backend.api.deps import wait_until_started
 
     routers = [r.original_router for r in app.routes if hasattr(r, "original_router")]
-    assert len(routers) == 8
+    assert len(routers) == 9  # including attempt (Try first)
     for router in routers:
         assert router.prefix.startswith("/api/v1")
         assert router.dependencies[0].dependency is wait_until_started, router.prefix
