@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Dict, Any
 
+from .safe_fetch import host_is
 from .sources.youtube_source import YouTubeSource
 from .sources.web_source import WebSource
 from .sources.github_source import GitHubSource
@@ -11,9 +12,9 @@ from .sources.audio_source import AudioSource
 def detect_source_type(input_str: str) -> str:
     s = input_str.strip().lower()
     if s.startswith("http"):
-        if "youtube.com" in s or "youtu.be" in s:
+        if host_is(s, "youtube.com", "youtu.be"):
             return "youtube"
-        if "github.com" in s:
+        if host_is(s, "github.com"):
             return "github"
         return "web"
     # file path or file-like

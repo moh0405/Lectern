@@ -5,12 +5,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Dict, List
-from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from ...rag_engine import RAGEngine
+from ...safe_fetch import UnsafeUrl, check_url
 from ..deps import common_dependencies, get_engine, get_jobs
 from ..errors import ERROR_RESPONSES, ApiError
 from ..jobs import JobManager
@@ -115,9 +115,10 @@ def add_urls(
     clean: List[str] = []
     for u in req.urls:
         u = u.strip()
-        p = urlparse(u)
-        if p.scheme not in {"http", "https"} or not p.hostname:
-            raise ApiError(422, f"Not a valid http(s) URL: {u[:120]}", code="invalid_url")
+        try:
+            check_url(u)  # no DNS here; the fetch itself checks the resolved address (backend/safe_fetch.py)
+        except UnsafeUrl as e:
+            raise ApiError(422, f"Not a valid http(s) URL: {u[:120]} ({e})", code="invalid_url")
         if u not in clean:
             clean.append(u)
     known = _read_urls()

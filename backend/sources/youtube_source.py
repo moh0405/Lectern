@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Any, List, Optional
 
+from ..safe_fetch import host_is, safe_get
 from .base_source import BaseSource
 
 try:
@@ -17,7 +18,9 @@ except Exception:
 
 
 def _parse_video_id(url: str) -> Optional[str]:
-    # Supports https://www.youtube.com/watch?v=ID and https://youtu.be/ID
+    # Supports https://www.youtube.com/watch?v=ID and https://youtu.be/ID, on YouTube's own hosts only
+    if not host_is(url, "youtube.com", "youtu.be"):
+        return None
     m = re.search(r"v=([A-Za-z0-9_\-]{6,})", url)
     if m:
         return m.group(1)
@@ -39,11 +42,7 @@ class YouTubeSource(BaseSource):
         if requests is None:
             return data
         try:
-            resp = requests.get(
-                "https://www.youtube.com/oembed",
-                params={"url": url, "format": "json"},
-                timeout=10,
-            )
+            resp = safe_get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, max_seconds=10)
             if resp.ok:
                 data = resp.json()
         except Exception:
@@ -54,7 +53,7 @@ class YouTubeSource(BaseSource):
         if requests is None:
             return None
         try:
-            r = requests.get(url, timeout=10)
+            r = safe_get(url, max_seconds=10)
             if not r.ok:
                 return None
             txt = r.text
@@ -83,10 +82,12 @@ class YouTubeSource(BaseSource):
         except Exception as e:
             raise RuntimeError(f"Failed to fetch transcript: {e}")
 
-        meta = self._fetch_oembed(input_value)
+        # Only the video id comes from the visitor's URL: what is fetched is always YouTube's own page for it.
+        canonical = f"https://www.youtube.com/watch?v={vid}"
+        meta = self._fetch_oembed(canonical)
         title = meta.get("title") or f"YouTube Video {vid}"
         thumb = meta.get("thumbnail_url") or f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
-        duration = self._fetch_duration(input_value)
+        duration = self._fetch_duration(canonical)
         self._meta = {
             "source_type": "youtube",
             "video_id": vid,

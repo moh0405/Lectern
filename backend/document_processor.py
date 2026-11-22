@@ -8,6 +8,7 @@ except Exception:
     PdfReader = None  # Allows import even if pypdf missing
 
 from .embeddings import embed_texts  # noqa: F401  (re-exported for existing callers)
+from .safe_fetch import host_is
 
 
 def _source_class(name: str) -> Any:
@@ -79,10 +80,9 @@ def _detect_source(input_value: str) -> Optional[str]:
     if path.exists() and path.suffix.lower() in {".mp3", ".mp4", ".wav", ".m4a"}:
         return "audio"
     if p.scheme in {"http", "https"}:
-        host = (p.hostname or "").lower()
-        if "youtube.com" in host or "youtu.be" in host:
+        if host_is(input_value, "youtube.com", "youtu.be"):
             return "youtube"
-        if "github.com" in host:
+        if host_is(input_value, "github.com"):
             return "github"
         return "web"
     return None
