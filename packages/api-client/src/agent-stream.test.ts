@@ -47,3 +47,11 @@ test("agentRunStream posts the task to the tool-agent endpoint and yields tool e
   assert.equal(url, "http://api.test/api/v1/agent/run/stream");
   assert.deepEqual(seen, ["tool_call", "tool_result", "token", "done"]);
 });
+
+test("agentRunStream ignores the opening and keep-alive comments the server sends while a model call is pending", async () => {
+  const body = `: stream open\n\n: keep-alive\n\n${sse(["tool_call", { name: "search_documents", arguments: {} }])}: keep-alive\n\n${sse(["error", { code: "timeout", message: "too slow" }])}`;
+  const client = createApiClient({ baseUrl: "http://api.test", fetch: (async () => new Response(body, { status: 200 })) as unknown as typeof fetch });
+  const seen: string[] = [];
+  for await (const ev of client.agentRunStream({ task: "what is a heap" })) seen.push(ev.event);
+  assert.deepEqual(seen, ["tool_call", "error"]);
+});
