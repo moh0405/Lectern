@@ -1,7 +1,7 @@
 """Similar example: one new practice question on the same concept, written from the passages the student just read.
 
 One model call, only when the student asks. The model also writes a one-sentence `answer_key`, which is never returned:
-it is used to reject a question that gives its own answer away (`hint_leaks_answer`, the guard hints and feedback use).
+it is used to reject a question that gives its own answer away (`gives_answer_away`).
 A question is only returned when it cites a passage it was given and shares content with that passage, so it stays
 grounded, and when it is not a rewording of the original question or of one already offered.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Sequence
 
-from .advanced_ai import _content_words, hint_leaks_answer
+from .advanced_ai import _REVEAL_PATTERNS, _content_words
 from .attempt_feedback import _check_item, _clean, _json, _passages
 from .llm_providers import create_llm
 
@@ -21,6 +21,7 @@ MIN_CHARS = 12
 MAX_CHARS = 500
 MAX_OVERLAP = 0.8  # share of content words above which a question counts as a rewording
 MIN_GROUNDING_WORDS = 2
+MAX_KEY_COVERAGE = 0.8  # share of the answer key's content words a question may not reach
 
 UNAVAILABLE = "Lectern could not write a practice question from these passages. Try again."
 
@@ -72,18 +73,32 @@ def interpret(data: Dict[str, Any], question: str, chunks: Sequence[Dict[str, An
     text = _clean(data.get("question"), MAX_CHARS + 1)
     key = data.get("answer_key") if isinstance(data.get("answer_key"), str) else ""
     if not MIN_CHARS <= len(text) <= MAX_CHARS or not key.strip():
-        return None
-    if key.strip().lower() in text.lower() or hint_leaks_answer(text, key, question):
-        logger.info("Rejected a practice question that gave its answer away")
-        return None
+        return _rejected("malformed")
+    if gives_answer_away(text, key):
+        return _rejected("leaks_answer")
     if any(_overlap(text, seen) >= MAX_OVERLAP for seen in [question, *previous]):
-        return None
+        return _rejected("rewording")
     raw = data.get("citations")
     labels = raw if isinstance(raw, list) else [raw] if isinstance(raw, str) else []
     citations = [c for c in _check_item("", labels, chunks) if c["status"] == "ok"]
     if not _grounded(text, citations, chunks):
-        return None
+        return _rejected("ungrounded")
     return {"question": text, "citations": citations}
+
+
+def _rejected(reason: str) -> None:
+    """Log only the guard's name: the question and its key are study content and stay out of the logs."""
+    logger.info("Rejected a practice question: %s", reason)
+
+
+def gives_answer_away(text: str, key: str) -> bool:
+    """Whether the question states its answer. A good question shares the answer's topic words (its premise), so shared
+    vocabulary alone is not a leak: it leaks when it says "the answer is", or carries nearly all of the key's content."""
+    if key.strip().lower() in text.lower() or _REVEAL_PATTERNS.search(text):
+        return True
+    answer = _content_words(key)
+    shared = answer & _content_words(text)
+    return len(shared) >= 3 and len(shared) / len(answer) >= MAX_KEY_COVERAGE
 
 
 def similar_question(question: str, chunks: Sequence[Dict[str, Any]], previous: Sequence[str] = (), model: Optional[str] = None,

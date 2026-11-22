@@ -5,6 +5,7 @@ import json
 import sqlite3
 
 from backend.api.study_store import StudyStore
+from backend.similar_practice import gives_answer_away
 
 HEAP = {"text": "Insert places the new key at the bottom of the heap and sifts it up, swapping with its parent while the "
                 "parent is larger. A complete binary tree with n nodes has height about log n, so insert takes O(log n).",
@@ -48,6 +49,14 @@ class TestSimilarQuestion:
     def test_a_question_that_states_the_answer_is_refused(self, api, fake_gemini):
         fake_gemini.handler = reply(question="For a heap of 1023 keys the answer is nine swaps, so how does insert behave?")
         assert post(api).status_code == 502
+
+    def test_sharing_the_answers_topic_words_is_not_a_leak(self):
+        # Answer keys a real model wrote; the questions state the premise and leave the answer to the student.
+        chaining = "It maintains constant average-time operations by resizing the table whenever the load factor exceeds a set threshold."
+        assert not gives_answer_away("What should a hash table do when its load factor exceeds a threshold, so that operations stay constant on average?", chaining)
+        bfs = "Breadth-first search uses a queue to visit vertices in order of their distance from the source."
+        assert not gives_answer_away("Which traversal would you pick to visit vertices in order of their distance from a source, and what structure does it need?", bfs)
+        assert gives_answer_away("Since breadth-first search uses a queue to visit vertices in order of distance from the source, why is that useful?", bfs)
 
     def test_an_uncited_or_invented_source_is_refused(self, api, fake_gemini):
         for citations in ((), ("invented.pdf (page 9)",)):

@@ -137,7 +137,7 @@ test("a failed similar question can be retried", async ({ page }) => {
   await askQuestion(page);
   await open(page, "Similar example");
   await page.getByRole("button", { name: "Write a similar question" }).click();
-  await expect(tools(page).getByText(/could not write a practice question/)).toBeVisible();
+  await expect(tools(page).getByRole("alert")).toContainText("couldn't finish this request");
   await page.getByRole("button", { name: "Write a similar question" }).click();
   await expect(page.getByTestId("similar-question")).toBeVisible();
 });
