@@ -79,6 +79,15 @@ _TRANSIENT_MARKERS = ("unavailable", "timeout", "timed out", "rate limit", "reso
 # (api key suffix, requested model) -> resolved model, so listing models is not repeated per request
 _resolved_models: Dict[tuple, str] = {}
 
+# (api key suffix, model) -> time.monotonic() until which the model is known to be out of quota. A free key's daily quota
+# runs out per model (20 requests a day for gemini-3.6-flash in November 2026), and after that every call to it fails with
+# a 429 that says "retry in 6h48m". Remembering that skips the doomed first attempt, so the fallback model answers sooner.
+# Kept per process (one Lambda instance), and for at most QUOTA_MEMORY_MAX_S so a reset quota or an upgraded key is
+# noticed within minutes.
+_out_of_quota: Dict[tuple, float] = {}
+QUOTA_MEMORY_MAX_S = 600.0
+QUOTA_MEMORY_DEFAULT_S = 60.0  # a 429 that does not say how long to wait
+
 
 def _timeout_s() -> float:
     try:
@@ -138,6 +147,27 @@ def fallback_models() -> List[str]:
 def _is_quota(exc: Exception) -> bool:
     text = str(exc).lower()
     return getattr(exc, "code", None) == 429 or "resource_exhausted" in text or "quota" in text
+
+
+def note_quota(key_id: str, model: str, exc: Exception) -> None:
+    """Remember for a while that `model` is out of quota, if `exc` says so."""
+    if not _is_quota(exc):
+        return
+    delay = retry_delay_seconds(exc)
+    wait = QUOTA_MEMORY_DEFAULT_S if delay is None else min(max(delay, 1.0), QUOTA_MEMORY_MAX_S)
+    _out_of_quota[(key_id, model)] = time.monotonic() + wait
+
+
+def quota_wait_s(key_id: str, model: str) -> float:
+    """Seconds until `model` is worth trying again (0 when it is not known to be out of quota)."""
+    until = _out_of_quota.get((key_id, model))
+    if until is None:
+        return 0.0
+    left = until - time.monotonic()
+    if left <= 0:
+        _out_of_quota.pop((key_id, model), None)
+        return 0.0
+    return left
 
 
 def _should_fail_over(exc: Exception) -> bool:
@@ -262,11 +292,23 @@ class GeminiClient:
             return ""
 
     def _candidates(self) -> List[str]:
+        """Models to try, in order. When failing over is allowed, models known to be out of quota are left out (unless
+        that would leave none), so a call does not wait on an answer that is certainly a 429."""
         names = [self.model]
         for m in [DEFAULT_MODEL, *self._fallbacks]:
             if m not in names:
                 names.append(m)
+        if not self._fail_over:
+            return names
+        usable = [m for m in names if quota_wait_s(self._key_id, m) <= 0]
+        skipped = [m for m in names if m not in usable]
+        if skipped and usable:
+            logger.warning("Skipping %s: out of quota for about %ds more", ", ".join(f"'{m}'" for m in skipped), int(max(quota_wait_s(self._key_id, m) for m in skipped)))
+            return usable
         return names
+
+    def note_failure(self, model: str, exc: Exception) -> None:
+        note_quota(self._key_id, model, exc)
 
     def _next_model_exists(self, names: List[str], i: int) -> bool:
         return self._fail_over and i < len(names) - 1
@@ -284,6 +326,7 @@ class GeminiClient:
                 try:
                     resp = self._client.models.generate_content(model=name, contents=prompt, config=config)
                 except Exception as e:
+                    self.note_failure(name, e)
                     # A retired or unknown model must not hide the real reason an earlier model failed.
                     if not (_is_model_missing(e) and last_err):
                         last_err = str(e)
@@ -331,6 +374,7 @@ class GeminiClient:
                 except Exception as e:
                     if started:
                         raise
+                    self.note_failure(name, e)
                     if not (_is_model_missing(e) and last_exc is not None):
                         last_exc = e  # a retired model's 404 must not hide the real reason an earlier model failed
                     if _is_model_missing(e):

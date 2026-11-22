@@ -275,9 +275,46 @@ def test_a_timeout_also_hands_over(sleeps):
 
 def test_a_model_that_is_out_of_quota_hands_over_whether_the_limit_is_per_minute_or_per_day(sleeps):
     for quota in (PER_MINUTE, PER_DAY):
+        llm_config._out_of_quota.clear()  # each case on its own (a 429 is remembered; see the tests below)
         c = make(models=ALL, script=[FakeAPIError(429, quota), "pong"])
         assert c.generate("hi")["model"] == LITE, quota[:40]
     assert sleeps == []  # a daily limit is not waited out, and a per-minute one is not waited out when another model can answer
+
+
+def test_a_model_out_of_daily_quota_is_not_asked_again_for_a_while(sleeps, monkeypatch):
+    # Live, 2026-11-22: gemini-3.6-flash's free-tier daily quota (20 requests) ran out and every later answer paid for a
+    # doomed first call before the lite model answered. Now the 429's retry delay is remembered (capped).
+    c = make(models=ALL, script=[FakeAPIError(429, PER_DAY), "one", "two", "three"])
+    assert c.generate("hi")["model"] == LITE
+    c2 = make(models=ALL, script=["two"])
+    assert c2.generate("hi")["model"] == LITE and c2._client.models.calls == [LITE]  # no wasted call
+    c3 = make(models=ALL, stream_script=[[FakeResp("streamed")]])
+    assert list(c3.stream("hi")) == ["streamed"] and c3._client.models.calls == [LITE] and c3.model == LITE
+    assert 0 < llm_config.quota_wait_s("injected", DEFAULT) <= llm_config.QUOTA_MEMORY_MAX_S
+    now = llm_config.time.monotonic()
+    monkeypatch.setattr(llm_config.time, "monotonic", lambda: now + llm_config.QUOTA_MEMORY_MAX_S + 1)
+    c4 = make(models=ALL, script=["back"])
+    assert c4.generate("hi")["model"] == DEFAULT  # tried again once the memory runs out
+
+
+def test_a_per_minute_limit_is_remembered_only_as_long_as_it_says(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(429, PER_MINUTE), "pong"])
+    c.generate("hi")
+    wait = llm_config.quota_wait_s("injected", DEFAULT)
+    assert 0 < wait <= (llm_config.retry_delay_seconds(PER_MINUTE) or 0) + 0.01
+
+
+def test_a_named_model_out_of_quota_is_still_tried(sleeps):
+    make(models=ALL, script=[FakeAPIError(429, PER_DAY), "pong"]).generate("hi")
+    c = make(models=ALL, model=DEFAULT, script=["it answers after all"])
+    assert c.generate("hi")["answer"] == "it answers after all" and c._client.models.calls == [DEFAULT]
+
+
+def test_when_every_model_is_remembered_out_of_quota_they_are_all_tried_again(sleeps):
+    c = make(models=ALL, script=[FakeAPIError(429, PER_DAY)] * 4)
+    assert c.generate("hi")["ok"] is False
+    c2 = make(models=ALL, script=["pong"])
+    assert c2.generate("hi")["model"] == DEFAULT  # better a call that may fail than no call at all
 
 
 def test_it_moves_down_the_whole_chain(sleeps):
