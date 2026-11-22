@@ -57,6 +57,17 @@ export function idleWatchdog(ms: number, onIdle: () => void) {
   return { poke, cancel };
 }
 
+/**
+ * Which model answered, for the line under the answer. When a model was busy or out of quota part-way and the next one in
+ * the failover chain continued, both are named in order, e.g. "gemini-3.6-flash → gemini-3.1-flash-lite".
+ */
+export function modelsLabel(done: Pick<Done, "model" | "models"> | undefined): string {
+  if (!done) return "";
+  const chain = (done.models ?? []).filter((m, i, all) => m && m !== all[i - 1]);
+  if (chain.length > 1) return chain.join(" → ");
+  return chain[0] ?? done.model ?? "";
+}
+
 /** Steps still spinning when a run stops will never get a result. */
 const settle = (trace: TraceItem[]): TraceItem[] =>
   trace.map((t) => (t.kind === "tool" && t.status === "running" ? { ...t, status: "failed" as const, summary: "did not finish" } : t));

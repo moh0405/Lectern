@@ -116,6 +116,12 @@ class FakeToolChat:
         if FakeGemini.fail_with is not None:
             raise FakeGemini.fail_with
         turn, self.turn = self.turn, self.turn + 1
+        if turn == 0 and isinstance(message, str):
+            self.task = message
+        if turn == 1 and "busy model" in getattr(self, "task", "").lower():
+            # e2e: the first model runs out of quota after its first turn and the failover chain's next model carries on
+            # (the real move is GeminiToolChat's, tested in tests/test_tool_chat.py; this only shows it to the page)
+            self.model = "gemini-3.1-flash-lite"
         script = getattr(FakeGemini, "tool_script", None)
         if script is not None:
             return script(turn, message)

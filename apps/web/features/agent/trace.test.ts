@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IDLE_TIMEOUT, IDLE_TIMEOUT_MS, STREAM_ENDED, idle, idleWatchdog, runReducer, stepLabel, type RunState } from "./trace";
+import { IDLE_TIMEOUT, IDLE_TIMEOUT_MS, STREAM_ENDED, idle, idleWatchdog, modelsLabel, runReducer, stepLabel, type RunState } from "./trace";
 
 const ev = (event: string, data: object) => ({ type: "event", event: { event, data } }) as never;
 const apply = (...actions: unknown[]) => actions.reduce<RunState>((s, a) => runReducer(s, a as never), idle);
@@ -138,5 +138,20 @@ describe("idleWatchdog", () => {
     idleWatchdog(1000, onIdle).cancel();
     vi.advanceTimersByTime(5000);
     expect(onIdle).not.toHaveBeenCalled();
+  });
+});
+
+describe("modelsLabel", () => {
+  it("names the one model that served the run", () => {
+    expect(modelsLabel({ model: "gemini-3.6-flash", models: ["gemini-3.6-flash", "gemini-3.6-flash"] })).toBe("gemini-3.6-flash");
+  });
+  it("names both models, in order, when the run failed over part-way", () => {
+    expect(modelsLabel({ model: "gemini-3.1-flash-lite", models: ["gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite"] })).toBe(
+      "gemini-3.6-flash → gemini-3.1-flash-lite",
+    );
+  });
+  it("falls back to `model` for a server that does not send `models`", () => {
+    expect(modelsLabel({ model: "fake-model", models: undefined as unknown as string[] })).toBe("fake-model");
+    expect(modelsLabel(undefined)).toBe("");
   });
 });

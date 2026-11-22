@@ -1,4 +1,4 @@
-"""GeminiToolChat: a first turn may move to another model; later turns never do."""
+"""GeminiToolChat: any turn may move to the next model in the failover chain; a named model is never swapped."""
 
 from __future__ import annotations
 
@@ -28,9 +28,10 @@ class Resp:
 
 class Chat:
     def __init__(self, model, plan):
-        self.model, self.plan = model, plan
+        self.model, self.plan, self.sent = model, plan, []
 
     def send_message(self, payload):
+        self.sent.append(payload)
         item = self.plan.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -43,7 +44,8 @@ class Chats:
 
     def create(self, model, config):
         self.created.append(model)
-        return Chat(model, self.plans.setdefault(model, []))
+        self.last = Chat(model, self.plans.setdefault(model, []))
+        return self.last
 
 
 def make(plans, model=None):
@@ -79,18 +81,89 @@ def test_an_overloaded_first_turn_starts_again_on_the_next_model():
     assert chats.created == [DEFAULT, LITE] and chat.model == LITE  # a fresh conversation on the lite model
 
 
-def test_later_turns_are_retried_but_never_moved_to_another_model():
-    chat, chats = make({DEFAULT: [Resp(Part(call=Call("search_documents", {}))), OVERLOADED, OVERLOADED, OVERLOADED]})
+QUOTA_DAY = FakeAPIError(
+    429,
+    "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash, "
+    "description: Generate content requests per day limit exceeded on Free Tier. Please retry in 6h48m42.99s. "
+    "'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'retryDelay': '24522s'",
+)
+SEARCH = Resp(Part(call=Call("search_documents", {"query": "heap"})))
+RESULTS = [ToolResult("search_documents", {"count": 1, "passages": [{"doc": "heaps.pdf", "page": 1, "text": "A binary heap is a complete tree."}]})]
+
+
+def test_a_later_turn_out_of_quota_moves_to_the_next_model_with_the_results_so_far():
+    # The live failure (2026-11-22 01:11 UTC): turn 2 got a daily-quota 429 and the run ended with an error.
+    chat, chats = make({DEFAULT: [SEARCH, QUOTA_DAY], LITE: [Resp(Part(text="A heap is a tree. [heaps.pdf (page 1)]"))]})
+    chat.send("what is a heap")
+    turn = chat.send(RESULTS)
+    assert turn.text.startswith("A heap is a tree") and chats.created == [DEFAULT, LITE]
+    assert chat.model == LITE and chat.turn_models == [DEFAULT, LITE]
+    replay = chats.last.sent[0]
+    assert isinstance(replay, str)  # plain text: the first model's thought signatures would not be valid on another
+    assert "what is a heap" in replay and 'CALL search_documents {"query": "heap"}' in replay and "A binary heap is a complete tree." in replay
+    assert "Do not repeat these calls" in replay
+
+
+def test_a_later_turn_overloaded_moves_on_without_waiting_on_retries():
+    chat, chats = make({DEFAULT: [SEARCH, OVERLOADED], LITE: [Resp(Part(text="done"))]})
     chat.send("hi")
+    assert chat.send(RESULTS).text == "done" and chats.created == [DEFAULT, LITE]
+
+
+def test_after_moving_the_next_turn_continues_the_new_conversation():
+    chat, chats = make({DEFAULT: [SEARCH, QUOTA_DAY], LITE: [SEARCH, Resp(Part(text="answer"))]})
+    chat.send("hi")
+    chat.send(RESULTS)
+    assert chat.send(RESULTS).text == "answer"
+    assert chats.created == [DEFAULT, LITE] and not isinstance(chats.last.sent[1], str)  # function results, not another replay
+    assert chat.turn_models == [DEFAULT, LITE, LITE]
+
+
+def test_a_later_turn_with_every_model_exhausted_raises_the_last_error():
+    chat, chats = make({DEFAULT: [SEARCH, QUOTA_DAY], LITE: [QUOTA_DAY], SECOND: [QUOTA_DAY], THIRD: [QUOTA_DAY]})
+    chat.send("hi")
+    with pytest.raises(FakeAPIError, match="RESOURCE_EXHAUSTED"):
+        chat.send(RESULTS)
+    assert chats.created == [DEFAULT, LITE, SECOND, THIRD]
+
+
+def test_a_named_model_is_retried_on_later_turns_but_never_swapped():
+    chat, chats = make({LITE: [SEARCH, OVERLOADED, Resp(Part(text="done"))]}, model=LITE)
+    chat.send("hi")
+    assert chat.send(RESULTS).text == "done" and chats.created == [LITE]
+
+
+def test_no_model_is_tried_after_the_run_deadline(monkeypatch):
+    chat, chats = make({DEFAULT: [SEARCH, OVERLOADED], LITE: [Resp(Part(text="too late"))]})
+    chat.send("hi")
+    chat.limit_to(tool_chat.time.monotonic() - 1)  # the agent run is already over its deadline
     with pytest.raises(FakeAPIError):
-        chat.send([ToolResult("search_documents", {"count": 0})])
-    assert chats.created == [DEFAULT]  # the history belongs to the first model, so the run does not hop to another
+        chat.send(RESULTS)
+    assert chats.created == [DEFAULT]
 
 
-def test_a_later_turn_recovers_by_retrying_the_same_model():
-    chat, chats = make({DEFAULT: [Resp(Part(call=Call("search_documents", {}))), OVERLOADED, Resp(Part(text="done"))]})
+def test_a_model_out_of_daily_quota_is_skipped_by_the_next_run():
+    chat, chats = make({DEFAULT: [QUOTA_DAY], LITE: [Resp(Part(text="one"))]})
+    assert chat.send("hi").text == "one"
+    chat2, chats2 = make({LITE: [Resp(Part(text="two"))]})
+    assert chat2.send("hi").text == "two"
+    assert chats2.created == [LITE] and chat2.turn_models == [LITE]  # no wasted call to the exhausted model
+
+
+def test_quota_memory_expires(monkeypatch):
+    chat, _ = make({DEFAULT: [QUOTA_DAY], LITE: [Resp(Part(text="one"))]})
     chat.send("hi")
-    assert chat.send([ToolResult("search_documents", {})]).text == "done" and chats.created == [DEFAULT]
+    now = tool_chat.time.monotonic()
+    monkeypatch.setattr(llm_config.time, "monotonic", lambda: now + llm_config.QUOTA_MEMORY_MAX_S + 1)
+    chat2, chats2 = make({DEFAULT: [Resp(Part(text="back"))]})
+    assert chat2.send("hi").text == "back" and chats2.created == [DEFAULT]
+
+
+def test_an_overload_is_not_remembered():
+    chat, _ = make({DEFAULT: [OVERLOADED], LITE: [Resp(Part(text="one"))]})
+    chat.send("hi")
+    chat2, chats2 = make({DEFAULT: [Resp(Part(text="fine now"))]})
+    assert chat2.send("hi").text == "fine now" and chats2.created == [DEFAULT]
 
 
 def test_a_model_named_by_the_caller_is_not_swapped():

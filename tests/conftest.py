@@ -20,6 +20,16 @@ def _never_load_torch(monkeypatch):
     monkeypatch.setenv("EMBEDDER", "hashing")
 
 
+@pytest.fixture(autouse=True)
+def _forget_quota():
+    """Which models are out of quota is remembered per process; no test may see another test's 429s."""
+    from backend import llm_config
+
+    llm_config._out_of_quota.clear()
+    yield
+    llm_config._out_of_quota.clear()
+
+
 @pytest.fixture
 def fake_gemini(monkeypatch):
     FakeGemini.handler, FakeGemini.fail_with, FakeGemini.calls, FakeGemini.tool_script = None, None, [], None

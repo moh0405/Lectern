@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { chipClass, LibraryLine, useLibrary } from "@/features/tutor/library";
 import { PassageList } from "@/features/tutor/passages";
 import { Announce, BusyIcon, useElapsed, useFocusAfterRender } from "@/features/tutor/pending";
-import { stepLabel, type TraceItem } from "./trace";
+import { modelsLabel, stepLabel, type TraceItem } from "./trace";
 import { useAgentRun } from "./use-agent-run";
 
 const EXAMPLES = [
@@ -196,7 +196,7 @@ export function AgentView() {
             {state.done ? (
               <p className="text-xs text-muted" data-testid="run-cost">
                 {state.done.tool_calls} tool {state.done.tool_calls === 1 ? "call" : "calls"} · {state.done.llm_calls} model {state.done.llm_calls === 1 ? "call" : "calls"}
-                {state.done.model ? ` · ${state.done.model}` : ""}
+                {modelsLabel(state.done) ? ` · ${modelsLabel(state.done)}` : ""}
               </p>
             ) : null}
           </Card>

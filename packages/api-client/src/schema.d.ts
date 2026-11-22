@@ -32,7 +32,7 @@ export interface paths {
         put?: never;
         /**
          * Run the tool-using agent, streamed as Server-Sent Events
-         * @description The model is given the task and a set of tools (search the study material, list documents, read a page, solve math, find a LeetCode problem) and decides which to call, in a loop: it asks for a tool, the server runs it and returns the result, and the model asks again or answers. The loop is bounded (`max_steps` model turns, then a forced wrap-up) and every model turn counts against the daily cap. Tools that change data are available only when the deployment sets `AGENT_ALLOW_WRITES=1`; a request cannot enable them.\n\nEvents: `thought` (`{text}`), `tool_call` (`{name, arguments}`), `tool_result` (`{name, summary, error}`), then `meta` (`{chunks}`, the passages the tools returned), `token` (the whole final answer), and `done` or `error`. The stream always ends with `done` or `error`. A run that is still going after `AGENT_DEADLINE_S` seconds (default 100, counted from when the request arrived) ends with `error` code `timeout`. While a model call is pending the server sends SSE comment lines (`: keep-alive`) every few seconds; readers should ignore them. Needs the Gemini provider; other providers answer with `tools_unsupported`.
+         * @description The model is given the task and a set of tools (search the study material, list documents, read a page, solve math, find a LeetCode problem) and decides which to call, in a loop: it asks for a tool, the server runs it and returns the result, and the model asks again or answers. The loop is bounded (`max_steps` model turns, then a forced wrap-up) and every model turn counts against the daily cap. Tools that change data are available only when the deployment sets `AGENT_ALLOW_WRITES=1`; a request cannot enable them.\n\nEvents: `thought` (`{text}`), `tool_call` (`{name, arguments}`), `tool_result` (`{name, summary, error}`), then `meta` (`{chunks}`, the passages the tools returned), `token` (the whole final answer), and `done` or `error`. The stream always ends with `done` or `error`. A run that is still going after `AGENT_DEADLINE_S` seconds (default 100, counted from when the request arrived) ends with `error` code `timeout`. While a model call is pending the server sends SSE comment lines (`: keep-alive`) every few seconds; readers should ignore them. When the server's default model is overloaded or out of quota on any turn, the next model in the failover chain continues the run with the tool results gathered so far (a `thought` says so); `done.models` lists the model that served each turn and `done.model` the last one. A model named in the request is never swapped. Needs the Gemini provider; other providers answer with `tools_unsupported`.
          */
         post: operations["agent_run_stream_api_v1_agent_run_stream_post"];
         delete?: never;
@@ -1619,9 +1619,15 @@ export interface components {
             llm_calls: number;
             /**
              * Model
+             * @description The model that served the last turn (the one that wrote the answer)
              * @default null
              */
             model?: string | null;
+            /**
+             * Models
+             * @description The model that served each turn, in order. It changes mid-run when a model is overloaded or out of quota and the next one in the failover chain continues
+             */
+            models?: string[];
             /**
              * Steps
              * @description Model turns used

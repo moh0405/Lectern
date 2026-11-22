@@ -293,3 +293,82 @@ def test_trace_summaries_use_the_right_plural():
     assert summarize("search_documents", {"count": 0, "passages": []}) == "0 passages"
     assert summarize("list_documents", {"count": 1}) == "1 document"
     assert summarize("find_leetcode_problem", {"count": 2}) == "2 problems"
+
+
+# --- Failing over to another model mid-run (live, 2026-11-22 01:11 UTC: turn 2 got a daily-quota 429 and the run ended) ---
+
+
+def _gemini_behind_the_route(monkeypatch, plans):
+    """The real GeminiClient and GeminiToolChat, on a scripted SDK client: the failover code under test is the real one."""
+    import backend.api.routers.agent as router
+    from backend import llm_config
+    from backend.llm_config import GeminiClient
+
+    from .test_llm_config import ALL, FakeClient, FakeModel
+    from .test_tool_chat import Chats
+
+    monkeypatch.setattr(llm_config.time, "sleep", lambda s: None)
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    llm_config._resolved_models.clear()
+    fake = FakeClient(models=[FakeModel(m) for m in ALL])
+    fake.chats = Chats(plans)
+    monkeypatch.setattr(router, "create_llm", lambda model=None, temperature=0.2: GeminiClient(model=model, client=fake))
+    return fake.chats
+
+
+def test_turn_two_out_of_quota_is_served_by_the_next_model_with_the_tool_results_kept(indexed, monkeypatch):
+    from backend.llm_config import DEFAULT_FALLBACKS, DEFAULT_MODEL
+
+    from .test_tool_chat import QUOTA_DAY, SEARCH, Part, Resp
+
+    lite = DEFAULT_FALLBACKS[0]
+    chats = _gemini_behind_the_route(monkeypatch, {DEFAULT_MODEL: [SEARCH, QUOTA_DAY], lite: [Resp(Part(text=ANSWER.text))]})
+    events = run(indexed)
+    assert names(events) == ["tool_call", "tool_result", "thought", "meta", "token", "done"]
+    assert f"{DEFAULT_MODEL} was unavailable" in events[2][1]["text"] and f"so {lite} continued with the tool results" in events[2][1]["text"]
+    assert events[4][1]["text"] == ANSWER.text
+    done = events[-1][1]
+    assert done["model"] == lite and done["models"] == [DEFAULT_MODEL, lite]  # the badge names the model that wrote the answer
+    assert done["tool_calls"] == 1 and done["llm_calls"] == 2  # the search was not run again
+    replay = chats.last.sent[0]
+    assert "what is a binary heap" in replay and "heaps.pdf" in replay  # the next model got the passages already found
+
+
+def test_turn_two_with_every_model_exhausted_ends_with_a_typed_error(indexed, monkeypatch):
+    from backend.llm_config import DEFAULT_FALLBACKS, DEFAULT_MODEL
+
+    from .test_tool_chat import QUOTA_DAY, SEARCH
+
+    plans = {DEFAULT_MODEL: [SEARCH, QUOTA_DAY], **{m: [QUOTA_DAY] for m in DEFAULT_FALLBACKS}}
+    chats = _gemini_behind_the_route(monkeypatch, plans)
+    events = run(indexed)
+    assert names(events) == ["tool_call", "tool_result", "error"]
+    assert events[-1][1]["code"] == "quota_exhausted"
+    assert chats.created == [DEFAULT_MODEL, *DEFAULT_FALLBACKS]
+
+
+def test_a_model_named_in_the_request_is_not_swapped_mid_run(indexed, monkeypatch):
+    from backend.llm_config import DEFAULT_FALLBACKS
+
+    from .test_tool_chat import QUOTA_DAY, SEARCH
+
+    lite = DEFAULT_FALLBACKS[0]
+    chats = _gemini_behind_the_route(monkeypatch, {lite: [SEARCH, QUOTA_DAY]})
+    events = run(indexed, model=lite)
+    assert events[-1][0] == "error" and events[-1][1]["code"] == "quota_exhausted" and chats.created == [lite]
+
+
+def test_every_turn_on_one_model_reports_it(indexed, fake_gemini):
+    fake_gemini.tool_script = scripted(call("search_documents", query="heap"), ANSWER)
+    done = run(indexed)[-1][1]
+    assert done["model"] == "fake-model" and done["models"] == ["fake-model", "fake-model"]
+    assert not [e for e in run(indexed) if e[0] == "thought"]  # no failover, no note about one
+
+
+def test_the_scripted_busy_model_shows_the_switch(indexed, fake_gemini):
+    # The trigger the browser test uses (tests/fake_gemini.py).
+    events = run(indexed, task="binary heap (busy model)")
+    thought = [d["text"] for n, d in events if n == "thought"]
+    assert thought == ["fake-model was unavailable (busy or out of quota), so gemini-3.1-flash-lite continued with the tool results gathered so far."]
+    assert events[-1][1]["models"] == ["fake-model", "gemini-3.1-flash-lite"]
