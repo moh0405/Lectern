@@ -45,7 +45,9 @@ async function audit(page: Page, name?: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   // An earlier axe run can leave the skip link focused; keep it out of the picture.
   await page.evaluate(() => { const el = document.activeElement as HTMLElement | null; if (el?.classList.contains("workspace-skip")) el.blur(); });
-  if (name) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+  // Stacked layouts scroll the window, and a full-page capture paints the sticky header and composer mid-page
+  // (a band that is not in the real layout), so those are captured as the window the reader sees.
+  if (name) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: (page.viewportSize()?.width ?? 0) >= 1180 });
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
 }
 
@@ -183,4 +185,61 @@ for (const theme of ["dark", "light"] as const) for (const width of [390, 768, 1
     await expect(page.getByRole("complementary", { name: "Source margin" })).toContainText("heaps.pdf");
   }
   await audit(page, `${width}-${theme}-feedback`);
+});
+
+for (const [width, height] of [[1440, 1000], [390, 844]] as const) test(`${width}x${height}: after feedback the composer folds and the last step can be read in full`, async ({ page }) => {
+  await page.setViewportSize({ width, height });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/ask");
+  await tryFirst(page);
+  const composer = page.locator("form").filter({ has: page.getByRole("group", { name: "How Lectern responds" }) });
+  const fold = composer.getByRole("button", { name: /^Write another attempt/ });
+  await expect(fold).toBeVisible();
+  await expect(composer.getByLabel(/Your attempt/)).toHaveCount(0);
+  expect((await composer.boundingBox())!.height).toBeLessThanOrEqual(height * 0.4);
+
+  // The last step scrolls into view and nothing (the sticky composer included) sits on top of it.
+  const last = page.getByRole("list", { name: "Your attempt, step by step" }).getByRole("listitem").last();
+  await last.evaluate((el) => el.scrollIntoView({ block: "end" }));
+  await expect(last).toBeInViewport({ ratio: 1 });
+  const covered = await last.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return [0.15, 0.5, 0.85].some((f) => { const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f); return !hit || !el.contains(hit); });
+  });
+  expect(covered).toBe(false);
+  const box = (await last.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual((await composer.boundingBox())!.y + 1);
+
+  // The fold opens on click (and on keyboard focus) with focus in the box, and the box starts at about three rows.
+  await fold.click();
+  const attempt = composer.getByLabel(/Your attempt/);
+  await expect(attempt).toBeFocused();
+  expect((await attempt.boundingBox())!.height).toBeLessThan(110);
+  await attempt.fill(Array.from({ length: 30 }, (_, i) => `step ${i}`).join("\n"));
+  const grown = (await attempt.boundingBox())!.height;
+  expect(grown).toBeGreaterThan(110); // grows with its text
+  expect(grown).toBeLessThanOrEqual(240); // up to a cap, then scrolls
+  await attempt.fill("");
+  await composer.getByLabel("Your question", { exact: true }).focus();
+  await expect(attempt).toBeVisible(); // still writing in the composer: stays open
+  await page.getByRole("heading", { name: QUESTION }).click(); // back to reading, and empty: folds again
+  await expect(fold).toBeVisible();
+  await composer.getByLabel("Your question", { exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(composer.getByLabel(/Your attempt/)).toBeFocused();
+  await audit(page);
+});
+
+test("390: the stacked composer has no empty band of its own below it; it rests on the source margin", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ask");
+  await page.getByRole("radio", { name: "Try first", exact: true }).check();
+  const composer = page.locator("form").filter({ has: page.getByRole("group", { name: "How Lectern responds" }) });
+  const margin = page.getByRole("complementary", { name: "Source margin" });
+  // Scrolled down to the margin, the sticky composer is back in its own slot, directly above the margin.
+  await margin.evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await page.evaluate(() => window.scrollBy(0, -200));
+  const c = (await composer.boundingBox())!;
+  const m = (await margin.boundingBox())!;
+  expect(Math.abs(m.y - (c.y + c.height))).toBeLessThanOrEqual(1);
 });
