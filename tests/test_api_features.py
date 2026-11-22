@@ -13,6 +13,8 @@ REPO = Path(__file__).resolve().parents[1]
 def parse_sse(text: str):
     events = []
     for frame in text.strip().split("\n\n"):
+        if frame.startswith(":"):  # a comment (the agent stream's opening line and keep-alives); readers ignore these
+            continue
         lines = dict(line.split(": ", 1) for line in frame.splitlines())
         events.append((lines["event"], json.loads(lines["data"])))
     return events

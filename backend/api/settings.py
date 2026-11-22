@@ -38,6 +38,12 @@ class Settings:
     # per request: a public deployment must not let a model write to a shared database.
     agent_allow_writes: bool = field(default_factory=lambda: os.getenv("AGENT_ALLOW_WRITES") == "1")
 
+    # The tool-using agent's stream ends with a `timeout` error this many seconds after the request arrived, so it
+    # finishes before the platform cuts it off (the Lambda function timeout is 120 s). Keep-alive comments go out
+    # whenever nothing else has been sent for `stream_keepalive_s`.
+    agent_deadline_s: float = field(default_factory=lambda: float(os.getenv("AGENT_DEADLINE_S", "100")))
+    stream_keepalive_s: float = field(default_factory=lambda: float(os.getenv("STREAM_KEEPALIVE_S", "10")))
+
     # Deferred startup (always on AWS Lambda): how long a request waits for the index and model to finish loading.
     startup_wait_s: float = field(default_factory=lambda: float(os.getenv("STARTUP_WAIT_S", "45")))
     health_startup_wait_s: float = field(default_factory=lambda: float(os.getenv("HEALTH_STARTUP_WAIT_S", "25")))
