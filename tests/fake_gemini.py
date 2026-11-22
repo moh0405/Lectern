@@ -182,5 +182,7 @@ class FakeToolChat:
         if passages:
             p = passages[0]
             ref = f"{p['doc']} (page {p['page']})" if p.get("page") else p["doc"]
+            if "bare page" in getattr(self, "task", "").lower() and p.get("page"):  # e2e: a model that omits the parentheses
+                ref = f"{p['doc']} page {p['page']}"
             return TurnResult(text=f"From your material: {p['text'][:140]} [{ref}]")
         return TurnResult(text="I could not find that in your sources.")
