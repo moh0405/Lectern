@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import json
 import logging
+import re
 
 from .citations import Citation, check_answer, extract_citations
 from .rag_engine import RAGEngine
@@ -173,17 +174,130 @@ def _hint_strings(value: Any) -> List[str]:
     return []
 
 
+SOCRATIC_PROMPT = """You are a Socratic tutor. The student asked the QUESTION below and wants to work the answer out themselves, using the PASSAGES from their own study material.
+
+First, privately decide the correct answer and write it as ONE sentence in "answer_key". The student never sees "answer_key"; it is used only to check that no hint gives the answer away.
+
+Then write 3-5 guiding "questions" that lead the student toward the answer without stating it.
+
+Then write a "hints" ladder of 3-4 hints the student reveals one at a time. It is graduated scaffolding, not a summary of the answer:
+- Hint 1 points at the relevant concept, or at where to look in the passages (name the passage, and its page if it has one, e.g. "Re-read the part of notes.pdf (page 4) that describes ...").
+- The middle hints ask a guiding question or give ONE partial step, leaving the next step for the student.
+- The last hint may narrow things down strongly, but the student must still state the conclusion themselves.
+
+Rules for every hint:
+- Phrase it as a question or a nudge ("What happens to ...?", "Look at ...", "Compare ...", "Think about ..."), never as a declarative statement of the answer's key mechanism, step or result.
+- Never write "The answer is", "This is because", "So the result is" or anything that completes the reasoning for the student.
+- Do not restate the answer_key in other words, and do not let the hints together spell out the whole answer.
+- Stay grounded in the PASSAGES; if they do not cover the question, guide from general knowledge and say what to look up.
+
+Example for "Why is searching a balanced binary search tree O(log n)?":
+  bad hint: "Each comparison discards half the remaining nodes, so the search takes log n steps." (states the answer)
+  good hints: "Look at how the passage on page 3 describes what one comparison at a node tells you.", "After one comparison, how many of the remaining nodes could still hold the key?", "If each step keeps only part of the tree, how many steps until one node is left? How does that relate to the tree's height?"
+
+Return pure JSON: {"answer_key": "...", "questions": ["..."], "hints": ["..."]}
+
+QUESTION: {question}
+
+PASSAGES:
+{passages}
+
+DEPTH: {depth} (0-5; higher means the student has struggled more, so the middle hints may give a slightly bigger step, but the rules above still apply)."""
+
+# Words that carry no answer content, for the leak check below.
+_STOPWORDS = frozenset("""
+a an the and or but if then than so as of to in on at by for with from into onto over under about after before
+is are was were be been being am do does did doing done has have had having can could will would shall should may
+might must it its this that these those there here which who whom whose what when where why how each every any all
+some no not only also just very more most less least much many such same other own both either neither one two
+you your yours we our they their them he she his her i me my itself themselves via per out up down off again once
+""".split())
+
+# Openers that make a hint a nudge rather than a statement.
+_NUDGE_OPENERS = ("look", "consider", "think", "check", "compare", "notice", "re-read", "reread", "read", "try",
+                  "ask yourself", "recall", "remember", "what", "why", "how", "which", "when", "where", "can you",
+                  "could you", "imagine", "trace", "picture", "start", "focus", "find", "see", "review", "revisit")
+
+# Declarative patterns that hand over the conclusion whatever the overlap.
+_REVEAL_PATTERNS = re.compile(
+    r"\b(the (final |short )?answer is|this is because|that is because|which is why|the reason is|"
+    r"so the (answer|result) is|in conclusion|therefore,? the)\b",
+    re.IGNORECASE,
+)
+
+
+def _content_words(text: str) -> set:
+    """Lower-case content words with a crude stem, so "swaps"/"swap" and "updates"/"updating" match."""
+    words = set()
+    for w in re.findall(r"[a-z][a-z0-9]+", text.lower()):
+        if w in _STOPWORDS or len(w) < 3:
+            continue
+        for suffix in ("ing", "ies", "ed", "es", "s"):
+            if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+                w = w[: -len(suffix)] + ("y" if suffix == "ies" else "")
+                break
+        words.add(w)
+    return words
+
+
+def _is_nudge(hint: str) -> bool:
+    h = hint.strip().lower().lstrip("*_\"'- ")
+    return h.endswith("?") or h.startswith(_NUDGE_OPENERS)
+
+
+def hint_leaks_answer(hint: str, answer_key: str, question: str = "") -> bool:
+    """Whether a hint gives the answer away: an explicit "the answer is"-style conclusion, or a hint whose own
+    content words (beyond those already in the question) are mostly the hidden answer's. Declarative hints
+    are judged strictly; a question or nudge may share more vocabulary before it counts as restating the answer."""
+    if _REVEAL_PATTERNS.search(hint):
+        return True
+    if not answer_key:
+        return False
+    asked = _content_words(question)
+    mine = _content_words(hint) - asked
+    answer = _content_words(answer_key) - asked
+    if not mine or not answer:
+        return False
+    shared = mine & answer
+    precision = len(shared) / len(mine)  # how much of the hint is answer content
+    coverage = len(shared) / len(answer)  # how much of the answer the hint carries
+    if _is_nudge(hint):
+        return len(shared) >= 5 and (precision >= 0.7 or coverage >= 0.6)
+    return len(shared) >= 3 and (precision >= 0.5 or coverage >= 0.4)
+
+
+def guard_hints(hints: List[str], answer_key: str, question: str) -> Tuple[List[str], int]:
+    """Drop hints that restate the hidden answer. Returns the kept hints and how many were dropped."""
+    kept = [h for h in hints if not hint_leaks_answer(h, answer_key, question)]
+    return kept, len(hints) - len(kept)
+
+
+_FALLBACK_QUESTIONS = [
+    "What key terms does the question involve?",
+    "Can you define those terms in your own words?",
+    "What relationship exists between those terms?",
+    "Which examples from your notes match this situation?",
+    "How would you test your current hypothesis?",
+]
+_FALLBACK_HINTS = [
+    "Look for definitions in the context provided.",
+    "Identify inputs, outputs, and constraints.",
+    "Consider simpler cases that you can reason about first.",
+]
+
+
 def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]] = None, depth: int = 0, temperature: float = 0.2) -> Dict[str, Any]:
-    """Return guiding questions and progressive hints without giving the answer directly."""
-    context_text = "\n".join([(c.get("text") or "")[:400] for c in (context_chunks or [])])
-    template = (
-        "You are a Socratic tutor. Given a QUESTION and optional CONTEXT, "
-        "ask 3-5 guiding questions that lead the student to the answer. "
-        "Provide a short hint ladder as an ordered JSON array of non-empty strings, each more explicit than the last. "
-        "Do NOT reveal the final answer. Return pure JSON: {questions: [..], hints: [..]}\n\n"
-        f"QUESTION: {question}\n\nCONTEXT:\n{context_text}\n\n"
-        f"DEPTH: {depth} (higher depth means the student has struggled more)."
-    )
+    """Return guiding questions and progressive hints without giving the answer directly.
+
+    The model also writes a one-sentence answer key in the same call; it is never returned, only used to drop
+    hints and questions that restate it."""
+    chunks = [c for c in (context_chunks or []) if (c.get("text") or "").strip()]
+    passages = "\n".join(
+        f"- [{RAGEngine.source_label(c)}] {(c.get('text') or '')[:400]}" if c.get("doc") else f"- {(c.get('text') or '')[:400]}"
+        for c in chunks
+    ) or "(none: no study material matched, so guide from general knowledge)"
+    template = (SOCRATIC_PROMPT.replace("{question}", question).replace("{passages}", passages)
+                .replace("{depth}", str(depth)))
     try:
         client = create_llm(temperature=temperature)
         resp = client.generate(template, json_mode=True)
@@ -192,25 +306,18 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
             start = text.find("{")
             end = text.rfind("}")
             data = json.loads(text[start : end + 1])
-            qs = data.get("questions") or []
-            hs = _hint_strings(data.get("hints"))
+            answer_key = data.get("answer_key") if isinstance(data.get("answer_key"), str) else ""
+            qs = [q for q in (data.get("questions") or []) if not (isinstance(q, str) and hint_leaks_answer(q, answer_key, question))]
+            hs, dropped = guard_hints(_hint_strings(data.get("hints")), answer_key, question)
+            if dropped:
+                logger.info("Dropped %d socratic hint(s) that restated the answer", dropped)
+            if not hs and dropped:
+                hs = list(_FALLBACK_HINTS)
             return {"ok": True, "questions": qs, "hints": hs, "model": resp.get("model")}
         return {"ok": False, "error": resp.get("error")}
     except Exception as e:
         # Fallback canned strategy
-        qs = [
-            "What key terms does the question involve?",
-            "Can you define those terms in your own words?",
-            "What relationship exists between those terms?",
-            "Which examples from your notes match this situation?",
-            "How would you test your current hypothesis?",
-        ]
-        hs = [
-            "Look for definitions in the context provided.",
-            "Identify inputs, outputs, and constraints.",
-            "Consider simpler cases that you can reason about first.",
-        ]
-        return {"ok": True, "questions": qs, "hints": hs, "warning": str(e)}
+        return {"ok": True, "questions": list(_FALLBACK_QUESTIONS), "hints": list(_FALLBACK_HINTS), "warning": str(e)}
 
 
 # -----------------------------
