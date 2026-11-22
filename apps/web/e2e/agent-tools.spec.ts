@@ -50,3 +50,18 @@ test("the task needs a few characters before it can run", async ({ page }) => {
   await page.getByLabel("Task").fill("what is a heap");
   await expect(page.getByRole("button", { name: "Run agent" })).toBeEnabled();
 });
+
+test("when the model runs out of quota part-way, the next model finishes and both are named", async ({ page }) => {
+  // Live, 2026-11-22: turn 2 got a 429 and the run ended with an error. The scripted model's "busy model" trigger
+  // switches models after the first turn, as GeminiToolChat now does (tests/test_tool_chat.py covers the real move).
+  await page.goto("/agent");
+  await page.getByLabel("Task").fill("What is a binary heap used for? (busy model)");
+  await page.getByRole("button", { name: "Run agent" }).click();
+
+  await expect(page.getByTestId("tool-step").first()).toContainText(/passages? from heaps\.pdf/, { timeout: 30_000 });
+  await expect(page.getByText(/was unavailable \(busy or out of quota\), so gemini-3\.1-flash-lite continued with the tool results gathered so far/)).toBeVisible();
+  const answer = page.getByRole("region", { name: "Answer" });
+  await expect(answer).toContainText("[heaps.pdf (page 1)]", { timeout: 30_000 });
+  await expect(page.getByTestId("run-cost")).toContainText("1 tool call · 2 model calls · fake-model → gemini-3.1-flash-lite");
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0); // no error (Next's route announcer is an empty alert)
+});
