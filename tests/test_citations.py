@@ -177,3 +177,104 @@ def test_a_listed_page_that_was_not_retrieved_is_still_flagged():
     chunks = [{"doc": "a.pdf", "page": 58, "end_page": 58}]
     out = check_answer("x [a.pdf (page 58, page 170)]", chunks)
     assert out["unverified"] == 1 and out["citations"][1]["status"] == "page_not_retrieved"
+
+
+# Prose-parenthesis citations, as the failover model gemini-3.1-flash-lite writes them (live evaluation, defect 1).
+PROSE = [
+    {"doc": "Data Structures Using Python.pdf", "page": 118, "end_page": 119, "text": "..."},
+    {"doc": "Data Structures Using Python.pdf", "page": 120, "end_page": None, "text": "..."},
+    {"doc": "heaps.pdf", "page": 1, "end_page": None, "text": "..."},
+    {"doc": "Intro to Heaps", "page": None, "text": "a video transcript"},
+]
+
+
+def prose(answer):
+    return [(c.label, c.doc, c.page, c.status) for c in extract_citations(answer, PROSE)]
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("A binary heap is used to implement a priority queue (heaps.pdf, page 1).", [("heaps.pdf, page 1", "heaps.pdf", 1, "ok")]),
+        ("…until the queue is empty (*Data Structures Using Python.pdf*, page 120).",
+         [("Data Structures Using Python.pdf, page 120", "Data Structures Using Python.pdf", 120, "ok")]),
+        ("Bold works too (**heaps.pdf**, p. 1) and underscores (_heaps.pdf_, p. 1).", [("heaps.pdf, p. 1", "heaps.pdf", 1, "ok")]),
+        ("A page range (*Data Structures Using Python.pdf*, pages 118–120).",
+         [("Data Structures Using Python.pdf, pages 118–120", "Data Structures Using Python.pdf", 118, "ok")]),
+        ("Hyphen and pp. (Data Structures Using Python.pdf, pp. 118-119).",
+         [("Data Structures Using Python.pdf, pp. 118-119", "Data Structures Using Python.pdf", 118, "ok")]),
+        ("Nested (heaps.pdf (page 1)).", [("heaps.pdf (page 1)", "heaps.pdf", 1, "ok")]),
+        ("With see (see heaps.pdf, page 1).", [("heaps.pdf, page 1", "heaps.pdf", 1, "ok")]),
+        ("A titled source (Intro to Heaps).", [("Intro to Heaps", "Intro to Heaps", None, "ok")]),
+    ],
+)
+def test_prose_parenthesis_citations_are_recognised(answer, expected):
+    assert prose(answer) == expected
+
+
+def test_several_citations_in_one_parenthesis():
+    answer = "Both agree (heaps.pdf, p. 1; *Data Structures Using Python.pdf*, page 120; Intro to Heaps)."
+    assert [(c[0], c[3]) for c in prose(answer)] == [
+        ("heaps.pdf, p. 1", "ok"),
+        ("Data Structures Using Python.pdf, page 120", "ok"),
+        ("Intro to Heaps", "ok"),
+    ]
+
+
+def test_a_page_range_verifies_when_any_page_in_it_was_retrieved():
+    assert prose("(heaps.pdf, pages 1-3)")[0][3] == "ok"
+    assert prose("(heaps.pdf, pages 4–6)")[0][3] == "page_not_retrieved"
+
+
+def test_a_prose_citation_of_a_page_not_retrieved_is_flagged():
+    assert prose("(heaps.pdf, page 7)") == [("heaps.pdf, page 7", "heaps.pdf", 7, "page_not_retrieved")]
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "The details come later (see below).",
+        "Insertion is fast (O(log n)) and lookups too (O(1)).",
+        "Priority queues (heaps) are trees.",  # a bare stem of heaps.pdf is a word, not a citation
+        "Call it as `push(heaps.pdf, page 1)` in code.",
+        "A link [text](heaps.pdf) is not a prose citation.",
+        "Use a list (for example, page 1 of a book).",
+    ],
+)
+def test_ordinary_parentheses_are_not_citations(answer):
+    assert prose(answer) == []
+
+
+def test_an_unknown_source_in_parentheses_is_ignored_not_flagged():
+    # Prose parentheses mention many things; only a source the model was given counts as a citation.
+    assert prose("CLRS covers this (Cormen.pdf, page 3) in depth.") == []
+
+
+def test_mixed_parenthesis_keeps_only_the_named_source():
+    assert [c[0] for c in prose("(heaps.pdf, page 1; see also the lecture)")] == ["heaps.pdf, page 1"]
+
+
+def test_a_bracket_citation_inside_parentheses_is_counted_once():
+    assert prose("Heaps are trees ([heaps.pdf (page 1)]).") == [("heaps.pdf (page 1)", "heaps.pdf", 1, "ok")]
+
+
+def test_bracket_citations_are_unchanged_next_to_prose_ones():
+    answer = "Heaps [heaps.pdf (page 1)] and queues (Data Structures Using Python.pdf, page 120)."
+    assert [c[0] for c in prose(answer)] == ["heaps.pdf (page 1)", "Data Structures Using Python.pdf, page 120"]
+
+
+def test_a_prose_cited_answer_is_not_reported_as_uncited():
+    answer = ("A binary heap is a complete binary tree stored in an array, so the parent of index i is at (i - 1) // 2 "
+              "and its children are at 2i + 1 and 2i + 2. It is used to implement a priority queue (heaps.pdf, page 1).")
+    result = check_answer(answer, PROSE)
+    assert result["uncited"] is False
+    assert result["unverified"] == 0
+    assert [c["label"] for c in result["citations"]] == ["heaps.pdf, page 1"]
+
+
+def test_the_answer_prompt_insists_on_brackets():
+    from backend.rag_engine import RAGEngine
+
+    for mode in (None, "eli5", "technical", "interview", "summary"):
+        template = RAGEngine._prompt_for_mode(RAGEngine.__new__(RAGEngine), mode)
+        assert "square brackets" in template and "Never cite in parentheses" in template
