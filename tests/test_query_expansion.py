@@ -40,10 +40,10 @@ def test_acronyms_match_whole_words_only():
     assert expansions("Who wrote the dpkg tool and osmosis?") == []
 
 
-def test_hash_collisions_add_the_textbook_names_of_the_strategies():
-    extra = expansions("How do hash tables handle collisions?")
-    assert extra == ["collision resolution separate chaining open addressing probing"]
-    assert expansions("What is a collision in a network?") == []  # needs hash context
+def test_concept_words_are_not_expanded():
+    """Synonyms for concepts measured no gain and hurt a question about one specific strategy (eval s02)."""
+    assert expansions("How do hash tables handle collisions?") == []
+    assert expansions("How does separate chaining resolve hash collisions?") == []
 
 
 def test_expansion_is_deterministic():
@@ -61,8 +61,6 @@ CHUNKS = [
     "DFS clients cache files; the DFS must keep the caches consistent.",
     "Depth-first search explores a graph as far as possible along each branch before backtracking.",
     "Breadth-first search explores a graph level by level from the start vertex using a queue.",
-    "A hash table resolves collisions by separate chaining or by open addressing with linear probing.",
-    "A collision is when two keys hash to the same index.",
 ]
 
 
@@ -95,11 +93,6 @@ def test_without_expansion_bfs_vs_dfs_retrieves_file_systems(engine):
     assert 4 not in _pages(engine.retrieve_context("Difference between BFS and DFS", k=2))
 
 
-def test_collision_question_finds_the_resolution_passage(engine):
-    engine.retrieval_mode = "bm25"
-    assert 6 in _pages(engine.retrieve_context("How do hash tables handle collisions?", k=2))
-
-
 def test_keyword_baseline_is_left_unexpanded(engine):
     engine.retrieval_mode = "keyword"
     assert engine.retrieve_context("BFS", k=3) == []  # no chunk contains the token "bfs"
@@ -111,9 +104,3 @@ def test_flags_come_from_the_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("QUERY_EXPANSION", "0")
     assert RAGEngine(store_dir=str(tmp_path / "s")).query_expansion is False
 
-
-def test_a_question_about_one_strategy_is_not_widened_to_the_others():
-    """Measured regression (eval s02): adding "open addressing" to a separate-chaining question ranked the
-    open-addressing passage first."""
-    assert expansions("How does separate chaining resolve hash collisions?") == []
-    assert expansions("Is linear probing good for hash collisions?") == []

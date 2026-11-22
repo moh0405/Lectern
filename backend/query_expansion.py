@@ -8,8 +8,9 @@ acronym with several senses it picks the sense the rest of the question points t
 acronym such as BFS, mean depth-first search; file, server and storage words mean distributed file system),
 and keeps every sense when nothing tells them apart, so a bare "What is DFS?" can retrieve both.
 
-A short list of related terms does the same for concepts a question names generically (a hash collision ->
-chaining, open addressing, probing), so a corpus that describes those strategies is found.
+Synonym expansion for concepts (hash collision -> chaining, open addressing) was tried and measured no gain on
+either evaluation corpus, while adding the other strategies' names to a question about one of them hurt it, so
+only acronyms are expanded.
 
 No model, no network, no state: safe at Lambda init, and well under a millisecond per query. Measured in
 eval/README.md (`default-*-noexpand` configs).
@@ -64,16 +65,6 @@ ACRONYMS: Dict[str, List[Tuple[str, FrozenSet[str]]]] = {
         "process processes kernel thread threads scheduling scheduler memory system call calls file".split()))],
 }
 
-# A few textbook terms students use for a concept the material may name differently. Applied only when the
-# trigger words all occur in the query and it names none of the terms yet. Kept short: every added word also
-# widens the BM25 match.
-RELATED_TERMS: List[Tuple[FrozenSet[str], str]] = [
-    (frozenset({"hash", "collision"}), "collision resolution separate chaining open addressing probing"),
-    (frozenset({"hash", "collisions"}), "collision resolution separate chaining open addressing probing"),
-    (frozenset({"hashing", "collision"}), "collision resolution separate chaining open addressing probing"),
-    (frozenset({"hashing", "collisions"}), "collision resolution separate chaining open addressing probing"),
-]
-
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -82,7 +73,7 @@ def _words(text: str) -> List[str]:
 
 
 def expansions(query: str) -> List[str]:
-    """The phrases `expand_query` would add, in order, without duplicates or phrases already in the query."""
+    """The spelled-out acronyms `expand_query` would add, in order, without duplicates or phrases already in the query."""
     words = _words(query)
     present = set(words)
     lowered = " ".join(words)
@@ -106,16 +97,11 @@ def expansions(query: str) -> List[str]:
         for (phrase, _), s in zip(senses, scores):
             if best == 0 or s == best:  # nothing disambiguates: keep every sense
                 add(phrase)
-    for triggers, phrase in RELATED_TERMS:
-        specific = set(_words(phrase)) - triggers - {"collision", "collisions", "resolution"}
-        # a question that already names one of the strategies is about that one: do not pull in the others
-        if triggers <= present and not specific & present:
-            add(phrase)
     return out
 
 
 def expand_query(query: str) -> str:
-    """`query` with the spelled-out acronyms and related terms appended, e.g.
+    """`query` with the spelled-out acronyms appended, e.g.
     "Difference between BFS and DFS" -> "Difference between BFS and DFS (breadth-first search; depth-first search)".
     Returns `query` unchanged when there is nothing to add."""
     extra = expansions(query)
