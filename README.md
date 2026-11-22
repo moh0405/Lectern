@@ -8,7 +8,7 @@
 
 Full stack: Python/FastAPI backend with a hand-built vector store and hybrid search, a TypeScript/Next.js frontend, and an evaluation harness that measures every retrieval decision.
 
-**Live demo: [ai-study-mentor-two.vercel.app](https://ai-study-mentor-two.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only, and you can add your own PDFs and ask about them: they are read, embedded and searched inside your browser and never uploaded. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
+**Live demo: [lectern-tutor.vercel.app](https://lectern-tutor.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only, and you can add your own PDFs and ask about them: they are read, embedded and searched inside your browser and never uploaded. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
 
 ![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
 
