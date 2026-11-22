@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from ...citations import check_answer
-from ...llm_config import DEFAULT_MODEL
+from ...llm_config import DEFAULT_MODEL, allowed_models
 from ...llm_providers import create_llm
 from ...rag_engine import RAGEngine
 from ..analytics_store import AnalyticsStore
@@ -295,4 +295,5 @@ def models():
         client = create_llm()
     except RuntimeError as e:
         raise ApiError(503, str(e), code="llm_unavailable")
-    return Models(models=client.list_supported_models(), default=client.model or DEFAULT_MODEL)
+    allowed = allowed_models()  # offer only what a request may actually name
+    return Models(models=[m for m in client.list_supported_models() if m in allowed], default=client.model or DEFAULT_MODEL)

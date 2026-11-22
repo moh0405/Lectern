@@ -397,3 +397,38 @@ def test_socratic_normalizes_model_hint_shapes(indexed, fake_gemini, hints, expe
     assert response.status_code == 200
     assert response.json()["hints"] == expected
     assert "never as a declarative statement" in fake_gemini.calls[-1]
+
+
+@pytest.mark.parametrize("path,body", [
+    ("/api/v1/ask", {"question": "What is a heap?"}),
+    ("/api/v1/ask/stream", {"question": "What is a heap?"}),
+    ("/api/v1/ask/agent/stream", {"question": "What is a heap?"}),
+    ("/api/v1/agent/run/stream", {"task": "What is a heap?"}),
+    ("/api/v1/attempt/feedback", {"question": "What is a heap?", "attempt": "A tree."}),
+])
+@pytest.mark.parametrize("model", ["gemini-pro-latest", "gemini-99-ultra", "models/gemini-3.6-flash", "../x"])
+def test_every_route_refuses_a_model_off_the_allowlist(api, fake_gemini, path, body, model):
+    r = api.post(path, json={**body, "model": model})
+    assert r.status_code == 422 and not fake_gemini.calls
+
+
+def test_every_request_body_with_a_model_field_is_allowlisted():
+    import typing
+
+    from pydantic import BaseModel
+
+    from backend.api import schemas
+    from backend.llm_config import check_requested_model
+
+    requests = [c for n, c in vars(schemas).items() if n.endswith("Request") and isinstance(c, type) and issubclass(c, BaseModel)]
+    with_model = [c for c in requests if "model" in c.model_fields]
+    assert len(with_model) >= 4
+    for cls in with_model:
+        meta = cls.model_fields["model"].metadata
+        assert any(getattr(m, "func", None) is check_requested_model for m in meta), cls.__name__
+    assert typing.get_type_hints(schemas.AskRequest, include_extras=True)
+
+
+def test_models_route_lists_only_what_a_request_may_name(api, fake_gemini, monkeypatch):
+    monkeypatch.setattr(fake_gemini, "list_supported_models", lambda self: ["gemini-3.7-flash", "gemini-pro-latest", "gemini-99-ultra"])
+    assert api.get("/api/v1/models").json()["models"] == ["gemini-3.7-flash"]
