@@ -396,4 +396,4 @@ def test_socratic_normalizes_model_hint_shapes(indexed, fake_gemini, hints, expe
     response = indexed.post("/api/v1/socratic", json={"question": "why use a heap"})
     assert response.status_code == 200
     assert response.json()["hints"] == expected
-    assert "Do NOT reveal the final answer" in fake_gemini.calls[-1]
+    assert "never as a declarative statement" in fake_gemini.calls[-1]
