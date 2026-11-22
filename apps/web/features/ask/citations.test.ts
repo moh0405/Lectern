@@ -55,6 +55,14 @@ describe("linkCitations", () => {
     expect(refs).toHaveLength(0);
   });
 
+  it("turns a citation the model wrapped in backticks into a chip (seen live on gemini-3.6-flash)", () => {
+    const answer = "BFS goes level by level `[heaps.pdf (page 1)]`. Also `(heaps.pdf, page 1)` and `[Other.pdf (page 3)]`.";
+    const cites = [ok("heaps.pdf (page 1)", "heaps.pdf", 1), ok("heaps.pdf, page 1", "heaps.pdf", 1)];
+    const { markdown, refs } = linkCitations(answer, cites, chunks);
+    expect(markdown).toBe("BFS goes level by level [0](#cite-0). Also [1](#cite-1) and `[Other.pdf (page 3)]`.");
+    expect(refs).toHaveLength(2);
+  });
+
   it("does nothing until the server has checked the citations", () => {
     expect(linkCitations("A [heaps.pdf (page 1)].", undefined, chunks).refs).toHaveLength(0);
   });

@@ -223,13 +223,31 @@ const DROPPED = "\u0000";
 /** Two references show the same thing: the same passage, or (with no passage) the same citation. */
 const sameTarget = (a: CiteRef, b: CiteRef) => (a.chunk !== null ? a.chunk === b.chunk : b.chunk === null && a.status === b.status && norm(a.label) === norm(b.label));
 
+// An inline code span that holds nothing but one citation, e.g. `[doc.pdf (page 3)]` (some models wrap citations in backticks).
+const CODED_CITATION = /^`\s*(\[[^[\]\n]{3,200}\]|\((?:[^()[\]\n]|\([^()[\]\n]*\)){3,300}\))\s*`$/;
+
+/** Removes the backticks around inline code spans that are exactly a known citation, so they become chips too. */
+function unwrapCodedCitations(answer: string, byLabel: Map<string, CitationCheck>, chunkDocs: string[]): string {
+  return answer
+    .split(CODE)
+    .map((part, i) => {
+      if (i % 2 === 0) return part;
+      const m = CODED_CITATION.exec(part);
+      const body = m?.[1];
+      if (!body) return part;
+      const known = body.startsWith("[") ? matching(body.slice(1, -1), byLabel, chunkDocs).length > 0 : matchingParen(body.slice(1, -1), byLabel, chunkDocs).found.length > 0;
+      return known ? body : part;
+    })
+    .join("");
+}
+
 export function linkCitations(answer: string, citations: CitationCheck[] | undefined, chunks: Chunk[]): LinkedAnswer {
   const refs: CiteRef[] = [];
   if (!citations?.length) return { markdown: answer, refs };
   const byLabel = new Map<string, CitationCheck>();
   for (const c of citations) if (!byLabel.has(norm(c.label))) byLabel.set(norm(c.label), c);
   const chunkDocs = [...new Set(chunks.map((ch) => ch.doc))];
-  const parts = answer.split(CODE);
+  const parts = unwrapCodedCitations(answer, byLabel, chunkDocs).split(CODE);
   const markdown = parts
     .map((part, i) => {
       if (i % 2 === 1) return part; // code
