@@ -48,3 +48,10 @@
 {"category": "unanswerable", "question": "What is a good recipe for sourdough bread?", "answerable": false, "expect": [], "id": "s48"}
 {"category": "unanswerable", "question": "Who won the 2018 football world cup?", "answerable": false, "expect": [], "id": "s49"}
 {"category": "unanswerable", "question": "How do I configure a Kubernetes ingress controller?", "answerable": false, "expect": [], "id": "s50"}
+{"category": "ambiguity", "question": "Difference between BFS and DFS?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["the key difference between the two"]}], "id": "s51"}
+{"category": "ambiguity", "question": "BFS vs DFS?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["the key difference between the two"]}], "id": "s52"}
+{"category": "ambiguity", "question": "DFS?", "answerable": true, "expect": [{"doc": "graphs.md", "any": ["depth-first search, or dfs"]}, {"doc": "file-systems.md", "any": ["a distributed file system, abbreviated dfs"]}], "id": "s53"}
+{"category": "ambiguity", "question": "How does a DFS keep cached files consistent between clients?", "answerable": true, "expect": [{"doc": "file-systems.md", "any": ["the problem of cache consistency"]}], "id": "s54"}
+{"category": "direct", "question": "How do hash tables handle collisions?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["collision resolution strategy", "each bucket holds a linked list", "resolves a collision by probing"]}], "id": "s55"}
+{"category": "direct", "question": "What is collision resolution?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["collision resolution strategy", "each bucket holds a linked list", "resolves a collision by probing"]}], "id": "s56"}
+{"category": "direct", "question": "What is open addressing?", "answerable": true, "expect": [{"doc": "hashing.md", "any": ["resolves a collision by probing"]}], "id": "s57"}
