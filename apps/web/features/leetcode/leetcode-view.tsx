@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Search } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
@@ -149,11 +148,6 @@ export function LeetCodeView() {
 
   return (
     <>
-      <PageHeader
-        title="LeetCode"
-        description="Search a bank of coding problems and get an AI study guide for any of them."
-      />
-
       {stats.data ? (
         <div className="mb-4 flex flex-wrap gap-2 text-sm text-muted">
           <span>{plural(stats.data.total, "problem")}</span>
@@ -163,6 +157,9 @@ export function LeetCodeView() {
             </span>
           ))}
         </div>
+      ) : stats.isPending ? (
+        // Holds the line's place so the search does not jump down when the counts arrive (layout shift).
+        <div className="mb-4 h-5" aria-hidden="true" />
       ) : null}
 
       <Card className="mb-4 min-w-0 space-y-3">
@@ -192,6 +189,11 @@ export function LeetCodeView() {
                 {t}
               </Chip>
             ))}
+          </div>
+        ) : stats.isPending ? (
+          // The topic row's height while the topics load (one row of chips), so the card does not grow later.
+          <div className="py-1" aria-hidden="true">
+            <Skeleton className="h-9 w-full rounded-full pointer-coarse:h-11" />
           </div>
         ) : null}
       </Card>

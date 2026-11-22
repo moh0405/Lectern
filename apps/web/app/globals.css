@@ -294,4 +294,13 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
   .workspace-jump, .reading-theme { min-height: 44px; min-width: 44px; }
   .reading-theme { width: 44px; height: 44px; }
   .demo-strip-close { width: 44px; height: 44px; }
+  .desk-brand { min-height: 44px; }
+}
+/* Touch screens narrower than the one-line strip: the two links get their own row of 44px-tall targets. */
+@media (pointer: coarse) and (max-width: 1179px) {
+  .demo-strip-text { padding-bottom: 0; }
+  .demo-strip-links { display: flex; flex-wrap: wrap; margin-left: -8px; }
+  .demo-strip-links > .demo-strip-sep:first-child { display: none; }
+  .demo-strip-links a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 8px; }
+  .demo-strip-links .demo-strip-sep { display: inline-flex; align-items: center; margin-inline: -4px; }
 }

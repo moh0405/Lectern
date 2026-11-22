@@ -93,7 +93,7 @@ export function VisualizeView() {
             <Notice>
               <p>Closeness on this map reflects shared words, not meaning: this library was indexed with the simple hashing embedder.</p>
               <details className="mt-1">
-                <summary className="cursor-pointer">For the site owner</summary>
+                <summary className="cursor-pointer pointer-coarse:py-3">For the site owner</summary>
                 <p className="mt-1">
                   Install the <code>embeddings</code> extra and re-index for a semantic map.
                 </p>

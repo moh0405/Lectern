@@ -18,7 +18,7 @@ const button = cva(
         ghost: "text-muted hover:bg-surface-2 hover:text-fg",
         danger: "border border-bad/40 text-bad hover:bg-bad/10",
       },
-      size: { sm: "min-h-10 px-3", md: "min-h-11 px-4", icon: "h-11 w-11" },
+      size: { sm: "min-h-10 px-3 pointer-coarse:min-h-11", md: "min-h-11 px-4", icon: "h-11 w-11" },
     },
     defaultVariants: { variant: "primary", size: "md" },
   },
