@@ -63,6 +63,7 @@ class ReactState(TypedDict, total=False):
     tool_calls: int
     llm_calls: int
     wrapped_up: bool
+    models: List[str]  # the model that served each turn, in order
 
 
 def _key(call: ToolCall) -> str:
@@ -70,11 +71,22 @@ def _key(call: ToolCall) -> str:
 
 
 def build_react_agent(chat: Any, tools: List[Tool], ctx: ToolContext, max_steps: int):
+    def send(state: ReactState, writer: StreamWriter, message: Any) -> tuple:
+        """One model turn. The chat may move to another model when the current one is overloaded or out of quota; say
+        so in the trace, and record which model served the turn."""
+        before = getattr(chat, "model", None)
+        turn = chat.send(message)
+        served = getattr(chat, "model", None)
+        if before and served and served != before:
+            kept = " with the tool results gathered so far" if state.get("models") else ""
+            writer({"event": "thought", "data": {"text": f"{before} was unavailable (busy or out of quota), so {served} continued{kept}."}})
+        return turn, [*state.get("models", []), *([served] if served else [])]
+
     def model(state: ReactState, writer: StreamWriter) -> Dict[str, Any]:
-        turn = chat.send(state["outbox"])
+        turn, models = send(state, writer, state["outbox"])
         if turn.calls and turn.text.strip():
             writer({"event": "thought", "data": {"text": turn.text.strip()[:500]}})
-        return {"pending": list(turn.calls), "text": turn.text, "steps": state.get("steps", 0) + 1, "llm_calls": state.get("llm_calls", 0) + 1}
+        return {"pending": list(turn.calls), "text": turn.text, "steps": state.get("steps", 0) + 1, "llm_calls": state.get("llm_calls", 0) + 1, "models": models}
 
     def run_tools(state: ReactState, writer: StreamWriter) -> Dict[str, Any]:
         seen = set(state.get("seen", []))
@@ -96,9 +108,9 @@ def build_react_agent(chat: Any, tools: List[Tool], ctx: ToolContext, max_steps:
         # The model still wants tools but the steps are used up. A function call must be answered with function
         # results, so answer each with "stop", then take whatever text it writes.
         stop = [ToolResult(c.name, {"error": WRAP_UP}) for c in state["pending"]]
-        turn = chat.send(stop)
+        turn, models = send(state, writer, stop)
         writer({"event": "thought", "data": {"text": "Step limit reached; writing the answer from what was found."}})
-        return {"pending": [], "text": turn.text, "llm_calls": state.get("llm_calls", 0) + 1, "wrapped_up": True}
+        return {"pending": [], "text": turn.text, "llm_calls": state.get("llm_calls", 0) + 1, "wrapped_up": True, "models": models}
 
     def route(state: ReactState) -> str:
         if not state.get("pending"):
@@ -123,7 +135,7 @@ def run_react_agent(chat: Any, tools: List[Tool], ctx: ToolContext, task: str, m
     app = build_react_agent(chat, tools, ctx, max_steps)
     final: ReactState = {}
     # The recursion limit must allow max_steps model turns, their tool turns and the wrap-up.
-    for kind, payload in app.stream({"outbox": task, "steps": 0, "tool_calls": 0, "llm_calls": 0}, config={"recursion_limit": 2 * max_steps + 6}, stream_mode=["custom", "values"]):
+    for kind, payload in app.stream({"outbox": task, "steps": 0, "tool_calls": 0, "llm_calls": 0, "models": []}, config={"recursion_limit": 2 * max_steps + 6}, stream_mode=["custom", "values"]):
         if kind == "custom":
             yield payload
         else:
@@ -142,6 +154,8 @@ def run_react_agent(chat: Any, tools: List[Tool], ctx: ToolContext, task: str, m
             "tool_calls": final.get("tool_calls", 0),
             "llm_calls": final.get("llm_calls", 0),
             "wrapped_up": bool(final.get("wrapped_up")),
+            "model": (final.get("models") or [None])[-1],
+            "models": list(final.get("models") or []),
             "_answer": answer,
         },
     }

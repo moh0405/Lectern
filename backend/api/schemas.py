@@ -525,7 +525,8 @@ class SseThought(BaseModel):
 
 
 class SseAgentRunDone(BaseModel):
-    model: Optional[str] = None
+    model: Optional[str] = Field(default=None, description="The model that served the last turn (the one that wrote the answer)")
+    models: List[str] = Field(default_factory=list, description="The model that served each turn, in order. It changes mid-run when a model is overloaded or out of quota and the next one in the failover chain continues")
     citations: List[CitationCheck]
     unverified_citations: int
     uncited: bool

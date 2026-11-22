@@ -35,6 +35,9 @@ class _Guarded:
 
     def __init__(self, inner: Any, cancelled: threading.Event, deadline: float):
         self._inner, self._cancelled, self._deadline = inner, cancelled, deadline
+        limit = getattr(inner, "limit_to", None)
+        if callable(limit):
+            limit(deadline)  # failing over to another model must not outlast the run either
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
@@ -59,6 +62,9 @@ class _Guarded:
         "The stream always ends with `done` or `error`. A run that is still going after `AGENT_DEADLINE_S` seconds (default "
         "100, counted from when the request arrived) ends with `error` code `timeout`. While a model call is pending the "
         "server sends SSE comment lines (`: keep-alive`) every few seconds; readers should ignore them. "
+        "When the server's default model is overloaded or out of quota on any turn, the next model in the failover chain "
+        "continues the run with the tool results gathered so far (a `thought` says so); `done.models` lists the model that "
+        "served each turn and `done.model` the last one. A model named in the request is never swapped. "
         "Needs the Gemini provider; other providers answer with `tools_unsupported`."
     ),
     responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
@@ -108,7 +114,8 @@ def agent_run_stream(
                     data = SseToken(**data).model_dump()
                 elif name == "done":
                     answer = data.pop("_answer")
-                    data = SseAgentRunDone(model=getattr(chat, "model", None), **data).model_dump()
+                    data["model"] = data.get("model") or getattr(chat, "model", None)
+                    data = SseAgentRunDone(**data).model_dump()
                     _record(analytics, as_request, ctx.passages, t0, "", answer, True)  # before `done`: the stream ends there
                 emit(sse(name, data))
         except StreamCancelled:  # the deadline passed or the client left; the response has already said so
