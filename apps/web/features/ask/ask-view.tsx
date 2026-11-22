@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookOpen, CloudOff, FileText, Link2, MessageSquare, PenLine, Plus, Send, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
@@ -211,6 +211,10 @@ export function AskView() {
   const trying = approach === "try";
   const [attempt, setAttempt] = useState("");
   const [attemptFormat, setAttemptFormat] = useState<AttemptFormat>("steps");
+  // The attempt box folds to one line after feedback, and when it is empty and focus leaves the composer, so the feedback keeps the room.
+  const [attemptOpen, setAttemptOpen] = useState(true);
+  const attemptRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
   const [language, setLanguage] = useState(CODE_LANGUAGES[0]!);
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<"" | Mode>("");
@@ -316,6 +320,21 @@ export function AskView() {
     return () => ro.disconnect();
   }, []);
 
+  // Leave room for the composer when the window scrolls to something (it sticks to the bottom when the columns stack).
+  useLayoutEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--ask-composer-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(set);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      root.style.removeProperty("--ask-composer-h");
+    };
+  }, []);
+
   // Bring the new or picked question into view: the answer column on wide screens, the window when the columns stack.
   useEffect(() => {
     if (!reveal) return;
@@ -363,6 +382,22 @@ export function AskView() {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight + 2, 220)}px`;
   }, [question]);
+  // The same for the attempt box, which grows from three rows up to its CSS max-height.
+  useLayoutEffect(() => {
+    const el = attemptRef.current;
+    if (!el || (typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content"))) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [attempt, attemptOpen, trying]);
+
+  const openAttempt = useCallback(() => {
+    setAttemptOpen(true);
+    requestAnimationFrame(() => attemptRef.current?.focus());
+  }, []);
+  const pickApproach = useCallback((value: Approach) => {
+    setApproach(value);
+    if (value === "try") setAttemptOpen(true);
+  }, []);
 
   const prefill = useCallback((q: string) => {
     setQuestion(q);
@@ -393,7 +428,7 @@ export function AskView() {
     if (q.length < 3 || offline || q.length > limit) return;
     if (trying && !attemptReady) {
       announce("Write your attempt first, then check it.");
-      document.getElementById("attempt")?.focus();
+      openAttempt();
       return;
     }
     setActiveId(null);
@@ -406,7 +441,10 @@ export function AskView() {
       attempt: trying ? { text: attempt, format: attemptFormat, language: attemptFormat === "code" ? language : undefined } : undefined });
     setReveal((n) => n + 1);
     setQuestion("");
-    if (trying) setAttempt("");
+    if (trying) {
+      setAttempt("");
+      setAttemptOpen(false);
+    }
   };
   useEffect(() => {
     if (!busyHint) return;
@@ -614,8 +652,16 @@ export function AskView() {
           )}
         </div>
 
-        <form onSubmit={onSubmit} className={styles.composer}>
-          <Segmented legend="How Lectern responds" name="approach" options={APPROACHES} value={approach} onChange={setApproach} className={styles.approach} fill={narrow} />
+        <form
+          onSubmit={onSubmit}
+          className={styles.composer}
+          ref={composerRef}
+          onBlur={(e) => {
+            // An empty attempt box folds once focus leaves the composer (back to reading), not while the question is being written.
+            if (trying && !attempt.trim() && !e.currentTarget.contains(e.relatedTarget as Node | null)) setAttemptOpen(false);
+          }}
+        >
+          <Segmented legend="How Lectern responds" name="approach" options={APPROACHES} value={approach} onChange={pickApproach} className={styles.approach} fill={narrow} />
           <div className={styles.composerBox}>
             <label htmlFor="question" className="sr-only">
               Your question
@@ -632,7 +678,15 @@ export function AskView() {
               aria-describedby={nearLimit ? "question-count" : undefined}
               className={styles.questionInput}
             />
-            {trying ? (
+            {trying && !attemptOpen ? (
+              <div className={styles.attemptPanel} data-collapsed>
+                <button type="button" className={styles.attemptCollapsed} aria-expanded={false} onFocus={openAttempt} onClick={openAttempt}>
+                  <PenLine aria-hidden="true" />
+                  <span>{turns.some((t) => t.attempt) ? "Write another attempt" : "Write your attempt"}</span>
+                  <span className={styles.attemptCollapsedHint}>{formatInfo.label}</span>
+                </button>
+              </div>
+            ) : trying ? (
               <div className={styles.attemptPanel} data-format={attemptFormat}>
                 <div className={styles.attemptControls}>
                   <Segmented legend="Attempt format" name="attempt-format" options={ATTEMPT_FORMATS.map((f) => ({ value: f.value, label: f.label }))} value={attemptFormat} onChange={setAttemptFormat} />
@@ -651,13 +705,14 @@ export function AskView() {
                   Your attempt <span>{formatInfo.hint}</span>
                 </label>
                 <Textarea
+                  ref={attemptRef}
                   id="attempt"
                   value={attempt}
                   onChange={(e) => setAttempt(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder={attemptFormat === "steps" ? "Write what you understand so far, one step per line" : "Write what you understand so far"}
                   maxLength={MAX_ATTEMPT}
-                  rows={attemptFormat === "short_answer" ? 3 : 4}
+                  rows={3}
                   spellCheck={attemptFormat !== "code"}
                   wrap={attemptFormat === "code" ? "off" : undefined}
                   className={styles.attemptInput}

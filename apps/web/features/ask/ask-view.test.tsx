@@ -203,6 +203,45 @@ describe("AskView approach control", () => {
     await userEvent.click(check);
     expect(session.ask).toHaveBeenCalledTimes(1);
     expect(session.ask.mock.calls[0]![0]).toMatchObject({ question: "Why is heap insert O(log n)?", guided: false, retrievalOnly: false, attempt: { text: "heap.add(x);", format: "code", language: "Java" } });
+    // After sending, the attempt box folds to one line so the feedback keeps the room.
+    expect(screen.queryByLabelText(/Your attempt/)).toBeNull();
+    const fold = screen.getByRole("button", { name: /^Write your attempt/ });
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(fold);
     expect(screen.getByLabelText(/Your attempt/)).toHaveValue("");
+    await waitFor(() => expect(screen.getByLabelText(/Your attempt/)).toHaveFocus());
+  });
+
+  it("folds an empty attempt box when focus leaves the composer, and opens it again from the keyboard", async () => {
+    serve();
+    view();
+    await userEvent.click(screen.getByRole("radio", { name: "Try first" }));
+    const box = screen.getByLabelText(/Your attempt/);
+    expect(box).toHaveAttribute("rows", "3");
+    await userEvent.click(box);
+    await userEvent.click(screen.getByRole("radio", { name: "Code" }));
+    await userEvent.click(screen.getByLabelText("Your question")); // still in the composer: stays open
+    expect(screen.getByLabelText(/Your attempt/)).toBeInTheDocument();
+    await userEvent.click(document.body); // left the composer, and empty: folds
+    expect(screen.queryByLabelText(/Your attempt/)).toBeNull();
+    screen.getByLabelText("Your question").focus();
+    await userEvent.tab(); // the folded line opens on focus and hands focus to the box
+    await waitFor(() => expect(screen.getByLabelText(/Your attempt/)).toHaveFocus());
+    await userEvent.type(screen.getByLabelText(/Your attempt/), "x = 1");
+    await userEvent.click(document.body); // has text: stays open
+    expect(screen.getByLabelText(/Your attempt/)).toHaveValue("x = 1");
+  });
+
+  it("says 'Write another attempt' once the session has an attempt, and reopens when Try first is picked again", async () => {
+    serve();
+    session.turns = [{ ...done, attempt: { text: "a", format: "steps", feedback: null, evidenceStarted: false } } as never];
+    view();
+    await userEvent.click(screen.getByRole("radio", { name: "Try first" }));
+    await userEvent.click(screen.getByLabelText(/Your attempt/));
+    await userEvent.click(document.body);
+    expect(screen.getByRole("button", { name: /^Write another attempt/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "Answer" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Try first" }));
+    expect(screen.getByLabelText(/Your attempt/)).toBeInTheDocument();
   });
 });
