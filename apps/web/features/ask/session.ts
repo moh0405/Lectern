@@ -9,6 +9,13 @@ export interface AgentStep {
   detail: string;
 }
 
+export interface Guided {
+  params: { question: string; mode?: Mode; k: number; temperature: number; model?: string; showPrompt?: boolean; local?: boolean; agent?: boolean };
+  hints?: string[];
+  revealed: number;
+  evidenceStarted: boolean;
+}
+
 export interface Turn {
   id: string;
   question: string;
@@ -30,12 +37,16 @@ export interface Turn {
   llmCalls?: number;
   /** Answered from documents kept in this browser (public demo), not the shared index. */
   local?: boolean;
+  guided?: Guided;
   status: TurnStatus;
   error?: { code: string; message: string };
 }
 
 export type Action =
-  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean; local?: boolean }
+  | { type: "start"; id: string; question: string; mode?: Mode; agent?: boolean; local?: boolean; guided?: Guided }
+  | { type: "resume"; id: string; evidence: boolean; agent?: boolean }
+  | { type: "hints"; id: string; hints: string[] }
+  | { type: "next-hint"; id: string }
   | { type: "step"; id: string; step: AgentStep }
   /** The agentic workflow discards the answer streamed so far; a corrected one follows. */
   | { type: "replace"; id: string }
@@ -57,9 +68,17 @@ export function reducer(turns: Turn[], action: Action): Turn[] {
   switch (action.type) {
     case "start":
       return [
-        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", ...(action.agent ? { agent: true, steps: [] } : {}), ...(action.local ? { local: true } : {}) },
+        { id: action.id, question: action.question, mode: action.mode, answer: "", chunks: [], status: "streaming", guided: action.guided, ...(action.agent ? { agent: true, steps: [] } : {}), ...(action.local ? { local: true } : {}) },
         ...turns,
       ];
+    case "resume":
+      return update(turns, action.id, (t) => ({ ...t, status: "streaming", error: undefined, agent: action.agent ?? t.agent,
+        ...(action.evidence ? { answer: "", chunks: [], citations: undefined, uncited: undefined, cached: undefined, prompt: undefined, steps: [], model: undefined, llmCalls: undefined, rewritten: undefined } : {}),
+        guided: t.guided ? { ...t.guided, evidenceStarted: t.guided.evidenceStarted || action.evidence } : undefined }));
+    case "hints":
+      return update(turns, action.id, (t) => ({ ...t, status: "done", guided: t.guided ? { ...t.guided, hints: action.hints, revealed: Math.min(1, action.hints.length) } : undefined }));
+    case "next-hint":
+      return update(turns, action.id, (t) => ({ ...t, guided: t.guided ? { ...t.guided, revealed: Math.min(t.guided.revealed + 1, t.guided.hints?.length ?? 0) } : undefined }));
     case "step":
       return update(turns, action.id, (t) => ({ ...t, steps: [...(t.steps ?? []), action.step] }));
     case "replace":

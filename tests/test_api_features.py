@@ -355,3 +355,43 @@ def test_supplied_passages_are_bounded(indexed):
     assert indexed.post("/api/v1/ask", json={"question": "what is a treap", "context": too_many}).status_code == 422
     too_long = [{"text": "x" * 4001, "doc": "d"}]
     assert indexed.post("/api/v1/ask", json={"question": "what is a treap", "context": too_long}).status_code == 422
+
+
+def test_socratic_local_context_is_request_only(indexed, fake_gemini, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("must not search the shared index")
+
+    monkeypatch.setattr("backend.rag_engine.RAGEngine.retrieve_context", forbidden)
+    result = indexed.post("/api/v1/socratic", json={"question": "what is a treap", "context": MINE})
+    assert result.status_code == 200
+    assert result.json()["chunks"][0]["doc"] == "my-notes.pdf"
+    assert MINE[0]["text"] in fake_gemini.calls[-1]
+    assert indexed.get("/api/v1/analytics").json()["queries"] == 0
+    assert indexed.get("/api/v1/history").json()["turns"] == []
+    assert indexed.get("/api/v1/documents").json()["documents"][0]["docs"] == ["heaps.pdf"]
+    empty = indexed.post("/api/v1/socratic", json={"question": "what is a treap", "context": []})
+    assert empty.status_code == 200 and empty.json()["chunks"] == []
+
+
+def test_socratic_context_has_ask_validation(indexed):
+    invalid = [MINE * 21, [{"text": "x" * 4001, "doc": "d"}], [{"text": "", "doc": "d"}],
+               [{"text": "x", "doc": "d" * 301}], [{"text": "x", "doc": "d", "page": 0}]]
+    for context in invalid:
+        for route in ("ask", "socratic"):
+            assert indexed.post(f"/api/v1/{route}", json={"question": "why treaps", "context": context}).status_code == 422
+
+
+@pytest.mark.parametrize("hints, expected", [
+    ({"hint3": "third", "hint1": "first", "hint2": "second", "hint10": "tenth"}, ["first", "second", "third", "tenth"]),
+    ([{"hint1": " first "}, {"hint2": "second"}], ["first", "second"]),
+    (["", "  ", None, 3, False, " keep ", {"answer": "must not become a hint"}], ["keep"]),
+    (None, []),
+    (42, []),
+    (" one hint ", ["one hint"]),
+])
+def test_socratic_normalizes_model_hint_shapes(indexed, fake_gemini, hints, expected):
+    fake_gemini.handler = lambda prompt, json_mode: json.dumps({"questions": [], "hints": hints})
+    response = indexed.post("/api/v1/socratic", json={"question": "why use a heap"})
+    assert response.status_code == 200
+    assert response.json()["hints"] == expected
+    assert "Do NOT reveal the final answer" in fake_gemini.calls[-1]

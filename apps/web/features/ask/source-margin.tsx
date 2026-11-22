@@ -87,6 +87,7 @@ export function Passage({ text, sentence, reason, anchor = true, className }: { 
 
 /** Honest copy for a turn that has no passage to show, by what happened to it. */
 export function noPassageText(turn: Turn): string {
+  if (turn.guided && !turn.guided.evidenceStarted) return "Choose Show me the evidence to read the cited answer and its passages here.";
   if (turn.status === "streaming") return "Finding the passages that answer your question…";
   if (turn.status === "error") return "This question didn't reach your sources. Try again.";
   if (turn.status === "stopped") return "You stopped this question before any passages came back. Ask it again to see them.";
@@ -128,7 +129,7 @@ export function SourceMargin({ turn, refs, selection, onSelect, scope }: { turn?
             {ref ? "Citation in focus" : chunk ? "Passage in focus" : "Sources"}
             {scope ? ` · ${scope}` : ""}
           </p>
-          <p className={styles.bandText}>{where || BAND_EMPTY[turn.status]}</p>
+          <p className={styles.bandText}>{where || (turn.guided && !turn.guided.evidenceStarted ? "Evidence when you are ready" : BAND_EMPTY[turn.status])}</p>
         </div>
       </div>
 

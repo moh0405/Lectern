@@ -80,7 +80,13 @@ jobs:
         working-directory: apps/web
         env:
           CI: "true"
-      - name: Public-demo mode (browser-stored flashcards and LeetCode progress)
+      - name: Build public-demo mode against its isolated proxy and keyword search
+        run: npm run web:build
+        env:
+          BACKEND_URL: http://127.0.0.1:8300
+          NEXT_PUBLIC_API_URL: http://localhost:3300/api/backend
+          NEXT_PUBLIC_BROWSER_EMBEDDINGS: "off"
+      - name: Public-demo mode (browser-stored documents, Guided hints, flashcards and progress)
         run: npx playwright test -c playwright.demo.config.ts
         working-directory: apps/web
         env:

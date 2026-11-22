@@ -155,13 +155,31 @@ def concept_map_to_dot(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]])
 # Socratic Tutor Mode
 # -----------------------------
 
+def _hint_strings(value: Any) -> List[str]:
+    """Accept numbered hint objects and lists without stringifying invalid model values."""
+    import re
+
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, list):
+        return [hint for item in value for hint in _hint_strings(item)]
+    if isinstance(value, dict):
+        numbered = []
+        for key, item in value.items():
+            match = re.fullmatch(r"hint[_ -]?(\d+)", str(key), re.IGNORECASE)
+            if match:
+                numbered.append((int(match.group(1)), item))
+        return [hint for _, item in sorted(numbered, key=lambda pair: pair[0]) for hint in _hint_strings(item)]
+    return []
+
+
 def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]] = None, depth: int = 0, temperature: float = 0.2) -> Dict[str, Any]:
     """Return guiding questions and progressive hints without giving the answer directly."""
     context_text = "\n".join([(c.get("text") or "")[:400] for c in (context_chunks or [])])
     template = (
         "You are a Socratic tutor. Given a QUESTION and optional CONTEXT, "
         "ask 3-5 guiding questions that lead the student to the answer. "
-        "Provide a short hint ladder (hint1, hint2, hint3) where each is more explicit than the last. "
+        "Provide a short hint ladder as an ordered JSON array of non-empty strings, each more explicit than the last. "
         "Do NOT reveal the final answer. Return pure JSON: {questions: [..], hints: [..]}\n\n"
         f"QUESTION: {question}\n\nCONTEXT:\n{context_text}\n\n"
         f"DEPTH: {depth} (higher depth means the student has struggled more)."
@@ -175,7 +193,7 @@ def socratic_tutor(question: str, context_chunks: Optional[List[Dict[str, Any]]]
             end = text.rfind("}")
             data = json.loads(text[start : end + 1])
             qs = data.get("questions") or []
-            hs = data.get("hints") or []
+            hs = _hint_strings(data.get("hints"))
             return {"ok": True, "questions": qs, "hints": hs, "model": resp.get("model")}
         return {"ok": False, "error": resp.get("error")}
     except Exception as e:

@@ -1547,6 +1547,11 @@ export interface components {
         /** SocraticRequest */
         SocraticRequest: {
             /**
+             * Context
+             * @description Guide from these passages instead of the server index. Nothing is stored or recorded.
+             */
+            context?: components["schemas"]["ContextPassage"][] | null;
+            /**
              * Depth
              * @description Higher means the student has struggled more
              * @default 0

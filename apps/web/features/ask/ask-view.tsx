@@ -196,7 +196,8 @@ function Library({ turns, activeId, onPick, onClear, demo }: { turns: Turn[]; ac
 }
 
 export function AskView() {
-  const { turns, ask, stop, remove, clear, busy } = useAskSession();
+  const { turns, ask, nextHint, retryHints, showEvidence, stop, remove, clear, busy } = useAskSession();
+  const [guided, setGuided] = useState(false);
   const [question, setQuestion] = useState("");
   const [mode, setMode] = useState<"" | Mode>("");
   const [k, setK] = useState(3);
@@ -259,7 +260,7 @@ export function AskView() {
   const scope = demo && active ? (active.local ? "In this browser" : "Shared library") : undefined;
   const grounding = groundingOf(active);
   const finished = active?.status === "done" && Boolean(active.answer);
-  const showSteps = finished;
+  const showSteps = finished || Boolean(active?.guided);
   const showUnderstanding = finished && grounding.kind !== "not-found";
 
   const select = (s: Selection) => {
@@ -283,7 +284,7 @@ export function AskView() {
     const seen = statuses.current;
     for (const t of turns) {
       const before = seen.get(t.id);
-      if (before === "streaming" && t.status !== "streaming") announce(finishedMessage(t));
+      if (before === "streaming" && t.status !== "streaming") announce(t.guided && !t.guided.evidenceStarted ? (t.status === "done" ? "Guided hints ready. Reveal hints or show the evidence." : t.status === "stopped" ? "Guided hints stopped." : "Guided hints unavailable. Retry or show the evidence.") : finishedMessage(t));
       seen.set(t.id, t.status);
     }
   }, [turns, announce]);
@@ -379,7 +380,7 @@ export function AskView() {
     setStep("question");
     if (advancedRef.current?.open) advancedRef.current.open = false; // the panel floats over the answer
     announce(local ? "Searching your browser documents…" : "Searching your material…");
-    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly, local, agent: agentic });
+    void ask({ question: q, mode: mode || undefined, k, temperature, model: demo ? undefined : model.trim() || undefined, showPrompt: !demo && showPrompt, retrievalOnly: !guided && retrievalOnly, guided, local, agent: agentic });
     setReveal((n) => n + 1);
     setQuestion("");
   };
@@ -488,7 +489,9 @@ export function AskView() {
                     focusAfterRemove.current = true;
                     announce("Question removed");
                   }}
-                  onFresh={() => askAgain(active)}
+                  onFresh={() => active.guided ? active.guided.evidenceStarted ? void showEvidence(active) : void retryHints(active) : askAgain(active)}
+                  onNextHint={() => nextHint(active.id)}
+                  onEvidence={() => void showEvidence(active)}
                   onSearchShared={
                     active.error?.code === "no_local_match"
                       ? () => {
@@ -582,6 +585,15 @@ export function AskView() {
         </div>
 
         <form onSubmit={onSubmit} className={styles.composer}>
+          <fieldset className={styles.guidedChoice}>
+            <legend className="sr-only">Response approach</legend>
+            {([false, true] as const).map((value) => (
+              <label key={String(value)}>
+                <input type="radio" name="approach" checked={guided === value} onChange={() => setGuided(value)} />
+                {value ? "Guided" : "Answer"}
+              </label>
+            ))}
+          </fieldset>
           <div className={styles.composerBox}>
             <label htmlFor="question" className="sr-only">
               Your question

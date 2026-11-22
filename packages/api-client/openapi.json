@@ -2262,6 +2262,22 @@
       },
       "SocraticRequest": {
         "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContextPassage"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Guide from these passages instead of the server index. Nothing is stored or recorded.",
+            "title": "Context"
+          },
           "depth": {
             "default": 0,
             "description": "Higher means the student has struggled more",

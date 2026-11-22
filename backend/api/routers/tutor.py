@@ -59,7 +59,10 @@ async def concept_map(req: TopicRequest, engine: RAGEngine = Depends(get_engine)
 
 @router.post("/socratic", response_model=Socratic, summary="Guiding questions and a hint ladder, without the answer")
 async def socratic(req: SocraticRequest, engine: RAGEngine = Depends(get_engine)):
-    chunks = await run_in_threadpool(engine.retrieve_context, req.question, req.k) if req.k else []
+    chunks = (
+        [c.model_dump() for c in req.context] if req.context is not None
+        else await run_in_threadpool(engine.retrieve_context, req.question, req.k) if req.k else []
+    )
     res = raise_if_failed(
         await run_in_threadpool(advanced_ai.socratic_tutor, req.question, chunks, req.depth, req.temperature)
     )

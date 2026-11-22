@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BookOpen, Check, ChevronDown, Copy, Layers, Link2, Plus, Sparkles, Square, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Markdown } from "@/components/markdown";
 import { ChunkCard } from "@/components/chunk-card";
 import { Button } from "@/components/ui/button";
 import { Badge, ErrorNotice, Notice } from "@/components/ui/feedback";
@@ -192,6 +193,8 @@ function QuestionHeading({ question, headingRef }: { question: string; headingRe
 export function TurnCard({
   turn,
   onStop,
+  onNextHint,
+  onEvidence,
   onRemove,
   onFresh,
   busy = false,
@@ -206,6 +209,8 @@ export function TurnCard({
 }: {
   turn: Turn;
   onStop: () => void;
+  onNextHint?: () => void;
+  onEvidence?: () => void;
   onRemove: () => void;
   onFresh?: () => void;
   busy?: boolean;
@@ -225,7 +230,7 @@ export function TurnCard({
   onSearchShared?: () => void;
 }) {
   const streaming = turn.status === "streaming";
-  const noKey = turn.error?.code === "llm_unavailable";
+  const noKey = turn.error?.code === "llm_unavailable" && !turn.guided;
   const noLocalMatch = turn.error?.code === "no_local_match";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const controlId = useId();
@@ -303,8 +308,8 @@ export function TurnCard({
             </div>
           ) : (
             <>
-              {turn.cached && onFresh ? (
-                <Button variant="ghost" size="sm" className={styles.actionButton} onClick={onFresh} disabled={busy}>
+              {turn.cached && !turn.guided && onFresh ? (
+                <Button variant="ghost" size="sm" className={styles.actionButton} onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
                   Fresh answer
                 </Button>
               ) : null}
@@ -325,6 +330,7 @@ export function TurnCard({
         <div className={styles.neutralNotice} role="status">
           <p>{turn.error?.message}</p>
           <div className={styles.noticeActions}>
+            {turn.guided && onFresh ? <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>Try this question again</Button> : null}
             {onSearchShared ? (
               <Button variant="secondary" size="sm" onClick={onSearchShared} disabled={busy}>
                 Search the shared textbooks instead
@@ -342,25 +348,26 @@ export function TurnCard({
             <p>{turn.error.message}</p>
           </ErrorNotice>
           {onFresh ? (
-            <Button variant="secondary" onClick={onFresh} disabled={busy}>
+            <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
               Try this question again
             </Button>
           ) : null}
         </div>
       ) : turn.status === "stopped" ? (
         <div className="space-y-3">
-          <p className={styles.quietNote}>You stopped this answer before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
+          <p className={styles.quietNote}>You stopped this {turn.guided && !turn.guided.evidenceStarted ? "hint request" : "answer"} before it finished{turn.answer ? "; what arrived is below" : ""}.</p>
           {onFresh ? (
-            <Button variant="secondary" onClick={onFresh} disabled={busy}>
+            <Button variant="secondary" onClick={() => { onFresh?.(); if (turn.guided) headingRef.current?.focus(); }} disabled={busy}>
               Try this question again
             </Button>
           ) : null}
         </div>
       ) : null}
 
+      {turn.guided ? <GuidedHints turn={turn} blocked={busy && !streaming} onNext={onNextHint} onEvidence={() => { onEvidence?.(); headingRef.current?.focus(); }} /> : null}
       <AgentSteps turn={turn} />
 
-      {turn.answer || streaming ? (
+      {turn.answer || (streaming && (!turn.guided || turn.guided.evidenceStarted)) ? (
         <div className={styles.answer} data-step="evidence">
           <p className={styles.answerLabel}>
             <Sparkles aria-hidden="true" />
@@ -430,9 +437,41 @@ export function TurnCard({
             ))}
           </div>
         </details>
-      ) : turn.status === "done" && !turn.answer ? (
+      ) : turn.status === "done" && !turn.answer && !turn.guided ? (
         <p className={cn("text-sm text-muted")}>No matching passages were found in your sources.</p>
       ) : null}
     </div>
+  );
+}
+
+/** Hidden hints are stored on the turn, but only revealed text enters the DOM. */
+function GuidedHints({ turn, blocked, onNext, onEvidence }: { turn: Turn; blocked: boolean; onNext?: () => void; onEvidence?: () => void }) {
+  const guided = turn.guided!;
+  const latest = useRef<HTMLDivElement>(null);
+  const previous = useRef(guided.revealed);
+  useEffect(() => {
+    if (guided.revealed > previous.current) latest.current?.focus();
+    previous.current = guided.revealed;
+  }, [guided.revealed]);
+  const hints = guided.hints ?? [];
+  return (
+    <section className={styles.guidedHints} data-step="evidence" aria-label="Guided hints">
+      <p className="eyebrow">Guided / think it through</p>
+      <p className={styles.quietNote}>Hints are prompts to help you think. Reveal the cited answer whenever you are ready.</p>
+      <div aria-live="polite" aria-atomic="false">
+        {hints.slice(0, guided.revealed).map((hint, i) => (
+          <div key={i}>
+            <p className="eyebrow">Hint {i + 1} of {hints.length}</p>
+            <div data-guided-hint={i + 1} tabIndex={-1} ref={i === guided.revealed - 1 ? latest : undefined}><Markdown>{hint}</Markdown></div>
+          </div>
+        ))}
+        {!guided.evidenceStarted && turn.status === "streaming" ? <p>Preparing your hints…</p> : null}
+        {guided.hints && !hints.length ? <p>No hints were returned. You can still explore the evidence.</p> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {guided.revealed < hints.length ? <Button variant="secondary" onClick={onNext}>Next hint</Button> : null}
+        {!guided.evidenceStarted ? <Button disabled={blocked} onClick={onEvidence}>Show me the evidence</Button> : null}
+      </div>
+    </section>
   );
 }

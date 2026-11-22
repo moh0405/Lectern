@@ -109,3 +109,29 @@ describe("agentic turns", () => {
     expect(reducer([], start("p"))[0]).not.toHaveProperty("steps");
   });
 });
+
+describe("guided turns", () => {
+  it.each([{ hints: [] }, { hints: ["first"] }, { hints: ["first", "second", "third", "fourth"] }])("reveals and persists hints without treating them as answers: $hints", ({ hints }) => {
+    let turns = reducer([], { ...start("guided"), guided: { params: { question: "why heaps", k: 2, temperature: 0.4 }, revealed: 0, evidenceStarted: false } });
+    turns = reducer(turns, { type: "hints", id: "guided", hints });
+    expect(turns[0]!.guided?.revealed).toBe(Math.min(1, hints.length));
+    for (let i = 0; i < 8; i++) turns = reducer(turns, { type: "next-hint", id: "guided" });
+    expect(turns[0]!.guided?.revealed).toBe(hints.length);
+    expect(turns[0]!.answer).toBe("");
+    saveTurns(turns);
+    expect(loadTurns()[0]!.guided).toEqual(turns[0]!.guided);
+    turns = reducer(turns, { type: "resume", id: "guided", evidence: true });
+    turns = reducer(turns, { type: "token", id: "guided", text: "Cited answer" });
+    expect(turns).toHaveLength(1);
+    expect(turns[0]!.guided).toMatchObject({ hints, evidenceStarted: true, params: { k: 2, temperature: 0.4 } });
+  });
+});
+
+it("evidence retry clears a partial answer but preserves Guided hints and original settings", () => {
+  const partial: Turn = { id: "retry", question: "why heaps", answer: "unfinished", chunks: [chunk], status: "stopped", citations: [], cached: true,
+    guided: { params: { question: "why heaps", k: 2, temperature: 0.4 }, hints: ["one", "two"], revealed: 2, evidenceStarted: true } };
+  const [retried] = reducer([partial], { type: "resume", id: "retry", evidence: true });
+  expect(retried?.guided).toEqual(partial.guided);
+  expect(retried).toMatchObject({ id: "retry", answer: "", chunks: [], status: "streaming" });
+  expect(retried?.cached).toBeUndefined();
+});

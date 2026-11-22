@@ -25,7 +25,7 @@ export default defineConfig({
       env: { E2E_WEB_ORIGIN: `http://localhost:${WEB_PORT}` },
     },
     {
-      command: `npm run dev -- --port ${WEB_PORT}`,
+      command: process.env.CI ? `npm run start -- --port ${WEB_PORT}` : `npm run dev -- --port ${WEB_PORT}`,
       url: `http://localhost:${WEB_PORT}`,
       reuseExistingServer: false,
       timeout: 120_000,
