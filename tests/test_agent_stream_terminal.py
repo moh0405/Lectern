@@ -11,6 +11,7 @@ import threading
 import time
 
 import pytest
+from fastapi import Request
 
 from backend.api.settings import settings
 from backend.api.streaming import guarded_stream
@@ -143,9 +144,19 @@ def test_the_deadline_counts_from_when_the_request_arrived(indexed, fake_gemini,
         return real(work, **kw)
 
     monkeypatch.setattr(router, "guarded_stream", spy)
-    fake_gemini.tool_script = scripted(ANSWER)
-    stream(indexed)
-    assert 0 < seen["budget"] <= 5.0
+    from backend.api.deps import get_engine
+
+    def slow_engine(request: Request):  # stands in for waiting on a cold start before the handler runs
+        time.sleep(0.6)
+        return get_engine(request)
+
+    indexed.app.dependency_overrides[get_engine] = slow_engine
+    try:
+        fake_gemini.tool_script = scripted(ANSWER)
+        stream(indexed)
+    finally:
+        indexed.app.dependency_overrides.pop(get_engine, None)
+    assert 0 < seen["budget"] <= 5.0 - 0.5
 
 
 # ------------------------------------------------------------- guarded_stream itself
