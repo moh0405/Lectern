@@ -204,6 +204,50 @@ class Socratic(BaseModel):
     )
 
 
+AttemptFormat = Literal["steps", "code", "short_answer"]
+Verdict = Literal["supported", "contradicted", "not_covered"]
+
+
+class AttemptFeedbackRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=2000)
+    attempt: str = Field(..., min_length=1, max_length=6000, description="The student's own attempt, written before seeing an answer")
+    format: AttemptFormat = Field(
+        "steps",
+        description="steps: one step per line. code: a program, judged line by line. short_answer: a paragraph, judged sentence by sentence.",
+    )
+    language: Optional[str] = Field(None, max_length=40, description="Programming language of a `code` attempt, for the rubric")
+    k: int = Field(3, ge=0, le=10, description="Number of passages to judge against (ignored when `context` is given)")
+    context: Optional[List[ContextPassage]] = Field(
+        None, max_length=20,
+        description="Judge against these passages instead of the server index (for example the visitor's browser documents). Nothing is stored or recorded.",
+    )
+    model: Optional[str] = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
+    temperature: float = Field(0.2, ge=0.0, le=1.0)
+
+
+class AttemptItem(BaseModel):
+    unit: int = Field(description="1-based index into `units`")
+    ref: str = Field(description="How to name the unit, e.g. 'Step 2', 'Line 5', 'Sentence 1'")
+    verdict: Verdict = Field(description="supported or contradicted by the passages, or not_covered by them")
+    note: str = Field(description="A pointer for the student. Never the corrected step or the solution")
+    citations: List[CitationCheck] = Field(description="The passages the verdict relies on, checked like Ask's citations")
+    checked: bool = Field(
+        description="True when the verdict is supported or contradicted and at least one of its citations is verified. "
+        "Otherwise the verdict was not checked against your sources and should be shown as such."
+    )
+
+
+class AttemptFeedback(BaseModel):
+    format: AttemptFormat
+    units: List[str] = Field(description="The attempt as it was split for judging: steps, code lines or sentences")
+    items: List[AttemptItem] = Field(description="One verdict per judged unit, in order. Units without an item were not judged")
+    summary: str
+    chunks: List[Chunk] = Field(description="The passages the attempt was judged against")
+    model: Optional[str] = None
+    unverified_citations: int = 0
+    withheld: int = Field(0, description="Notes replaced by a neutral pointer because they gave the answer away")
+
+
 class SynthesisRequest(BaseModel):
     topic: str = Field(..., min_length=2, max_length=200)
     k_per_doc: int = Field(2, ge=1, le=5)

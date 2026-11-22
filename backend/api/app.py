@@ -21,7 +21,7 @@ from .. import __version__, cloud_sync
 from .deps import make_engine, shared_engine
 from .errors import ERROR_RESPONSES, ApiError, ErrorResponse, install_error_handlers
 from .jobs import JobManager
-from .routers import agent, ask, leetcode, sources, study, tracking, tutor, viz
+from .routers import agent, ask, attempt, leetcode, sources, study, tracking, tutor, viz
 from .schemas import Health, SseAgentDone, SseAgentRunDone, SseDone, SseError, SseMeta, SseReplace, SseStep, SseThought, SseToken, SseToolCall, SseToolResult
 from .settings import settings
 from .startup import LAMBDA_INVOKE_HEADER, DeferredStartup
@@ -133,7 +133,7 @@ def create_app() -> FastAPI:
         engine = await run_in_threadpool(shared_engine, app)
         return Health(status="ok", version=__version__, semantic_search=engine.semantic_search, chunks=len(engine.store))
 
-    for r in (sources.router, ask.router, agent.router, tutor.router, leetcode.router, study.router, viz.router, tracking.router):
+    for r in (sources.router, ask.router, agent.router, tutor.router, attempt.router, leetcode.router, study.router, viz.router, tracking.router):
         app.include_router(r)
 
     base_openapi = app.openapi
