@@ -27,6 +27,8 @@ const PAGES: [string, (page: Page) => Promise<void>][] = [
     await p.getByLabel(/Temperature/).waitFor();
   }],
   ["/leetcode", async (p) => void (await p.getByRole("button", { name: /^1\. Two Sum/ }).waitFor())],
+  // A problem opens as a full-screen sheet on a phone.
+  ["/leetcode?q=two+sum&p=1", async (p) => void (await p.getByRole("dialog", { name: "Problem" }).getByRole("heading").first().waitFor())],
   ["/concept-map", async (p) => void (await p.getByTestId("idle-preview").waitFor())],
   ["/compare", async (p) => void (await p.getByTestId("idle-preview").waitFor())],
   ["/work-it-out", async () => {}],
@@ -34,6 +36,7 @@ const PAGES: [string, (page: Page) => Promise<void>][] = [
   ["/sources", async (p) => void (await p.getByRole("heading", { name: "Indexed sources", exact: true }).waitFor())],
   ["/study", async (p) => void (await p.getByRole("button", { name: "Show answer" }).waitFor())],
   ["/math", async () => {}],
+  ["/visualize", async (p) => void (await p.getByText(/Showing \d+/).waitFor())],
   ["/agent", async () => {}],
   ["/analytics", async () => {}],
 ];
