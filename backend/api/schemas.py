@@ -210,6 +210,7 @@ class Socratic(BaseModel):
 
 AttemptFormat = Literal["steps", "code", "short_answer"]
 Verdict = Literal["supported", "contradicted", "not_covered"]
+AttemptJudge = Literal["sources", "problem"]
 
 
 class AttemptFeedbackRequest(BaseModel):
@@ -220,6 +221,11 @@ class AttemptFeedbackRequest(BaseModel):
         description="steps: one step per line. code: a program, judged line by line. short_answer: a paragraph, judged sentence by sentence.",
     )
     language: Optional[str] = Field(None, max_length=40, description="Programming language of a `code` attempt, for the rubric")
+    judge: AttemptJudge = Field(
+        "sources",
+        description="sources: judge only against the passages. problem: a unit may also be judged on whether its reasoning "
+        "works for the problem statement in the passages; those verdicts have `basis: problem` and are never `checked`.",
+    )
     k: int = Field(3, ge=0, le=10, description="Number of passages to judge against (ignored when `context` is given)")
     context: Optional[List[ContextPassage]] = Field(
         None, max_length=20,
@@ -238,6 +244,11 @@ class AttemptItem(BaseModel):
     checked: bool = Field(
         description="True when the verdict is supported or contradicted and at least one of its citations is verified. "
         "Otherwise the verdict was not checked against your sources and should be shown as such."
+    )
+    basis: AttemptJudge = Field(
+        "sources",
+        description="sources: judged against the passages. problem: reasoned from the problem statement, not from your "
+        "sources, so it is never `checked` and carries no verified citation.",
     )
 
 

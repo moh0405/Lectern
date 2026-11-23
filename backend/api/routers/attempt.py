@@ -1,4 +1,4 @@
-"""Try first: feedback on the student's own attempt, judged against the retrieved passages (one model call)."""
+"""Try first: feedback on the student's own attempt (one model call), and a similar practice question (up to two)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,10 @@ router = APIRouter(prefix="/api/v1", tags=["tutor"], dependencies=common_depende
         "`not_covered` by the passages retrieved for the question (or the `context` given). Each verdict's citations are "
         "checked against those passages the same way `/ask` checks an answer; a verdict without a verified citation has "
         "`checked: false` and should be shown as not checked against your sources. The feedback gives pointers only: "
-        "ask `/ask` (\"Show me the evidence\") for the answer. One model call per request; nothing is cached or stored."
+        "ask `/ask` (\"Show me the evidence\") for the answer. With `judge: problem` a unit may instead be judged on whether "
+        "its reasoning works for the problem statement: such an item has `basis: problem`, `checked: false` and no verified "
+        "citation, and must be shown as reasoned from the problem, not from your sources. One model call per request; "
+        "nothing is cached or stored."
     ),
 )
 async def feedback(req: AttemptFeedbackRequest, engine: RAGEngine = Depends(get_engine)):
@@ -43,7 +46,7 @@ async def feedback(req: AttemptFeedbackRequest, engine: RAGEngine = Depends(get_
     else:
         chunks = []
     res = raise_if_failed(await run_in_threadpool(
-        attempt_feedback.give_feedback, req.question, req.attempt, req.format, chunks, req.language, req.model, req.temperature
+        attempt_feedback.give_feedback, req.question, req.attempt, req.format, chunks, req.language, req.model, req.temperature, req.judge
     ))
     return AttemptFeedback(
         format=req.format,
@@ -64,7 +67,8 @@ async def feedback(req: AttemptFeedbackRequest, engine: RAGEngine = Depends(get_
     description=(
         "Writes one question from the `context` passages. It is returned only if it cites one of them, shares content "
         "with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it "
-        "with `/attempt/feedback`. One model call per request; nothing is cached or stored."
+        "with `/attempt/feedback`. Up to two model calls per request (a second only when a guard rejects the first draft, "
+        "never after a provider, quota or daily-limit error); each counts against the daily limit. Nothing is cached or stored."
     ),
 )
 async def similar(req: SimilarPracticeRequest):
