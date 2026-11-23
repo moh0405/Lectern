@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Concept map" };
 
 export default function Page() {
   return (
-    <ToolPage title="Concept map" description="See how the ideas in a topic connect, drawn from your sources." fallback={<ConceptMap />}>
+    <ToolPage eyebrow="Tools" title="Concept map" description="See how the ideas in a topic connect, drawn from your sources." fallback={<ConceptMap />}>
       <ConceptMapFromUrl />
     </ToolPage>
   );

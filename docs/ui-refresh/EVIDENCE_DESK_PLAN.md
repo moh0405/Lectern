@@ -132,6 +132,8 @@ Each phase ends with passing checks and is its own PR. Phases 1–2 deliver the 
 
 **Done when:** all 9 existing routes use the new shell and pass the visual suite at all widths and both themes.
 
+*Built, with no new backend route or proxy entry:* the Library has a rail and a paper shelf (`.paper-tokens` re-points the desk tokens to paper inside a subtree). The public demo labels "Your documents (this browser)" and "Shared textbook (read-only)"; a private deployment has no browser documents, so it keeps "Add material" and "Indexed sources". Similar-example history reads the examples Ask already saved in this browser. LeetCode Try first judges an attempt against the problem statement plus up to three library passages, in one model call made on click.
+
 ### Phase 6: Verify, ship, update the portfolio
 - Checks: `npm run web:typecheck && npm run web:lint && npm run web:test`, `.venv/bin/python -m pytest`, `ruff check .`, Playwright (default and `playwright.demo.config.ts`), production build.
 - New screenshots in `docs/ui-refresh/after/`; update `docs/ui-refresh/README.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/API.md`.

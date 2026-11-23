@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Explain at my level" };
 
 export default function Page() {
   return (
-    <ToolPage title="Explain at my level" description="The same idea explained your way, from ELI5 to expert, using your material." fallback={<Adaptive />}>
+    <ToolPage eyebrow="Practice" title="Explain at my level" description="The same idea explained your way, from ELI5 to expert, using your material." fallback={<Adaptive />}>
       <AdaptiveFromUrl />
     </ToolPage>
   );

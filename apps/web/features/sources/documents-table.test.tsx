@@ -25,7 +25,7 @@ describe("DocumentsTable", () => {
   it("does not offer deleting in the read-only public collection", async () => {
     renderTable(true);
     expect(await screen.findByText("dsa.pdf")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Shared textbooks" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Shared textbook (read-only)" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
   it("requires confirmation and supports cancel without deleting", async () => {

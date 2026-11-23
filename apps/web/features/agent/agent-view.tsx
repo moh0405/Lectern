@@ -97,6 +97,7 @@ export function AgentView() {
   return (
     <>
       <PageHeader
+        eyebrow="Tools"
         title="Agent"
         description="Hand it a multi-step task and watch which tools it uses to answer from your material."
       />

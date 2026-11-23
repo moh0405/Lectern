@@ -11,6 +11,7 @@ import { QueryError } from "@/features/shared/query-error";
 import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
 import { DifficultyBadge } from "./difficulty-badge";
 import { ProgressPanel } from "./progress";
+import { TryFirstPanel } from "./try-first-panel";
 
 export function ProblemDetail({ pid, onClose, focusTitle = false, showClose = true }: {
   pid: string;
@@ -87,10 +88,17 @@ export function ProblemDetail({ pid, onClose, focusTitle = false, showClose = tr
             tabIndex={0}
             role="region"
             aria-label="Problem statement"
-            className="max-h-[22rem] overflow-y-auto rounded-lg border border-border bg-bg/40 p-4 text-sm [overflow-wrap:anywhere]"
+            className="paper paper-tokens max-h-[22rem] overflow-y-auto rounded-lg border border-border p-4 text-sm [overflow-wrap:anywhere]"
           >
             <Markdown breaks>{problem.data.description}</Markdown>
           </div>
+
+          <TryFirstPanel
+            problem={{ pid: problem.data.pid, title: problem.data.title, description: problem.data.description }}
+            guideShown={Boolean(guide.data) || guide.isPending}
+            guideBusy={guide.isPending}
+            onShowGuide={() => guide.mutate()}
+          />
 
           <div>
             <Button onClick={() => guide.mutate()} disabled={guide.isPending}>

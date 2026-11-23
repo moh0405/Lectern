@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Work it out" };
 
 export default function Page() {
   return (
-    <ToolPage title="Work it out" description="Reason it through yourself, with guiding questions and hints instead of the answer." fallback={<Socratic />}>
+    <ToolPage eyebrow="Practice" title="Work it out" description="Reason it through yourself, with guiding questions and hints instead of the answer." fallback={<Socratic />}>
       <SocraticFromUrl />
     </ToolPage>
   );

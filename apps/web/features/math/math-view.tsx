@@ -70,7 +70,7 @@ export function MathView() {
 
   return (
     <>
-      <PageHeader title="Math" description="Exact symbolic answers, typeset, for the algebra and calculus in your course." />
+      <PageHeader eyebrow="Tools" title="Math" description="Exact symbolic answers, typeset, for the algebra and calculus in your course." />
       <Card className="mb-4">
         <form onSubmit={onSubmit} className="space-y-3">
           <div>

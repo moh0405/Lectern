@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Database, FileText, HardDrive, Info, Trash2, Upload } from "lucide-react";
+import { ArrowUpRight, Database, FileText, Info, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -108,10 +108,10 @@ export function MyDocumentsCard() {
   };
 
   return (
-    <Card aria-label="My documents" className={`sources-local-card ${styles.localCard}`}>
+    <Card aria-label="Your documents (this browser)" className={`sources-local-card ${styles.localCard}`}>
       <div className={styles.sectionHead}>
         <div>
-          <div className={styles.titleRow}><CardTitle>My documents</CardTitle><span className={styles.scope}><HardDrive className="h-3 w-3" aria-hidden="true" />This browser only</span></div>
+          <div className={styles.titleRow}><CardTitle>Your documents (this browser)</CardTitle></div>
           <p className="text-muted">Your course notes, readings, and PDFs. Files are read and searched here; only matching passages are sent to the model when you ask a question.</p>
         </div>
       </div>

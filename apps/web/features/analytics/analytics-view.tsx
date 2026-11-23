@@ -138,6 +138,7 @@ export function AnalyticsView() {
   return (
     <>
       <PageHeader
+        eyebrow="Library"
         title="Insights"
         description="See what you have asked, how fast it was answered and which sources did the work."
         actions={

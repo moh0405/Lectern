@@ -21,7 +21,7 @@ const ICON: Record<VerdictKind, ReactNode> = {
  * checked against the passages. A verdict with a passage behind it is a button that opens that passage in the source
  * margin (below the feedback on narrow screens). The cited answer is only fetched when the student asks for it.
  */
-export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blocked, narrow, inlinePassage }: {
+export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blocked, narrow, inlinePassage, evidenceLabel = "Show me the evidence", evidenceNote = "The full answer, with citations, when you are ready." }: {
   turn: Turn;
   selection?: Selection;
   onSelect?: (selection: Selection) => void;
@@ -30,6 +30,9 @@ export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blo
   narrow: boolean;
   /** The passage opened from a verdict, on narrow screens before the answer exists. */
   inlinePassage?: ReactNode;
+  /** What the reveal button offers, on pages where the next step is not a cited answer. */
+  evidenceLabel?: string;
+  evidenceNote?: string;
 }) {
   const attempt = turn.attempt!;
   const feedback = attempt.feedback;
@@ -136,8 +139,8 @@ export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blo
       )}
       {!attempt.evidenceStarted ? (
         <div className={styles.attemptActions}>
-          <Button disabled={blocked} onClick={onEvidence}>Show me the evidence</Button>
-          <span className={styles.quietNote}>The full answer, with citations, when you are ready.</span>
+          <Button disabled={blocked} onClick={onEvidence}>{evidenceLabel}</Button>
+          <span className={styles.quietNote}>{evidenceNote}</span>
         </div>
       ) : null}
     </section>

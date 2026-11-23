@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Globe, GitBranch, LockKeyhole, Mic, Search, Trash2, Video, type LucideIcon } from "lucide-react";
+import { FileText, Globe, GitBranch, Mic, Search, Trash2, Video, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -62,15 +62,14 @@ export function DocumentsTable({ onDeleted }: { onDeleted?: (sourceKey: string) 
     <Card className="sources-shared-card">
       <div className={styles.sectionHead}>
         <div>
-          {demo ? <p className={`${styles.eyebrow} mb-2`}>Indexed sources</p> : null}
-          <div className={styles.titleRow}><CardTitle id={`${controlId}-heading`} tabIndex={-1}>{demo ? "Shared textbooks" : "Indexed sources"}</CardTitle>{demo ? <span className={styles.scope}><LockKeyhole className="h-3 w-3" aria-hidden="true" />Read-only collection</span> : null}</div>
+          <div className={styles.titleRow}><CardTitle id={`${controlId}-heading`} tabIndex={-1}>{demo ? "Shared textbook (read-only)" : "Indexed sources"}</CardTitle></div>
           <p className="text-muted">{demo ? "Explore the collection already available to everyone. Your own documents live separately in this browser and never change this shared index." : "Source material available to search and cite. Review the original source name and its indexed passage count."}</p>
         </div>
       </div>
       {docs.isPending ? <div className="space-y-3" role="status" aria-label="Loading indexed sources"><Skeleton className="h-16" /><Skeleton className="h-16" /><span className="sr-only">Loading indexed sources…</span></div> : docs.isError ? (
         <div className="space-y-3"><ErrorNotice>{errorMessage(docs.error)}</ErrorNotice><Button variant="secondary" disabled={docs.isFetching} onClick={() => void docs.refetch()}>{docs.isFetching ? "Retrying…" : "Retry loading sources"}</Button></div>
       ) : documents.length === 0 ? (
-        <EmptyState title={demo ? "No shared textbooks yet" : "Nothing indexed yet"}>{demo ? "There are no shared textbooks in this index yet. You can still add your own files to My documents above." : "Upload a PDF or add a link above. It will appear here when indexing finishes."}</EmptyState>
+        <EmptyState title={demo ? "No shared textbooks yet" : "Nothing indexed yet"}>{demo ? "There are no shared textbooks in this index yet. You can still add your own files to Your documents above." : "Upload a PDF or add a link above. It will appear here when indexing finishes."}</EmptyState>
       ) : <>
         <div className={styles.libraryToolbar}>
           <div className={styles.filter}><Search aria-hidden="true" /><Input type="search" aria-label="Filter indexed sources" placeholder="Find a source by name…" value={filter} onChange={(event) => setFilter(event.target.value)} /></div>
