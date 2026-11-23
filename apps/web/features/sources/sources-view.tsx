@@ -35,15 +35,25 @@ export function SourcesView() {
   return (
     <div className={`sources-library ${styles.library}`}>
       <PageHeader
+        eyebrow="Library"
         title="Sources"
-        description="A library your answers can point back to. Add your material, then ask questions with the original passages in view."
+        description="Material to learn. Lectern teaches it, with sources."
       />
+      <div className={styles.desk}>
+      <nav className={styles.rail} aria-label="On this page">
+        <p className="eyebrow">Your library</p>
+        <a href="#library-yours">{demo ? "Your documents" : "Add material"}</a>
+        <a href="#library-shared">{demo ? "Shared textbook" : "Indexed sources"}{stats.data ? <span>{stats.data.documents.toLocaleString()}</span> : null}</a>
+      </nav>
+      <div className={styles.shelves}>
+      <div id="library-yours" className={styles.anchor}>
       {demo ? <MyDocumentsCard /> : (
         <section aria-label="Add source material" className="grid gap-4 lg:grid-cols-2">
           <UploadCard onJob={addJob} />
           <UrlCard onJob={addJob} />
         </section>
       )}
+      </div>
       {jobs.length ? (
         <section aria-label="Indexing jobs">
           <p className={`${styles.eyebrow} mb-3`}>Processing activity</p>
@@ -52,7 +62,7 @@ export function SourcesView() {
           </div>
         </section>
       ) : null}
-      <section aria-label={demo ? "Shared textbook collection" : "Source index overview"}>
+      <section id="library-shared" className={`paper paper-tokens ${styles.shelf} ${styles.anchor}`} aria-label={demo ? "Shared textbook collection" : "Source index overview"}>
         <div className={styles.statScope}>
           <span className="inline-flex items-center gap-2"><Library className="h-4 w-4" aria-hidden="true" />{demo ? "Shared textbook index" : "Server source index"}</span>
           <span>{demo ? "Separate from your browser-local documents" : "New or changed material is processed"}</span>
@@ -71,6 +81,8 @@ export function SourcesView() {
         </dl>
         <div className="mt-4"><DocumentsTable onDeleted={(key) => setDeleted((d) => [...d, key])} /></div>
       </section>
+      </div>
+      </div>
     </div>
   );
 }

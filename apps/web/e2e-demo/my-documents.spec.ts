@@ -15,7 +15,7 @@ test("add a PDF in the browser, ask about it, and only its passages go to the se
 
   // 1) the Sources page offers browser-side documents, not a server upload
   await page.goto("/sources");
-  await expect(page.getByRole("heading", { name: "My documents" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your documents (this browser)" })).toBeVisible();
   await expect(page.getByLabel("Upload files")).toHaveCount(0);
 
   await page.getByLabel("Add my documents").setInputFiles(PDF);

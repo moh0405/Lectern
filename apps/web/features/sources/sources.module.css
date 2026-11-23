@@ -1,4 +1,19 @@
 .library { display: grid; gap: 1.5rem; min-width: 0; }
+/* The Ask desk's arrangement: a library rail, then the shelves. The rail stacks above them below 1180px. */
+.desk { display: grid; gap: 1.5rem; min-width: 0; }
+.shelves { display: grid; gap: 1.5rem; min-width: 0; }
+.rail { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; min-width: 0; }
+.rail > :global(.eyebrow) { width: 100%; margin-bottom: .25rem; }
+.rail a { display: inline-flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; padding: 0 .75rem; border-radius: 8px; color: var(--color-muted); font-size: .875rem; text-decoration: none; }
+.rail a:hover { background: var(--color-surface-2); color: var(--color-fg); }
+.rail a span { font: 400 .75rem var(--font-mono), monospace; }
+.shelf { min-width: 0; padding: 1.25rem; border: 1px solid var(--color-paper-line); border-radius: 12px; }
+.anchor { min-width: 0; scroll-margin-top: calc(var(--shell-header, 73px) + 1rem); }
+@media (min-width: 1180px) {
+  .desk { grid-template-columns: 220px minmax(0, 1fr); align-items: start; gap: 2rem; }
+  .rail { position: sticky; top: calc(var(--shell-header, 73px) + 1.5rem); flex-direction: column; align-items: stretch; flex-wrap: nowrap; padding-right: 1rem; border-right: 1px solid var(--color-border); }
+}
+@media (max-width: 640px) { .shelf { padding: 1rem; } }
 .eyebrow { color: var(--color-accent-2); font-size: .75rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .sectionHead { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: .8rem; margin-bottom: 1.1rem; }
 .sectionHead p { max-width: 46rem; margin-top: .4rem; font-size: .85rem; line-height: 1.75; }
