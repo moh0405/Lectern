@@ -8,7 +8,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 {"error": {"code": "not_found", "message": "No such job", "details": null}}
 ```
 
-## All 42 operations
+## All 45 operations
 
 ### Health and corpus
 
@@ -24,7 +24,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/v1/sources/files` | multipart upload of PDFs/audio; returns `202 {files, urls, job_id}` |
-| POST | `/api/v1/sources/urls` | body `{urls: [...]}` of YouTube/GitHub/web links; returns `202` |
+| POST | `/api/v1/sources/urls` | body `{urls: [...]}` of YouTube/GitHub/web links; returns `202`. A URL that is not http(s) on port 80 or 443, carries credentials or names a private host is refused with `422 invalid_url`; the fetch re-checks the resolved address |
 | GET | `/api/v1/jobs/{job_id}` | `{id, kind, status (queued/running/done/failed), progress[], result, error, created_at, finished_at}` |
 
 ### Asking and searching
@@ -37,7 +37,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 | POST | `/api/v1/agent/run/stream` | tool-using agent (ReAct, Gemini function calling): the model chooses the tools; streamed as `tool_call` / `tool_result` events |
 | GET | `/api/v1/search?query=&k=` | retrieval only, no model call |
 | GET | `/api/v1/suggestions?n=` | study questions generated from your material |
-| GET | `/api/v1/models` | models your key can use, and the default |
+| GET | `/api/v1/models` | models your key can use that a request is allowed to name, and the default |
 
 ### Tutor tools
 
@@ -45,9 +45,8 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 |---|---|---|
 | POST | `/api/v1/concept-map` | `{topic, temperature}` → `{nodes, edges, dot, model, warning, chunks, grounding_note}` (built from the passages retrieved for the topic) |
 | POST | `/api/v1/socratic` | `{question, depth, k, temperature}` → `{questions, hints, ...}` |
-| POST | `/api/v1/practice/similar` | `{question, context, previous?, model?}` → `{question, citations, model}`. Up to two model calls (a second only when a guard rejects the first draft, never after a provider, quota or daily-limit error; both count against the daily limit); the question must cite a given passage and not state its answer, which is never returned |
-| PUT | `/api/v1/history/{id}/note` | `{note}` → the saved turn. An empty note clears it. Refused in the public demo |
-| POST | `/api/v1/attempt/feedback` | `{question, attempt, format: steps\|code\|short_answer, judge?: sources\|problem, language?, k, context?, model?}` → `{units, items: [{unit, ref, verdict, note, citations, checked, basis}], summary, chunks, ...}`. One model call; citations checked like `/ask`; `checked: false` means not checked against your sources; `basis: problem` (only with `judge: problem`) means reasoned from the problem statement, never with a verified citation; never returns the solution |
+| POST | `/api/v1/practice/similar` | `{question, context, previous?, model?, temperature?}` → `{question, citations, model}`. See [Try first and practice](#try-first-and-practice) |
+| POST | `/api/v1/attempt/feedback` | `{question, attempt, format: steps\|code\|short_answer, judge?: sources\|problem, language?, k, context?, model?, temperature?}` → `{format, units, items: [{unit, ref, verdict, note, citations, checked, basis}], summary, chunks, model, unverified_citations, withheld}`. See [Try first and practice](#try-first-and-practice) |
 | POST | `/api/v1/synthesis` | `{topic, k_per_doc, temperature}` → `{similarities, conflicts, synthesis, citations, chunks, checked_citations, unverified_citations, grounding_note}` (each document's passages most relevant to the topic; citations checked against them) |
 | POST | `/api/v1/adaptive` | `{question, level, temperature}` → explanation at a level with a mini quiz |
 | POST | `/api/v1/math` | `{input}` → `{kind, latex, steps}` |
@@ -87,6 +86,7 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 |---|---|---|
 | GET | `/api/v1/history?limit=` | saved turns, newest first (question, answer, passages, checked citations) |
 | POST | `/api/v1/history` | save a finished turn |
+| PUT | `/api/v1/history/{id}/note` | `{note}` (up to 2,000 characters) → the saved turn; an empty note clears it. Refused by the public-demo proxy |
 | DELETE | `/api/v1/history/{id}` | delete one (204) |
 | DELETE | `/api/v1/history` | delete all (204) |
 
@@ -126,7 +126,7 @@ Request:
 }
 ```
 
-`mode` is the study style (technical, interview prep, quick summary). Response (abridged):
+`mode` is the study style (technical, interview prep, quick summary). `model` must be one a request may name (see `GET /models`); any other is refused with a 422 and is never swapped for another. Response (abridged):
 
 ```json
 {
@@ -201,6 +201,26 @@ Bounds: at most 4 tool calls per turn; an identical repeated call is refused; ea
 
 
 The stream always ends with `done` or `error`. It opens with an SSE comment line (`: stream open`) and sends `: keep-alive` comments whenever nothing else has gone out for `STREAM_KEEPALIVE_S` seconds (default 10), for example while a model call is pending; SSE readers ignore comments. A run still going `AGENT_DEADLINE_S` seconds (default 100) after the request arrived ends with `error` code `timeout`, so the stream finishes before the Lambda's 120 s limit can cut it off silently. A model failure mid-run (out of quota, overloaded after retries) ends with a typed `error` (`quota_exhausted`, `daily_limit`, `llm_error`); after the first turn the conversation stays on one model, so it does not fail over.
+
+## Try first and practice
+
+Both routes make one model call per request and neither caches nor stores anything. The public-demo proxy allows them.
+
+**`POST /api/v1/attempt/feedback`** splits `attempt` (up to 6,000 characters) into steps (up to 30), code lines (up to 200) or sentences (up to 30), and judges each against the `k` retrieved passages or the `context` you send.
+
+| Field in `items[]` | Meaning |
+|---|---|
+| `verdict` | `supported`, `contradicted` or `not_covered` by the passages |
+| `citations` | checked the same way as `/ask` |
+| `checked` | `true` when a `supported` or `contradicted` verdict has a verified citation. `false` means treat it as not checked against your sources |
+| `note` | a pointer, not the solution. A note or summary that restates the model's hidden answer is replaced, and `withheld` counts the replacements |
+
+A unit without an item was not judged. An attempt that is too long or empty is refused with `422 attempt_too_long` or `422 attempt_empty`. `checked: true` means the cited passage was retrieved; it does not prove the verdict is right.
+
+**`POST /api/v1/practice/similar`** writes one new question from `context` (1 to 10 passages). `previous` (up to 5) lists questions already offered. The question is returned only if it cites a given passage, shares content with it, does not state its answer and is not a rewording of `question` or `previous`. Its answer is never returned. If no question passes, the route answers `502 llm_error` with a message to try again.
+
+Model failures on both routes use the standard error shape: `429 daily_limit`, `429 quota_exhausted`, `503 llm_unavailable` or `502 llm_error`.
+
 ## Indexing a PDF
 
 ```bash
@@ -221,3 +241,7 @@ Returns `{"chunks": [...]}` with the same `Chunk` objects as above; useful for d
 ## Limits
 
 Flashcards, progress and history are stored in `data/study.db` (`STUDY_DB`); there are no accounts. Uploads: allowed types only, `%PDF-` signature checked, `MAX_UPLOAD_MB` (50) per file, bounded file count. Requests: `RATE_LIMIT_PER_MIN` (60) per IP, answered with `429` in the standard error shape.
+
+Model calls: `DAILY_LLM_LIMIT` caps requests to the model per UTC day, counting retries and failover attempts (off by default). With `S3_BUCKET` the count is shared atomically across instances, and if it cannot be checked the call is refused. On Gemini's free tier a request can still fail when every model is busy or out of quota.
+
+Citations: a check confirms that the cited document and page were among the retrieved passages. It does not confirm that the passage supports the claim.
