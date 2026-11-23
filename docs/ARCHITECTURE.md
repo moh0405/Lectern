@@ -32,8 +32,12 @@ Plus `eval/` (retrieval evaluation), `tests/` (Python tests), `scripts/` (CLI to
 | `rerank.py` | Optional re-ordering | A cross-encoder that reads query and passage together |
 | `indexer.py` | Build and update the index | Incremental: content fingerprints, skip unchanged files, re-chunk when the chunker changes |
 | `rag_engine.py` | The orchestrator | `retrieve_context`, prompt building, calls the model, suggestions, notes |
-| `llm_config.py` | Talk to Gemini | Model resolution, retries that honour the provider's retry hint, fail-over to other models when one is overloaded or out of quota, streaming, JSON mode |
-| `citations.py` | Verify an answer's citations | Checks each `[doc (page N)]` against the retrieved passages |
+| `llm_config.py` | Talk to Gemini | Model resolution, the allowlist of models a request may name, retries that honour the provider's retry hint, fail-over to other models when one is overloaded or out of quota, streaming, JSON mode |
+| `spend_cap.py` | Daily ceiling on model requests | Counts every request, retry and failover attempt; shared across instances through S3 conditional writes; refuses calls if the count cannot be checked |
+| `safe_fetch.py` | Fetch visitor-supplied URLs | Blocks private addresses at connect time and on each redirect; limits ports, size and time |
+| `citations.py` | Verify an answer's citations | Checks each `[doc (page N)]` against the retrieved passages (that the page was retrieved, not that it supports the claim) |
+| `attempt_feedback.py` | Try first | Judges each unit of a student's attempt against the passages, checks its citations, withholds feedback that restates the answer |
+| `similar_practice.py` | Similar example | Writes one new grounded question; its answer key is used for a leak check and never returned |
 | `advanced_ai.py` | Tutor tools | Concept map, Socratic tutor, source synthesis, adaptive explanation |
 | `safe_math.py` | Math without `eval` | Whitelist parser in a sandboxed worker process with a timeout |
 | `leetcode_handler.py` | Problem bank | Load, normalize, search and explain problems |
@@ -167,6 +171,17 @@ flowchart LR
 - **Streaming:** tool calls and results stream as they happen; the final answer arrives whole (the last model turn is not streamed token by token). The loop runs in a worker thread behind `guarded_stream` (`backend/api/streaming.py`): the response opens with a comment, sends keep-alive comments while a model call blocks, and always ends with `done` or `error`, including `timeout` at `AGENT_DEADLINE_S` (100 s from arrival, under the 120 s Lambda limit). No new model turn starts after the deadline. The web page treats a stream that closes without either event, or 150 s with no events, as an error and re-enables Run.
 - **Observed on real Gemini** (by hand, a few tasks): the model chose its own tool sequence, including re-searching with different words and, once, trying `read_page` on a Markdown file that has no pages (the tool now handles that case and the prompt discourages repeating a failed call). It sometimes uses more calls than a human would. No benchmark exists.
 
+### Try first and the Understanding step
+
+The Ask page has three approaches: Answer, Guided and Try first. A finished, cited answer also opens an Understanding step. Each model call below happens only on a click, and none is cached.
+
+- **Attempt feedback** (`POST /attempt/feedback`, `backend/attempt_feedback.py`): the attempt is split into steps (one per line, up to 30), code lines (up to 200) or sentences (up to 30). One model call labels each unit `supported`, `contradicted` or `not_covered` by the retrieved passages, or by passages the browser sends as `context`.
+- **What "checked" means:** each verdict's citations go through the same checker as Ask. A `supported` or `contradicted` verdict with no verified citation returns `checked: false` and is shown as unchecked. A checked verdict means its cited passage was retrieved. The model's judgement of that passage can still be wrong.
+- **Not giving the answer away:** the prompt asks for pointers only. The model also writes a one-sentence `answer_key`, never returned, and a note or summary that restates it is replaced with a neutral pointer (`withheld` counts these). This is a heuristic guard.
+- **Own-words note:** seeded from the answer without a model call. It is saved on the turn in the browser and, where writes are allowed, on the server with `PUT /history/{id}/note`. The public-demo proxy refuses that route, so a demo note stays in the browser.
+- **Similar example** (`POST /practice/similar`, `backend/similar_practice.py`): one model call writes a new question from the same passages. It is returned only if it cites a given passage, shares content with it, does not state its answer and is not a rewording of the original or of a question already offered. Otherwise the request fails with a message to try again.
+- **Flashcard and different explanation:** a note can be saved as a card (`/cards`, or browser storage in the demo). A different explanation calls `/adaptive` with the same passages as `context`.
+
 ## 5. Where the data lives
 
 ```
@@ -203,6 +218,9 @@ A subtle consequence: the math worker is created with `spawn`, which **re-import
 - **Versioned** under `/api/v1`; `/health` is outside it.
 - **One error shape** for every failure (HTTP, validation, unexpected): `{"error": {"code", "message", "details?"}}`. Internal exception text is never returned.
 - **Safety rails:** per-IP rate limit, optional `X-API-Key`, CORS limited to configured origins, upload type/signature/size/count limits and sanitized file names.
+- **Model allowlist:** a `model` named in a request must be in `allowed_models()` (the Flash and Flash-Lite list, or `ALLOWED_MODELS`, plus the server's configured model). Anything else is a 422; a named model is never swapped. `GET /models` lists only allowed models.
+- **Daily spend cap:** with `DAILY_LLM_LIMIT` set, each model request reserves one count first. With `S3_BUCKET`, the count is a compare-and-swap on `<prefix>/usage/<UTC date>.json` using `If-Match` / `If-None-Match`, so concurrent instances cannot lose an increment or pass the limit. If the count cannot be read or saved, the call is refused. It counts requests rather than tokens, and a failed call can use allowance without spending anything, so the count can err high. A request already in flight when the limit is reached still finishes.
+- **SSRF guard:** page and API fetches of visitor-supplied URLs go through `safe_get`, which allows http(s) on ports 80 and 443, refuses credentials in URLs and non-public addresses (including IPv4 embedded in IPv6 and odd numeric spellings), checks the address on the socket it connects with (so DNS rebinding cannot slip through), re-checks every redirect (at most 5), ignores environment proxies, and stops at 5 MB or 30 s. GitHub clones are built from a validated owner and repo, over https with redirects off. YouTube transcripts are requested by video ID through their library. The guard cannot recognise a private service exposed on a public address.
 - **The schema is the contract.** `scripts/export_openapi.py` writes `packages/api-client/openapi.json`; `openapi-typescript` generates types from it; CI fails if either is stale. The frontend never hand-writes request or response types.
 
 Full route list: see the README or [API reference](API.md).
@@ -262,7 +280,8 @@ Full route list: see the README or [API reference](API.md).
 - Exact search compares the query with every vector: fine up to roughly 100,000 passages on one machine; beyond that you would want an approximate index (FAISS IVF/HNSW, or a vector database).
 - One process, in-memory jobs and rate limits: right for a portfolio deployment, not for many users. Section 13 describes the deployment; a real multi-user system would need auth, a shared job queue and a database.
 - Retrieval quality is measured on 33 and 44 questions, so differences smaller than about 10 points are noise (see `eval/README.md`).
-- Answer *faithfulness* (does the model's claim match its source?) is not measured, only whether citations point at real retrieved passages.
+- Answer *faithfulness* (does the model's claim match its source?) is not measured, only whether citations point at real retrieved passages. The same applies to Try first verdicts: a citation check cannot show that a verdict is right.
+- Gemini's free tier can still fail a request. Retries and failover help, but when every model is busy or out of quota the user gets an error and can try again.
 
 ## 13. Deployment
 
@@ -275,7 +294,7 @@ Browser -> Vercel (Next.js) -> /api/backend/* proxy (adds X-API-Key) -> Lambda F
 
 - **API:** the same Docker image runs on AWS Lambda (CPU PyTorch, MiniLM baked in). State lives in S3 because a container's disk is wiped on restart. Infrastructure is Terraform (`infra/`); see [AWS.md](AWS.md) for costs and measurements.
 - **Web app:** Vercel. The browser never calls the API directly; `apps/web/lib/backend-proxy.ts` forwards allowed requests and adds the key, so the key never reaches a visitor.
-- **Public-demo rules:** the proxy allows reading and asking only. Routes that write to, or reveal, the shared study database answer `403 disabled_in_demo`, and the web app does not send them (`lib/demo.tsx`). Flashcards and LeetCode progress still work for each visitor through browser storage; history, analytics and the personalised study plan stay off.
+- **Public-demo rules:** the proxy allows reading and asking only. Routes that write to, or reveal, the shared study database answer `403 disabled_in_demo`, and the web app does not send them (`lib/demo.tsx`). Attempt feedback and similar questions are allowed because they store nothing. Flashcards, LeetCode progress and own-words notes still work for each visitor through browser storage; server history, analytics and the personalised study plan stay off.
 - **Delivery:** CI (GitHub Actions) tests every push, including a real-browser run in demo mode (`apps/web/playwright.demo.config.ts`). An optional OIDC deploy workflow (`.github/workflows/deploy.yml`, off until enabled in `infra/ci.tf`) updates the Lambda without stored AWS keys.
 - **Your own documents in the demo (browser-side RAG):** hosting limits make server uploads impractical (Vercel rejects bodies over about 4.5 MB, Lambda about 6 MB) and a shared index cannot hold private files, so the demo's Sources page lets a visitor add PDF, TXT or Markdown files that never leave the browser. `lib/browser-rag/` extracts text (pdf.js), cuts it into sentence-based passages (`chunk.ts`), embeds them with MiniLM via transformers.js (`embed.ts`, about 25 MB downloaded once, cached; if the download fails or stalls past 90 s it falls back to keyword-only search and tells the visitor), stores everything in IndexedDB (`store.ts`) and searches with BM25 + cosine merged by reciprocal rank fusion (`search.ts`, `retrieve.ts`). Asking sends only the question and the top few passages as `context` on `POST /ask` or `/ask/stream`; the server then skips its index, answer cache and analytics (private material is not recorded) and still streams the answer and checks citations against those passages. Not covered yet: the tutor tools (concept map, Socratic, compare, adaptive) still use the shared index.
 - **Known limit:** Lambda may run several copies, each with its own disk, so concurrent writes to `study.db` could overwrite each other. Fine for one person, which is why the demo keeps visitor data in the browser.
