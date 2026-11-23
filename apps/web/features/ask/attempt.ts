@@ -17,14 +17,22 @@ export const MAX_ATTEMPT = 6000;
 
 export const UNCHECKED = "not checked against your sources";
 
-export type VerdictKind = "supported" | "contradicted" | "unchecked" | "not_covered";
+/** How a verdict judged from the problem statement is labelled, so it never reads as source-checked. */
+export const REASONED = "Reasoned from the problem, not from your sources";
+
+export type VerdictKind = "supported" | "contradicted" | "reasoned" | "reasoned_wrong" | "unchecked" | "not_covered";
 
 /**
  * How to show a verdict. A supported or contradicted verdict with no verified citation is never shown as if it were
  * confirmed: it reads "not checked against your sources", because a wrong "supported" is worse than none.
  */
-export function verdictOf(item: Pick<AttemptItem, "verdict" | "checked">): { kind: VerdictKind; label: string; long: string } {
+export function verdictOf(item: Pick<AttemptItem, "verdict" | "checked"> & { basis?: AttemptItem["basis"] }): { kind: VerdictKind; label: string; long: string } {
   if (item.verdict === "not_covered") return { kind: "not_covered", label: "Not in your sources", long: "Not covered by your sources" };
+  if (item.basis === "problem") {
+    return item.verdict === "supported"
+      ? { kind: "reasoned", label: "Works for this problem", long: `Works for this problem. ${REASONED}` }
+      : { kind: "reasoned_wrong", label: "Does not hold for this problem", long: `Does not hold for this problem. ${REASONED}` };
+  }
   if (!item.checked) {
     const said = item.verdict === "supported" ? "Looks right" : "Looks wrong";
     return { kind: "unchecked", label: `${said}, unchecked`, long: `${said}, but ${UNCHECKED}` };
@@ -46,11 +54,13 @@ export function passagesFor(item: AttemptItem, chunks: Chunk[], unitText: string
 
 /** One line that sums up the feedback, e.g. "2 supported · 1 to re-check · 1 not in your sources". */
 export function tally(feedback: Pick<AttemptFeedback, "items">): string {
-  const counts: Record<VerdictKind, number> = { supported: 0, contradicted: 0, unchecked: 0, not_covered: 0 };
+  const counts: Record<VerdictKind, number> = { supported: 0, contradicted: 0, reasoned: 0, reasoned_wrong: 0, unchecked: 0, not_covered: 0 };
   for (const item of feedback.items) counts[verdictOf(item).kind]++;
+  const reasoned = [counts.reasoned ? `${counts.reasoned} fine` : "", counts.reasoned_wrong ? `${counts.reasoned_wrong} to re-check` : ""].filter(Boolean).join(", ");
   const parts = [
     counts.supported ? `${counts.supported} supported` : "",
     counts.contradicted ? `${counts.contradicted} to re-check` : "",
+    reasoned ? `reasoned from the problem: ${reasoned}` : "",
     counts.unchecked ? `${counts.unchecked} ${UNCHECKED}` : "",
     counts.not_covered ? `${counts.not_covered} not in your sources` : "",
   ].filter(Boolean);

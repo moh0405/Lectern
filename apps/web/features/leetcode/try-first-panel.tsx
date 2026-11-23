@@ -14,7 +14,7 @@ import type { Selection } from "@/features/ask/citation-chip";
 import { InlinePassage } from "@/features/ask/inline-passage";
 import type { AttemptFormat, Turn } from "@/features/ask/session";
 import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
-import { attemptContext, attemptQuestion, LIBRARY_PASSAGES, librarySearch, type TryFirstProblem } from "./try-first";
+import { attemptContext, attemptJudge, attemptQuestion, LIBRARY_PASSAGES, librarySearch, type TryFirstProblem } from "./try-first";
 
 /**
  * Write an attempt before reading the study guide. The check is one model call, made only by "Check my attempt"; the
@@ -35,7 +35,7 @@ export function TryFirstPanel({ problem, guideShown, guideBusy, onShowGuide }: {
         library = unwrap(await api.http.GET("/api/v1/search", { params: { query: { query: librarySearch(problem), k: LIBRARY_PASSAGES } } })).chunks;
       } catch { /* The statement alone is still something to judge against. */ }
       return unwrap(await api.http.POST("/api/v1/attempt/feedback", {
-        body: { question, attempt: text, format, language: format === "code" ? language : undefined, context: attemptContext(problem, library) },
+        body: { question, attempt: text, format, judge: attemptJudge(problem), language: format === "code" ? language : undefined, context: attemptContext(problem, library) },
       }));
     },
     onMutate: () => setSelection(null),
@@ -85,7 +85,7 @@ export function TryFirstPanel({ problem, guideShown, guideBusy, onShowGuide }: {
           {check.isPending ? <Spinner /> : null}
           {check.isPending ? "Checking…" : feedback ? "Check again" : "Check my attempt"}
         </Button>
-        <p className="text-xs text-muted">Uses one model call. Checked against the problem statement and your library, without giving the solution.</p>
+        <p className="text-xs text-muted">Uses one model call. Checked against your library where it covers a step, otherwise reasoned from the problem statement, without giving the solution.</p>
       </form>
       {noKey ? <Notice>The server has no language-model key configured, so it cannot check attempts.</Notice> : check.isError ? <ErrorNotice>{errorMessage(check.error)}</ErrorNotice> : null}
       {turn ? (

@@ -1,17 +1,19 @@
 "use client";
 
-import { AlertTriangle, Check, CircleHelp, Minus, X } from "lucide-react";
+import { AlertTriangle, Check, CircleHelp, Lightbulb, Minus, X } from "lucide-react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { twoDigits } from "./citations";
 import { CITE_PROBLEM, type Selection } from "./citation-chip";
-import { ATTEMPT_FORMATS, passagesFor, tally, UNCHECKED, verdictOf, type VerdictKind } from "./attempt";
+import { ATTEMPT_FORMATS, passagesFor, REASONED, tally, UNCHECKED, verdictOf, type VerdictKind } from "./attempt";
 import type { Turn } from "./session";
 import styles from "./ask.module.css";
 
 const ICON: Record<VerdictKind, ReactNode> = {
   supported: <Check aria-hidden="true" />,
   contradicted: <X aria-hidden="true" />,
+  reasoned: <Lightbulb aria-hidden="true" />,
+  reasoned_wrong: <AlertTriangle aria-hidden="true" />,
   unchecked: <CircleHelp aria-hidden="true" />,
   not_covered: <Minus aria-hidden="true" />,
 };
@@ -109,6 +111,7 @@ export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blo
                           </button>
                         ))}
                         {v.kind === "unchecked" ? <span className={styles.verdictNote}>{UNCHECKED}</span> : null}
+                        {v.kind === "reasoned" || v.kind === "reasoned_wrong" ? <span className={styles.verdictNote}>{REASONED}</span> : null}
                       </div>
                     ) : null}
                     {item?.note ? <p className={styles.lineNote}>{item.note}</p> : null}
@@ -133,6 +136,7 @@ export function AttemptFeedbackView({ turn, selection, onSelect, onEvidence, blo
           {inlinePassage}
           <p className={styles.quietNote}>
             Verdicts are checked against the passages Lectern retrieved. One marked &ldquo;unchecked&rdquo; has no verified citation, so treat it as {UNCHECKED}.
+            {feedback.items.some((it) => it.basis === "problem") ? " One marked “Reasoned from the problem” is the model's reasoning about the problem statement: no passage backs it, so test it yourself." : ""}
             {feedback.withheld ? " Feedback that would have given the answer away was replaced with a pointer." : ""}
           </p>
         </>

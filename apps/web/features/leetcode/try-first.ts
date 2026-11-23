@@ -14,6 +14,9 @@ export const attemptQuestion = (p: TryFirstProblem) => `Solve LeetCode problem $
 /** What to search the library for: the problem's name, which carries its idea better than the full statement. */
 export const librarySearch = (p: TryFirstProblem) => p.title.slice(0, MAX_QUESTION);
 
+/** LeetCode statements describe no method, so reasoning is judged against the statement, when there is one to judge against. */
+export const attemptJudge = (p: TryFirstProblem): "problem" | "sources" => (p.description.trim() ? "problem" : "sources");
+
 /** The passages an attempt is judged against: the problem statement first, then what the library holds on it. */
 export function attemptContext(p: TryFirstProblem, library: Chunk[]): ContextPassage[] {
   const text = p.description.trim().slice(0, MAX_PASSAGE);
