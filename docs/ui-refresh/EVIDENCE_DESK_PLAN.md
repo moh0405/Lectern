@@ -123,6 +123,8 @@ Each phase ends with passing checks and is its own PR. Phases 1–2 deliver the 
 
 **Done when:** the full Question → Evidence → Understanding loop works end to end in both modes.
 
+*Built (decision 3: a small `POST /practice/similar`, because its guards and response differ from `/adaptive`):* three closed rows under the answer, shown once a cited answer exists. The note is seeded from the answer without a model call and saved on the turn, in `/history` (`PUT /history/{id}/note`) where writes are allowed. A similar question is fetched only on click and answered through Try first against the passages it came from. `/adaptive` now accepts `context`. Code: `backend/similar_practice.py`, `features/ask/{understanding.ts,understanding-panel.tsx}`.
+
 ### Phase 5: Restyle the other pages
 - **Library (Sources):** same rail and paper treatment; separate "Shared textbook (read-only)" from "Your documents (this browser)". Copy: "Material to learn. Lectern teaches it, with sources."
 - **Practice:** flashcards review, LeetCode progress and study plan, Similar-example history. LeetCode "explain" gains a Try-first option using Phase 3.
