@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import os
+import re
+import shutil
+import subprocess
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from urllib.parse import urlparse
 
+from ..safe_fetch import safe_get
 from .base_source import BaseSource
-
-try:
-    from git import Repo
-except Exception:
-    Repo = None
 
 try:
     import requests
@@ -17,14 +17,22 @@ except Exception:
     requests = None
 
 
+CLONE_TIMEOUT_S = 60
+MAX_FILES = 2000
+MAX_FILE_BYTES = 1024 * 1024
+_NAME = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$")
+
+
 def _repo_parts(url: str) -> Optional[tuple[str, str]]:
     try:
         p = urlparse(url)
-        if p.netloc != "github.com":
+        if p.scheme not in {"http", "https"} or p.netloc != "github.com":
             return None
         parts = [x for x in p.path.split("/") if x]
         if len(parts) >= 2:
-            return parts[0], parts[1]
+            owner, repo = parts[0], parts[1].removesuffix(".git")
+            if _NAME.match(owner) and _NAME.match(repo):
+                return owner, repo
     except Exception:
         pass
     return None
@@ -40,8 +48,8 @@ class GitHubSource(BaseSource):
         return _repo_parts(input_value) is not None
 
     def _clone(self, url: str) -> Path:
-        if Repo is None:
-            raise RuntimeError("gitpython not installed. Add it to requirements.")
+        if shutil.which("git") is None:
+            raise RuntimeError("git is not installed.")
         owner, repo = _repo_parts(url) or (None, None)
         if not owner or not repo:
             raise ValueError("Invalid GitHub repo URL")
@@ -51,7 +59,17 @@ class GitHubSource(BaseSource):
             # Already cloned
             self.repo_dir = target
             return target
-        Repo.clone_from(url, str(target))
+        # Built from the checked owner and repo, shallow, https only, no redirects, no prompts, and bounded in time.
+        command = [
+            "git", "-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "http.followRedirects=false",
+            "-c", "core.symlinks=false", "clone", "--depth=1", "--single-branch", "--no-tags", "--",
+            f"https://github.com/{owner}/{repo}.git", str(target),
+        ]
+        try:
+            subprocess.run(command, check=True, capture_output=True, timeout=CLONE_TIMEOUT_S, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        except (subprocess.SubprocessError, OSError) as e:
+            shutil.rmtree(target, ignore_errors=True)  # a partial clone must not look "already cloned" next time
+            raise RuntimeError(f"Could not clone {owner}/{repo}.") from e
         self.repo_dir = target
         return target
 
@@ -59,7 +77,7 @@ class GitHubSource(BaseSource):
         if requests is None:
             return None
         try:
-            resp = requests.get(f"https://api.github.com/repos/{owner}/{repo}/readme", timeout=10)
+            resp = safe_get(f"https://api.github.com/repos/{owner}/{repo}/readme", max_seconds=10)
             if resp.status_code == 200:
                 import base64
                 content = resp.json().get("content")
@@ -74,7 +92,7 @@ class GitHubSource(BaseSource):
         if requests is None:
             return info
         try:
-            resp = requests.get(f"https://api.github.com/repos/{owner}/{repo}", timeout=10)
+            resp = safe_get(f"https://api.github.com/repos/{owner}/{repo}", max_seconds=10)
             if resp.ok:
                 j = resp.json()
                 info = {
@@ -91,11 +109,19 @@ class GitHubSource(BaseSource):
     def _iter_files(self, root: Path) -> List[Path]:
         allow_ext = {".md", ".rst", ".txt", ".py"}
         files: List[Path] = []
+        base = root.resolve()
         for p in root.rglob("*"):
-            if p.is_file() and p.suffix.lower() in allow_ext:
-                if any(part.startswith(".") for part in p.parts):
-                    continue
-                files.append(p)
+            # A repository can hold a symlink to a server file (/proc/self/environ, say): never follow one.
+            if p.is_symlink() or not p.is_file() or p.suffix.lower() not in allow_ext:
+                continue
+            rel = p.relative_to(root)
+            if any(part.startswith(".") for part in rel.parts) or not p.resolve().is_relative_to(base):
+                continue
+            if p.stat().st_size > MAX_FILE_BYTES:
+                continue
+            files.append(p)
+            if len(files) >= MAX_FILES:
+                break
         return files
 
     def _read_text(self, fp: Path) -> str:

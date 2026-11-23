@@ -281,6 +281,8 @@ Environment variables (loaded from `.env` via `python-dotenv`):
 | `GEMINI_MODEL` | No | `gemini-3.6-flash` | Preferred model. The client verifies it supports `generateContent` and falls back automatically. |
 | `GEMINI_FALLBACK_MODELS` | No | `gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-2.5-flash-lite` | Models tried, in order and without waiting, when the chosen model is overloaded, timing out or out of quota (each model has its own quota). A model named in the request is never swapped. `none` turns this off. |
 | `GEMINI_TOTAL_BUDGET_S` | No | `90` | The most time one call may spend across all models and retries, so a chain cannot outlast the Lambda's 120 s limit. |
+| `ALLOWED_MODELS` | No | the Flash and Flash-Lite models | Comma-separated models a request may name. Any other is refused with a 422, never swapped. The server's configured model is always allowed. |
+| `DAILY_LLM_LIMIT` | No | off | Most requests to the model per UTC day, counting every agent turn, retry and failover attempt (an attempt the provider rejects outright for quota or an unknown model does not use extra allowance). With `S3_BUCKET` the count is shared atomically across instances through S3 conditional writes; without it, the count is per process. |
 | `GEMINI_TEMPERATURE` | No | `0.2` | Default sampling temperature |
 | `EMBEDDER` | No | `auto` | `auto`, `sentence-transformers` or `hashing` |
 | `RETRIEVAL_MODE` | No | `auto` | `auto` (hybrid with a semantic index, else BM25), `hybrid`, `dense` or `bm25` |

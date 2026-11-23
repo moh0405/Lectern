@@ -15,6 +15,7 @@ dependencies = [
     "fonttools>=4.0",  # lets pypdf decode more embedded fonts (fewer garbled PDF pages)
     "python-dotenv>=1.0",
     "requests>=2.31",
+    "urllib3>=2.3",  # backend/safe_fetch.py needs read1 and the v2 connection classes
     "google-genai>=1.0",
 ]
 
@@ -52,7 +53,7 @@ export = [
 # Anki package (.apkg) export for flashcards; CSV export needs nothing extra.
 anki = ["genanki>=0.13"]
 # Keep the index and study database in S3 (see backend/cloud_sync.py).
-aws = ["boto3>=1.34"]
+aws = ["boto3>=1.36"]  # spend_cap uses S3 conditional writes (IfMatch)
 # The agentic answer workflow (backend/agent.py). Without it the API still runs; that one endpoint answers 503.
 agent = [
     "langgraph>=1.0",

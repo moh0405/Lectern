@@ -26,7 +26,7 @@ from typing import Any, Dict, Iterator, List, TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import StreamWriter
 
-from .citations import check_answer
+from .citations import check_answer, passages_to_show
 from .tool_chat import ToolCall, ToolResult
 from .tools import Tool, ToolContext, run_tool, summarize
 
@@ -142,7 +142,7 @@ def run_react_agent(chat: Any, tools: List[Tool], ctx: ToolContext, task: str, m
             final = payload
     answer = (final.get("text") or "").strip() or FALLBACK
     check = check_answer(answer, ctx.passages)
-    yield {"event": "meta", "data": {"chunks": ctx.passages[:12]}}
+    yield {"event": "meta", "data": {"chunks": passages_to_show(answer, ctx.passages)}}  # every cited passage, then the rest up to 12
     yield {"event": "token", "data": {"text": answer}}  # the final turn arrives whole, so it is sent whole
     yield {
         "event": "done",

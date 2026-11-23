@@ -280,3 +280,62 @@ def test_the_answer_prompt_insists_on_brackets():
     for mode in (None, "eli5", "technical", "interview", "summary"):
         template = RAGEngine._prompt_for_mode(RAGEngine.__new__(RAGEngine), mode)
         assert "square brackets" in template and "Never cite in parentheses" in template
+
+
+# ---------------------------------------------------------------- formats real models use (Task: unverified agent citations)
+LIVE = [{"doc": "Dsa.pdf", "page": 118, "text": "heap"}, {"doc": "Dsa.pdf", "page": 120, "end_page": 121, "text": "x"}, {"doc": "notes.md", "text": "n"}]
+
+
+@pytest.mark.parametrize("label", [
+    "Dsa.pdf page 118", "Dsa.pdf p. 118", "Dsa.pdf, Page: 118", "Dsa.pdf (page: 118)", "Dsa.pdf (page no. 118)", "doc: Dsa.pdf, page: 118",
+    "Document: Dsa.pdf (page 118)", "Source: Dsa.pdf, page 118", "*Dsa.pdf*, page 118", "**Dsa.pdf** (page 118)",
+    "Dsa.pdf (pages 118—120)", "Dsa.pdf (pages 118‑120)", "Dsa.pdf (pages 118 to 120)", "Dsa.pdf, pages 118 and 120",
+    "Dsa.pdf (pages 118, 120-121)", "Dsa.pdf (page 118) and notes.md", "Dsa.pdf (page 118) & Dsa.pdf (page 120)",
+    "Dsa.pdf, page 118, notes.md", "Dsa.pdf and notes.md", "Dsa.pdf (page 121)",
+])
+def test_valid_citations_are_not_reported_unverified_whatever_the_format(label):
+    res = check_answer(f"A heap is a tree [{label}].", LIVE)
+    assert res["citations"] and res["unverified"] == 0, res["citations"]
+
+
+@pytest.mark.parametrize("label,status", [
+    ("Dsa.pdf page 999", "page_not_retrieved"), ("Dsa.pdf, pages 500 and 501", "page_not_retrieved"), ("Invented.pdf page 3", "unknown_source"),
+    ("*Invented.pdf*, page 3", "unknown_source"), ("Invented Book (page None)", "unknown_source"), ("Invented Book, page: n/a", "unknown_source"),
+    ("notes.md (page 1)", "page_not_retrieved"),
+])
+def test_wrong_citations_are_still_flagged(label, status):
+    assert {c["status"] for c in check_answer(f"Claim [{label}].", LIVE)["citations"]} == {status}
+
+
+@pytest.mark.parametrize("text", ["[see page 3]", "[Some Book]", "nums[0]", "grid[row][col]", "[1]", "[page 3]"])
+def test_ordinary_brackets_are_still_not_citations(text):
+    assert check_answer(f"Look at {text} here.", LIVE)["citations"] == []
+
+
+def test_a_citation_right_after_another_is_checked_too():
+    res = check_answer("Claim [Dsa.pdf (page 118)][Invented.pdf (page 2)].", LIVE)
+    assert [c["status"] for c in res["citations"]] == ["ok", "unknown_source"]
+
+
+def test_label_splitting_matches_the_shared_fixture():
+    import json
+    from pathlib import Path
+
+    from backend.citations import _index, _split_multi
+
+    data = json.loads((Path(__file__).parent / "fixtures" / "citation_labels.json").read_text())
+    docs = _index([{"doc": d} for d in data["docs"]])
+    for case in data["cases"]:
+        assert _split_multi(case["inner"], docs) == case["labels"], case["inner"]
+
+
+def test_passages_to_show_never_drops_a_cited_passage():
+    from backend.citations import passages_to_show
+
+    passages = [{"doc": "big.pdf", "page": n, "text": f"t{n}"} for n in range(1, 21)]
+    shown = passages_to_show("Late evidence [big.pdf (page 19)].", passages, limit=12)
+    assert len(shown) == 12 and any(p["page"] == 19 for p in shown)
+    assert [p["page"] for p in shown] == sorted(p["page"] for p in shown)  # retrieval order is kept
+    many = " ".join(f"[big.pdf (page {n})]" for n in range(1, 16))
+    assert len(passages_to_show(many, passages, limit=12)) == 15  # more citations than the limit: all of them are shown
+    assert passages_to_show("No citations.", passages, limit=12) == passages[:12]

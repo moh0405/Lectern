@@ -1,0 +1,24 @@
+{
+  "docs": ["Dsa.pdf", "notes.md"],
+  "cases": [
+    {"inner": "Dsa.pdf (page 118)", "labels": ["Dsa.pdf (page 118)"]},
+    {"inner": "Dsa.pdf page 118", "labels": ["Dsa.pdf page 118"]},
+    {"inner": "Dsa.pdf p. 118", "labels": ["Dsa.pdf p. 118"]},
+    {"inner": "Dsa.pdf, Page: 118", "labels": ["Dsa.pdf, Page: 118"]},
+    {"inner": "Dsa.pdf (page: 118)", "labels": ["Dsa.pdf (page: 118)"]},
+    {"inner": "doc: Dsa.pdf, page: 118", "labels": ["doc: Dsa.pdf, page: 118"]},
+    {"inner": "*Dsa.pdf*, page 118", "labels": ["*Dsa.pdf*, page 118"]},
+    {"inner": "Dsa.pdf (pages 118—120)", "labels": ["Dsa.pdf (pages 118—120)"]},
+    {"inner": "Dsa.pdf (pages 118 to 120)", "labels": ["Dsa.pdf (pages 118 to 120)"]},
+    {"inner": "Dsa.pdf, pages 118 and 120", "labels": ["Dsa.pdf (page 118)", "Dsa.pdf (page 120)"]},
+    {"inner": "Dsa.pdf pages 118 and 120", "labels": ["Dsa.pdf (page 118)", "Dsa.pdf (page 120)"]},
+    {"inner": "Dsa.pdf (pages 118, 120-121)", "labels": ["Dsa.pdf (page 118)", "Dsa.pdf (pages 120-121)"]},
+    {"inner": "Dsa.pdf (page 118) and notes.md", "labels": ["Dsa.pdf (page 118)", "notes.md"]},
+    {"inner": "Dsa.pdf (page 118) & Dsa.pdf (page 120)", "labels": ["Dsa.pdf (page 118)", "Dsa.pdf (page 120)"]},
+    {"inner": "Dsa.pdf, page 118, notes.md", "labels": ["Dsa.pdf, page 118", "notes.md"]},
+    {"inner": "Dsa.pdf and notes.md", "labels": ["Dsa.pdf", "notes.md"]},
+    {"inner": "Dsa.pdf, notes.md", "labels": ["Dsa.pdf", "notes.md"]},
+    {"inner": "see pages 1 and 2", "labels": ["see pages 1 and 2"]},
+    {"inner": "Rock and Roll", "labels": ["Rock and Roll"]}
+  ]
+}

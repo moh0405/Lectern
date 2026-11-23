@@ -65,3 +65,14 @@ test("when the model runs out of quota part-way, the next model finishes and bot
   await expect(page.getByTestId("run-cost")).toContainText("1 tool call · 2 model calls · fake-model → gemini-3.1-flash-lite");
   await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0); // no error (Next's route announcer is an empty alert)
 });
+
+test("a valid citation written without parentheses is not reported as unverified", async ({ page }) => {
+  // Live, 2026-11-22: a flash-lite run reported its citations as unverified. "[doc page N]" was read as an unknown source.
+  await page.goto("/agent");
+  await page.getByLabel("Task").fill("What is a binary heap used for? (bare page)");
+  await page.getByRole("button", { name: "Run agent" }).click();
+  const answer = page.getByRole("region", { name: "Answer" });
+  await expect(answer).toContainText("[heaps.pdf page 1]", { timeout: 30_000 });
+  await expect(page.getByTestId("run-cost")).toContainText("1 tool call");
+  await expect(page.getByRole("status").filter({ hasText: /This answer cites .* the tools never returned/ })).toHaveCount(0);
+});

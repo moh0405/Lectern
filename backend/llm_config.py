@@ -12,7 +12,8 @@ Configuration (environment or `.env`):
     GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.6-flash), GEMINI_TEMPERATURE,
     GEMINI_TIMEOUT_S (per attempt, default 30), GEMINI_FALLBACK_MODELS (models tried in order when the chosen one is
     overloaded or out of quota; default gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-2.5-flash-lite; "none" disables),
-    GEMINI_TOTAL_BUDGET_S (most time one call may spend across all models and retries, default 90)
+    GEMINI_TOTAL_BUDGET_S (most time one call may spend across all models and retries, default 90),
+    ALLOWED_MODELS (comma-separated models a request may name; default REQUESTABLE_MODELS plus the configured model)
 """
 
 from __future__ import annotations
@@ -21,7 +22,9 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+
+from .spend_cap import DailyLimitReached
 
 try:
     from dotenv import load_dotenv
@@ -67,6 +70,8 @@ FALLBACK_MODELS = [
 # Chosen from what answered quickly on a real free key (measured 2026-11-06): gemini-3.8-flash and 3.7 timed out after ~87 s each,
 # gemini-2.5-flash returns 404 (retired for new users), so they are not in the chain. Quota errors and 404s fail instantly.
 DEFAULT_FALLBACKS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"]
+# What a request may name: the Flash and Flash-Lite tiers. Pro models cost several times more, so a visitor cannot pick one.
+REQUESTABLE_MODELS = [DEFAULT_MODEL, "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest", *DEFAULT_FALLBACKS]
 # Everything one call may spend across all models and retries, so a chain can never outlast the host (Lambda stops at 120 s).
 DEFAULT_TOTAL_BUDGET_S = 90.0
 RETRY_ATTEMPTS = 3
@@ -144,6 +149,51 @@ def fallback_models() -> List[str]:
     return [m.strip() for m in raw.split(",") if m.strip()]
 
 
+def allowed_models() -> Set[str]:
+    """The models a client may name in a request. `ALLOWED_MODELS` replaces the default list; the model the server is
+    configured to use is always included."""
+    raw = os.getenv("ALLOWED_MODELS")
+    names = {m.strip() for m in raw.split(",") if m.strip()} if raw is not None else set(REQUESTABLE_MODELS)
+    for var in ("GEMINI_MODEL", "OPENAI_MODEL"):
+        configured = (os.getenv(var) or "").strip()
+        if configured:
+            names.add(configured)
+    if (os.getenv("LLM_PROVIDER") or "gemini").strip().lower() == "openai":
+        names.add("gpt-4o-mini")  # OPENAI_DEFAULT_MODEL, what the provider uses when OPENAI_MODEL is unset
+    return names
+
+
+def check_requested_model(model: Optional[str]) -> Optional[str]:
+    """`model` if a client may ask for it. Raises ValueError otherwise; it is refused, never replaced by another."""
+    if model is None or model in allowed_models():
+        return model
+    raise ValueError("This model is not available. Choose one from GET /api/v1/models.")
+
+
+class AttemptMeter:
+    """Counts each request sent to the provider against the daily cap, for one generate/stream/turn.
+
+    The caller has already counted the first attempt. A retry or failover attempt is counted too, because a request that
+    timed out or failed part-way may have been billed. The exception is a request the provider rejected outright (out of
+    quota, unknown model): nothing was generated, so its count carries over to the next attempt."""
+
+    def __init__(self, guard: Optional[Callable[[], Any]]):
+        self._guard = guard
+        self._spare = True
+
+    def before_attempt(self) -> None:
+        if self._guard is None:
+            return
+        if self._spare:
+            self._spare = False
+            return
+        self._guard()
+
+    def after_failure(self, exc: Exception) -> None:
+        if _is_quota(exc) or _is_model_missing(exc):
+            self._spare = True
+
+
 def _is_quota(exc: Exception) -> bool:
     text = str(exc).lower()
     return getattr(exc, "code", None) == 429 or "resource_exhausted" in text or "quota" in text
@@ -207,10 +257,11 @@ class GeminiClient:
         else:
             self._key_id = "injected"
         self._client = client
+        self.attempt_guard: Optional[Callable[[], Any]] = None  # set by spend_cap.CappedLLM
         requested = model or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
-        self.model = self._resolve_model(requested)
         # A model the caller asked for by name is respected: no silent swapping. The server's default may fail over.
         self._fail_over = model is None
+        self.model = self._resolve_model(requested) if self._fail_over else requested
         self._fallbacks = fallback_models() if self._fail_over else []
         try:
             self.temperature = float(os.getenv("GEMINI_TEMPERATURE", str(temperature)))
@@ -294,12 +345,12 @@ class GeminiClient:
     def _candidates(self) -> List[str]:
         """Models to try, in order. When failing over is allowed, models known to be out of quota are left out (unless
         that would leave none), so a call does not wait on an answer that is certainly a 429."""
+        if not self._fail_over:
+            return [self.model]  # a named model is never replaced, whatever the failure
         names = [self.model]
         for m in [DEFAULT_MODEL, *self._fallbacks]:
             if m not in names:
                 names.append(m)
-        if not self._fail_over:
-            return names
         usable = [m for m in names if quota_wait_s(self._key_id, m) <= 0]
         skipped = [m for m in names if m not in usable]
         if skipped and usable:
@@ -319,13 +370,19 @@ class GeminiClient:
         last_err: Optional[str] = None
         names = self._candidates()
         started_at, budget = time.monotonic(), _total_budget_s()
+        meter = AttemptMeter(self.attempt_guard)
         for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
                 if (i or attempt) and time.monotonic() - started_at > budget:
                     return {"ok": False, "error": last_err or "Unknown generation error"}  # out of time: do not start another call
                 try:
+                    meter.before_attempt()
+                except DailyLimitReached as e:
+                    return {"ok": False, "error": str(e)}
+                try:
                     resp = self._client.models.generate_content(model=name, contents=prompt, config=config)
                 except Exception as e:
+                    meter.after_failure(e)
                     self.note_failure(name, e)
                     # A retired or unknown model must not hide the real reason an earlier model failed.
                     if not (_is_model_missing(e) and last_err):
@@ -357,10 +414,12 @@ class GeminiClient:
         last_exc: Optional[Exception] = None
         names = self._candidates()
         started_at, budget = time.monotonic(), _total_budget_s()
+        meter = AttemptMeter(self.attempt_guard)
         for i, name in enumerate(names):
             for attempt in range(RETRY_ATTEMPTS):
                 if (i or attempt) and time.monotonic() - started_at > budget and last_exc is not None:
                     raise last_exc  # out of time: do not start another call
+                meter.before_attempt()  # DailyLimitReached reaches the caller, which turns it into an error event
                 started = False
                 try:
                     for chunk in self._client.models.generate_content_stream(model=name, contents=prompt, config=config):
@@ -374,6 +433,7 @@ class GeminiClient:
                 except Exception as e:
                     if started:
                         raise
+                    meter.after_failure(e)
                     self.note_failure(name, e)
                     if not (_is_model_missing(e) and last_exc is not None):
                         last_exc = e  # a retired model's 404 must not hide the real reason an earlier model failed

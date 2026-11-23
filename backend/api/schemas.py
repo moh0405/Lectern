@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator
+
+from ..llm_config import check_requested_model
 
 StudyMode = Literal["eli5", "technical", "interview", "summary"]
 EliLevel = Literal["ELI5", "ELI10", "Undergrad", "Grad", "Expert"]
 JobStatus = Literal["queued", "running", "done", "failed"]
+# A model a client names: limited to the allowlist on every route, and refused (never swapped) when it is not on it.
+RequestedModel = Annotated[Optional[str], AfterValidator(check_requested_model)]
 
 
 # ---------------------------------------------------------------- shared
@@ -109,7 +113,7 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
     k: int = Field(3, ge=1, le=20, description="Number of chunks to retrieve")
     mode: Optional[StudyMode] = None
-    model: Optional[str] = Field(None, max_length=100)
+    model: RequestedModel = Field(None, max_length=100)
     temperature: float = Field(0.2, ge=0.0, le=1.0)
     include_prompt: bool = False
     no_cache: bool = Field(False, description="Skip the answer cache and ask the model again")
@@ -124,7 +128,7 @@ class AgentAskRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
     k: int = Field(3, ge=1, le=10, description="Number of passages to answer from")
     mode: Optional[StudyMode] = None
-    model: Optional[str] = Field(None, max_length=100)
+    model: RequestedModel = Field(None, max_length=100)
     temperature: float = Field(0.2, ge=0.0, le=1.0)
 
 
@@ -221,7 +225,7 @@ class AttemptFeedbackRequest(BaseModel):
         None, max_length=20,
         description="Judge against these passages instead of the server index (for example the visitor's browser documents). Nothing is stored or recorded.",
     )
-    model: Optional[str] = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
+    model: RequestedModel = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
     temperature: float = Field(0.2, ge=0.0, le=1.0)
 
 
@@ -252,7 +256,7 @@ class SimilarPracticeRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000, description="The question the student just studied")
     context: List[ContextPassage] = Field(..., min_length=1, max_length=10, description="The passages to write the new question from. Nothing is stored.")
     previous: List[str] = Field(default_factory=list, max_length=5, description="Practice questions already offered, so a new one differs")
-    model: Optional[str] = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
+    model: RequestedModel = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
     temperature: float = Field(0.4, ge=0.0, le=1.0)
 
     @field_validator("previous")
@@ -579,7 +583,7 @@ class SseDone(BaseModel):
 class AgentRunRequest(BaseModel):
     task: str = Field(..., min_length=3, max_length=2000, description="What the student wants done, in their own words")
     max_steps: int = Field(6, ge=1, le=8, description="Most model turns before the agent must wrap up")
-    model: Optional[str] = Field(None, max_length=100)
+    model: RequestedModel = Field(None, max_length=100)
     temperature: float = Field(0.2, ge=0.0, le=1.0)
 
 

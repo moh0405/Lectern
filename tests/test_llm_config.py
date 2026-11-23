@@ -422,3 +422,24 @@ def test_the_stream_also_keeps_the_real_reason(sleeps):
     with pytest.raises(FakeAPIError) as caught:
         list(c.stream("hi"))
     assert "UNAVAILABLE" in str(caught.value)
+
+
+def test_a_named_model_that_is_missing_is_reported_not_replaced(sleeps):
+    c = make(models=(DEFAULT,), model=LITE, script=[FakeAPIError(404, "model not found"), "never reached"])
+    assert c.model == LITE and c.generate("hi")["ok"] is False
+    assert c._client.models.calls == [LITE]
+
+
+def test_a_named_model_with_an_empty_reply_is_not_replaced(sleeps):
+    c = make(models=ALL, model=LITE, script=["", "never reached"])
+    assert c.generate("hi")["ok"] is False and c._client.models.calls == [LITE]
+
+
+def test_the_allowlist_has_flash_tiers_but_no_pro(monkeypatch):
+    monkeypatch.delenv("ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    allowed = llm_config.allowed_models()
+    assert {DEFAULT, LITE, SECOND, THIRD} <= allowed and "gemini-pro-latest" not in allowed
+    monkeypatch.setenv("ALLOWED_MODELS", "only-this")
+    monkeypatch.setenv("GEMINI_MODEL", "server-model")
+    assert llm_config.allowed_models() == {"only-this", "server-model"}

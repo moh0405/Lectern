@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 from urllib.parse import urlparse
 
+from ..safe_fetch import check_url, safe_get
 from .base_source import BaseSource
 
 try:
@@ -27,9 +28,9 @@ class WebSource(BaseSource):
 
     def validate(self, input_value: str) -> bool:
         try:
-            p = urlparse(input_value)
-            return p.scheme in {"http", "https"}
-        except Exception:
+            check_url(input_value)
+            return True
+        except ValueError:
             return False
 
     def _favicon_for(self, url: str) -> str | None:
@@ -50,7 +51,7 @@ class WebSource(BaseSource):
         if Document is None:
             raise RuntimeError("readability-lxml not installed. Add it to requirements.")
 
-        resp = requests.get(input_value, timeout=20)
+        resp = safe_get(input_value)  # blocks private addresses, caps size and time
         resp.raise_for_status()
 
         # Use readability to get clean article text
