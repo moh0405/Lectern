@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { indexFixture, removeFixture } from "./helpers";
 import { expect, test } from "./test";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -9,6 +10,22 @@ test("Library keeps the new copy and shows the indexed shelf on paper", async ({
   await expect(page.getByRole("navigation", { name: "On this page" })).toBeVisible();
   await expect(page.locator("#library-shared")).toHaveClass(/paper-tokens/);
 });
+
+for (const theme of ["dark", "light"] as const) {
+  test(`${theme}: the paper shelf with indexed sources passes axe`, async ({ page, request }) => {
+    await indexFixture(request, "heaps.pdf");
+    try {
+      await page.addInitScript((t) => { try { localStorage.setItem("lectern-reading-theme", t); } catch { /* default theme */ } }, theme);
+      await page.goto("/sources");
+      await expect(page.locator("#library-shared").getByText("heaps.pdf").first()).toBeVisible();
+      await page.waitForTimeout(200);
+      const axe = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(axe.violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(" ")}`)).toEqual([]);
+    } finally {
+      await removeFixture(request, "heaps.pdf");
+    }
+  });
+}
 
 test("LeetCode Try first checks an attempt only on click and keeps the guide hidden until asked", async ({ page }) => {
   const calls = { feedback: 0, explain: 0 };
