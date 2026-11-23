@@ -1,4 +1,4 @@
-import type { Turn } from "@/features/ask/session";
+import type { SimilarExample, Turn } from "@/features/ask/session";
 
 export interface SimilarEntry {
   question: string;
@@ -17,11 +17,16 @@ export function similarHistory(turns: Turn[], limit = MAX_SIMILAR_HISTORY): Simi
   const seen = new Set<string>();
   const entries: SimilarEntry[] = [];
   for (const turn of turns) {
-    for (const example of [...(turn.similar ?? [])].reverse()) {
-      const key = sameText(example?.question ?? "");
+    // Read from browser storage, which may hold an older or damaged shape.
+    const saved: unknown[] = Array.isArray(turn.similar) ? turn.similar : [];
+    for (const raw of [...saved].reverse()) {
+      const example = raw as Partial<SimilarExample> | null;
+      if (typeof example?.question !== "string") continue;
+      const key = sameText(example.question);
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      entries.push({ question: example.question, from: turn.question, source: example.citations?.[0]?.doc ?? undefined });
+      const doc = Array.isArray(example.citations) ? example.citations[0]?.doc : undefined;
+      entries.push({ question: example.question, from: turn.question, source: typeof doc === "string" ? doc : undefined });
       if (entries.length === limit) return entries;
     }
   }

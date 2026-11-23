@@ -63,6 +63,8 @@ export function TryFirstPanel({ problem, guideShown, guideBusy, onShowGuide }: {
         className="space-y-3 rounded-lg border border-border p-4"
         aria-label="Your attempt at this problem"
         noValidate
+        // Escape closes the problem, which would throw away a draft.
+        onKeyDown={(event) => { if (event.key === "Escape" && text.trim()) { event.preventDefault(); event.stopPropagation(); } }}
         onSubmit={(event) => { event.preventDefault(); if (!blocked) check.mutate(); }}
       >
         <Segmented legend="Attempt format" name={`${id}-format`} options={ATTEMPT_FORMATS.map((f) => ({ value: f.value, label: f.label }))} value={format} onChange={setFormat} />

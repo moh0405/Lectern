@@ -41,9 +41,18 @@ test("LeetCode Try first checks an attempt only on click and keeps the guide hid
   await detail.getByLabel("Your attempt", { exact: true }).fill("Given an array of integers, return two indices.\nHeaps were invented in 1964.");
   expect(calls).toEqual({ feedback: 0, explain: 0 });
 
+  // Escape must not close the problem and lose the draft.
+  await detail.getByLabel("Your attempt", { exact: true }).press("Escape");
+  await expect(page).toHaveURL(/p=1(&|$)/);
+  await expect(detail.getByLabel("Your attempt", { exact: true })).toHaveValue(/Heaps were invented/);
+
   await detail.getByRole("button", { name: "Check my attempt" }).click();
   await expect(detail.getByRole("list", { name: "Your attempt, step by step" })).toBeVisible();
   expect(calls).toEqual({ feedback: 1, explain: 0 });
+
+  // A verified verdict opens the problem statement it cites.
+  await detail.getByRole("button", { name: /Step 1: Supported.*Open passage 1/ }).click();
+  await expect(detail.getByRole("heading", { name: /Passage 1: LeetCode 1\. Two Sum/ })).toBeVisible();
   const axe = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(axe.violations.map((v) => v.id)).toEqual([]);
 

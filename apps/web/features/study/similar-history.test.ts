@@ -20,6 +20,14 @@ describe("similarHistory", () => {
     expect(entries).toHaveLength(1);
   });
 
+  it("ignores damaged saved data instead of crashing the page", () => {
+    const damaged = [
+      { ...turn("a"), similar: { question: "not a list" } },
+      { ...turn("b"), similar: [null, 7, { question: 3 }, { question: "kept", citations: "nope" }] },
+    ] as unknown as Turn[];
+    expect(similarHistory(damaged)).toEqual([{ question: "kept", from: "b", source: undefined }]);
+  });
+
   it("stops at the limit and handles turns with no examples", () => {
     expect(similarHistory([turn("none"), turn("a", [example("1"), example("2"), example("3")])], 2)).toHaveLength(2);
     expect(similarHistory([turn("none")])).toEqual([]);

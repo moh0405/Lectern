@@ -16,6 +16,8 @@ for (const theme of ["dark", "light"] as const) {
       await sheet.getByRole("button", { name: "Try first" }).click();
       await sheet.getByRole("radio", { name: "Steps" }).check();
       await sheet.getByLabel("Your attempt", { exact: true }).fill("Given an array of integers, return two indices.\nHeaps were invented in 1964.");
+      await sheet.getByLabel("Your attempt", { exact: true }).press("Escape");
+      await expect(sheet.getByLabel("Your attempt", { exact: true })).toHaveValue(/Heaps were invented/);
       await sheet.getByRole("button", { name: "Check my attempt" }).click();
       await expect(sheet.getByRole("list", { name: "Your attempt, step by step" })).toBeVisible();
 
