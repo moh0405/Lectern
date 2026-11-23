@@ -16,6 +16,7 @@ import { ApiError, api, errorMessage, unwrap } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { plural } from "@/lib/format";
 import { describeInterval, GRADES, nextIntervalDays, shortInterval } from "./interval";
+import { SimilarHistoryPanel } from "./similar-history-panel";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -121,7 +122,7 @@ function Review({ onReviewed }: { onReviewed: () => void }) {
         <h2 ref={question} tabIndex={-1} aria-describedby={hintId} className="text-lg font-semibold leading-snug [overflow-wrap:anywhere]">{card.front}</h2>
         {shown ? (
           <>
-            <p className="whitespace-pre-wrap rounded-lg border border-border bg-bg/40 p-4 text-sm [overflow-wrap:anywhere]" data-testid="card-back">
+            <p className="paper paper-tokens whitespace-pre-wrap rounded-lg border border-border p-4 text-sm [overflow-wrap:anywhere]" data-testid="card-back">
               {card.back}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="How well did you remember it?">
@@ -246,6 +247,7 @@ export function StudyView() {
   return (
     <>
       <PageHeader
+        eyebrow="Practice"
         title="Flashcards"
         description="Spaced repetition (SM-2, the scheduler behind Anki). Cards you remember come back less and less often; cards you forget come back tomorrow."
         actions={
@@ -361,6 +363,8 @@ export function StudyView() {
           )}
         </Card>
       </div>
+
+      <SimilarHistoryPanel />
 
       {cards.length ? (
         <section className="mt-6" aria-label="Deck">
