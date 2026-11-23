@@ -97,7 +97,10 @@ async def synthesis(req: SynthesisRequest, engine: RAGEngine = Depends(get_engin
 
 @router.post("/adaptive", response_model=Adaptive, summary="Explain at a chosen level (ELI5 to Expert) with a mini quiz")
 async def adaptive(req: AdaptiveRequest, engine: RAGEngine = Depends(get_engine)):
-    res = raise_if_failed(await run_in_threadpool(advanced_ai.adaptive_explain, req.question, req.level, req.temperature, engine))
+    res = raise_if_failed(await run_in_threadpool(
+        advanced_ai.adaptive_explain, req.question, req.level, req.temperature, engine,
+        [c.model_dump() for c in req.context] if req.context is not None else None,
+    ))
     return Adaptive(
         answer=res.get("answer") or "",
         chunks=[Chunk(**c) for c in res.get("chunks") or []],

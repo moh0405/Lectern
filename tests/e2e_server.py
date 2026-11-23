@@ -38,13 +38,14 @@ FakeGemini.echo_context = True
 
 import backend.advanced_ai  # noqa: E402
 import backend.attempt_feedback  # noqa: E402
+import backend.similar_practice  # noqa: E402
 import backend.api.routers.agent  # noqa: E402
 import backend.api.routers.ask  # noqa: E402
 import backend.leetcode_handler  # noqa: E402
 import backend.api.routers.tracking  # noqa: E402
 import backend.llm_providers  # noqa: E402
 
-for module in (backend.llm_providers, backend.api.routers.ask, backend.api.routers.agent, backend.api.routers.tracking, backend.advanced_ai, backend.attempt_feedback, backend.leetcode_handler):
+for module in (backend.llm_providers, backend.api.routers.ask, backend.api.routers.agent, backend.api.routers.tracking, backend.advanced_ai, backend.attempt_feedback, backend.similar_practice, backend.leetcode_handler):
     module.create_llm = FakeGemini
 
 import uvicorn  # noqa: E402

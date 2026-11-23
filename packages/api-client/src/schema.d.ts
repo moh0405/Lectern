@@ -336,6 +336,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/{turn_id}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save your own-words note on a saved turn */
+        put: operations["save_turn_note_api_v1_history__turn_id__note_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -524,6 +541,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/practice/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One new practice question on the same concept, from the same passages (answer never returned)
+         * @description Writes one question from the `context` passages. It is returned only if it cites one of them, shares content with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it with `/attempt/feedback`. One model call per request; nothing is cached or stored.
+         */
+        post: operations["similar_api_v1_practice_similar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -702,6 +739,11 @@ export interface components {
         };
         /** AdaptiveRequest */
         AdaptiveRequest: {
+            /**
+             * Context
+             * @description Explain from these passages instead of the server index (for example the ones an answer was built from). Nothing is stored.
+             */
+            context?: components["schemas"]["ContextPassage"][] | null;
             /**
              * Level
              * @default Undergrad
@@ -1311,6 +1353,14 @@ export interface components {
             /** Q */
             q: string;
         };
+        /** HistoryNote */
+        HistoryNote: {
+            /**
+             * Note
+             * @description The student's own-words note; empty clears it
+             */
+            note: string;
+        };
         /** HistoryTurn */
         HistoryTurn: {
             /**
@@ -1337,6 +1387,11 @@ export interface components {
             mode?: string | null;
             /** Model */
             model?: string | null;
+            /**
+             * Note
+             * @description The student's own-words note on this turn
+             */
+            note?: string | null;
             /** Question */
             question: string;
             /**
@@ -1643,6 +1698,11 @@ export interface components {
             mode?: string | null;
             /** Model */
             model?: string | null;
+            /**
+             * Note
+             * @description The student's own-words note on this turn
+             */
+            note?: string | null;
             /** Question */
             question: string;
             /** Ts */
@@ -1662,6 +1722,49 @@ export interface components {
         SearchResponse: {
             /** Chunks */
             chunks: components["schemas"]["Chunk"][];
+        };
+        /** SimilarPractice */
+        SimilarPractice: {
+            /**
+             * Citations
+             * @description The verified passages the question is based on
+             */
+            citations: components["schemas"]["CitationCheck"][];
+            /** Model */
+            model?: string | null;
+            /**
+             * Question
+             * @description A new practice question. Its answer is never returned
+             */
+            question: string;
+        };
+        /** SimilarPracticeRequest */
+        SimilarPracticeRequest: {
+            /**
+             * Context
+             * @description The passages to write the new question from. Nothing is stored.
+             */
+            context: components["schemas"]["ContextPassage"][];
+            /**
+             * Model
+             * @description A model named here is used as is, never swapped for another
+             */
+            model?: string | null;
+            /**
+             * Previous
+             * @description Practice questions already offered, so a new one differs
+             */
+            previous?: string[];
+            /**
+             * Question
+             * @description The question the student just studied
+             */
+            question: string;
+            /**
+             * Temperature
+             * @default 0.4
+             */
+            temperature?: number;
         };
         /** Socratic */
         Socratic: {
@@ -4087,6 +4190,104 @@ export interface operations {
             };
         };
     };
+    save_turn_note_api_v1_history__turn_id__note_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turn_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryNote"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedTurn"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_job_api_v1_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -5145,6 +5346,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Notes"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    similar_api_v1_practice_similar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimilarPracticeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarPractice"];
                 };
             };
             /** @description Bad Request */

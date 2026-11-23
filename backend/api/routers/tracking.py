@@ -18,7 +18,7 @@ from ...rag_engine import RAGEngine
 from ...study_plan import build_plan
 from ..deps import common_dependencies, get_engine, get_study, raise_if_failed
 from ..errors import ERROR_RESPONSES, ApiError
-from ..schemas import (Card, CardCreate, CardList, CardStats, GenerateCardsRequest, HistoryTurn, ProgressItem, ProgressList,
+from ..schemas import (Card, CardCreate, CardList, CardStats, GenerateCardsRequest, HistoryNote, HistoryTurn, ProgressItem, ProgressList,
                        ProgressSummary, ProgressUpdate, ReviewRequest, SavedHistory, SavedTurn, StudyPlan)
 from ..study_store import StudyStore
 from .leetcode import get_leetcode
@@ -158,6 +158,14 @@ def list_history(limit: int = Query(100, ge=1, le=500), store: StudyStore = Depe
 def save_turn(turn: HistoryTurn, store: StudyStore = Depends(get_study)):
     data = turn.model_dump()
     return SavedTurn(**store.add_history(data))
+
+
+@router.put("/history/{turn_id}/note", response_model=SavedTurn, summary="Save your own-words note on a saved turn")
+def save_turn_note(turn_id: int, body: HistoryNote, store: StudyStore = Depends(get_study)):
+    saved = store.set_history_note(turn_id, body.note)
+    if saved is None:
+        raise ApiError(404, "No such turn", code="not_found")
+    return SavedTurn(**saved)
 
 
 @router.delete("/history/{turn_id}", status_code=204, summary="Delete one saved turn")

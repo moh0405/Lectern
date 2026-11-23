@@ -440,13 +440,14 @@ ELI_LEVELS = {
 
 
 def adaptive_explain(question: str, level: str = "Undergrad", temperature: float = 0.2,
-                     engine: Optional[RAGEngine] = None) -> Dict[str, Any]:
+                     engine: Optional[RAGEngine] = None, passages: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Generate an explanation tailored to the requested ELI level, using RAG context and Gemini.
 
+    `passages`, when given, are used instead of retrieving (the ones an answer was built from, or browser documents).
     Falls back to a template-based rewrite if Gemini is unavailable.
     """
     eng = engine or RAGEngine.shared()
-    chunks = eng.retrieve_context(question, k=4)
+    chunks = passages if passages is not None else eng.retrieve_context(question, k=4)
     context = eng.format_context(chunks)
     instr = ELI_LEVELS.get(level, ELI_LEVELS["Undergrad"])
     prompt = (

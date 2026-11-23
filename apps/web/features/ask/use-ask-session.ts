@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, ApiError, errorMessage, unwrap } from "@/lib/api";
 import { retrieveLocal } from "@/lib/browser-rag/retrieve";
 import { useDemo } from "@/lib/demo";
-import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type AttemptFormat, type Mode, type Turn } from "./session";
+import { fromSavedTurn, initialSession, loadTurns, saveTurns, sessionReducer, toHistoryTurn, type Action, type AskSettings, type AttemptFormat, type Explanation, type Mode, type SimilarExample, type Turn } from "./session";
 
 export interface AskParams {
   guided?: boolean;
@@ -24,6 +24,8 @@ export interface AskParams {
   local?: boolean;
   /** Use the agentic (LangGraph) workflow: rewrite the search, grade the passages, verify the citations. */
   agent?: boolean;
+  /** Use exactly these passages instead of searching (a similar example is judged against the passages it came from). */
+  passages?: AskSettings["passages"];
 }
 
 /** Run a server call whose failure must never disturb the UI (a sync or throw is swallowed too). */
@@ -35,10 +37,13 @@ async function bestEffort(call: () => unknown): Promise<void> {
   }
 }
 
-async function saveRemote(turn: Turn, ids: Map<string, number>): Promise<void> {
+async function saveRemote(turn: Turn, ids: Map<string, number>, dispatch: (action: Action) => void): Promise<void> {
   try {
     const res = await api.http.POST("/api/v1/history", { body: toHistoryTurn(turn) });
-    if (res?.data) ids.set(turn.id, res.data.id);
+    if (res?.data) {
+      ids.set(turn.id, res.data.id);
+      dispatch({ type: "saved", id: turn.id, serverId: res.data.id });
+    }
   } catch {
     /* offline: the turn stays in this browser only */
   }
@@ -57,10 +62,12 @@ export function useAskSession() {
   // if the API is unreachable the session still works from this browser's own storage.
   const synced = useRef(new Set<string>());
   const serverIds = useRef(new Map<string, number>());
+  const saving = useRef(new Map<string, Promise<void>>());
 
   useEffect(() => {
     const loaded = loadTurns();
     loaded.filter((t) => t.answer).forEach((t) => synced.current.add(t.id));
+    loaded.forEach((t) => { if (t.serverId !== undefined) serverIds.current.set(t.id, t.serverId); });
     dispatch({ type: "hydrate", turns: loaded });
     if (loaded.length > 0 || demo) return;
     void (async () => {
@@ -84,7 +91,7 @@ export function useAskSession() {
       if (t.status !== "done" || synced.current.has(t.id)) continue;
       if (!t.answer) continue; // Hints and retrieval-only lookups are not answers.
       synced.current.add(t.id);
-      if (!demo) void saveRemote(t, serverIds.current);
+      if (!demo) saving.current.set(t.id, saveRemote(t, serverIds.current, dispatch));
     }
   }, [turns, hydrated, demo]);
 
@@ -107,7 +114,7 @@ export function useAskSession() {
     controllers.current.get(id)?.abort();
     const controller = new AbortController();
     controllers.current.set(id, controller);
-    const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly;
+    const agent = Boolean(p.agent) && !p.local && !p.retrievalOnly && !p.passages;
     const guiding = Boolean(p.guided) && !evidence;
     const attempting = Boolean(p.attempt) && !guiding && !evidence;
     if (existing) dispatch({ type: "resume", id, evidence, agent: evidence && agent });
@@ -116,7 +123,7 @@ export function useAskSession() {
       attempt: attempting && p.attempt ? { params: p, text: p.attempt.text, format: p.attempt.format, language: p.attempt.language, evidenceStarted: false } : undefined });
     try {
       let context: Awaited<ReturnType<typeof retrieveLocal>> | undefined;
-      if (p.local) {
+      if (p.local && !p.passages) {
         context = await retrieveLocal(p.question, p.k);
         if (controller.signal.aborted) {
           if (controllers.current.get(id) === controller) dispatch({ type: "stop", id });
@@ -138,9 +145,10 @@ export function useAskSession() {
         if (controllers.current.get(id) === controller) dispatch({ type: "stop", id });
         return;
       }
+      const passages = context ?? p.passages;
       if (guiding) {
         const result = unwrap(await api.http.POST("/api/v1/socratic", {
-          body: { question: p.question, k: Math.min(p.k, 10), temperature: p.temperature, context }, signal: controller.signal,
+          body: { question: p.question, k: Math.min(p.k, 10), temperature: p.temperature, context: passages }, signal: controller.signal,
         }));
         if (result.warning) throw new Error("Source-based hints are unavailable right now. Try again or show the evidence.");
         if (!controller.signal.aborted) dispatch({ type: "hints", id, hints: result.hints });
@@ -150,7 +158,7 @@ export function useAskSession() {
         // One model call; the passages come back with the feedback so each verdict can open its passage.
         const feedback = unwrap(await api.http.POST("/api/v1/attempt/feedback", {
           body: { question: p.question, attempt: p.attempt.text, format: p.attempt.format, language: p.attempt.language || undefined,
-            k: Math.min(p.k, 10), temperature: p.temperature, model: p.model || undefined, context },
+            k: Math.min(p.k, 10), temperature: p.temperature, model: p.model || undefined, context: passages },
           signal: controller.signal,
         }));
         if (!controller.signal.aborted) dispatch({ type: "feedback", id, feedback });
@@ -170,7 +178,7 @@ export function useAskSession() {
         model: p.model || undefined,
         include_prompt: p.showPrompt || undefined,
         no_cache: p.noCache || undefined,
-        context,
+        context: passages,
       };
       if (agent) {
         const agentBody = { question: p.question, k: Math.min(p.k, 10), mode: p.mode, temperature: p.temperature, model: p.model || undefined };
@@ -240,5 +248,21 @@ export function useAskSession() {
     const params = t.attempt?.params ?? t.guided?.params;
     return params ? ask({ ...params, guided: false, attempt: undefined }, t, true) : undefined;
   };
-  return { turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
+  /** Keep the note on the turn (this browser), and in the server's history where writes are allowed. */
+  const saveNote = useCallback(async (t: Turn, note: string): Promise<"server" | "browser"> => {
+    dispatch({ type: "note", id: t.id, note });
+    if (demo) return "browser";
+    await saving.current.get(t.id); // the turn may still be on its way to the server
+    const serverId = serverIds.current.get(t.id);
+    if (serverId === undefined) return "browser";
+    try {
+      const res = await api.http.PUT("/api/v1/history/{turn_id}/note", { params: { path: { turn_id: serverId } }, body: { note } });
+      return res?.data ? "server" : "browser";
+    } catch {
+      return "browser";
+    }
+  }, [demo]);
+  const addSimilar = useCallback((t: Turn, example: SimilarExample) => dispatch({ type: "similar", id: t.id, example }), []);
+  const addExplanation = useCallback((t: Turn, level: string, explanation: Explanation) => dispatch({ type: "explanation", id: t.id, level, explanation }), []);
+  return { saveNote, addSimilar, addExplanation, turns, ask, nextHint, retryHints, retryFeedback, showEvidence, stop, remove, clear, busy: turns.some((t) => t.status === "streaming") };
 }

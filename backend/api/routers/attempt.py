@@ -5,11 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from ... import attempt_feedback
+from ... import attempt_feedback, similar_practice
 from ...rag_engine import RAGEngine
 from ..deps import common_dependencies, get_engine, raise_if_failed
 from ..errors import ERROR_RESPONSES, ApiError
-from ..schemas import AttemptFeedback, AttemptFeedbackRequest, AttemptItem, Chunk
+from ..schemas import AttemptFeedback, AttemptFeedbackRequest, AttemptItem, CitationCheck, Chunk, SimilarPractice, SimilarPracticeRequest
 
 router = APIRouter(prefix="/api/v1", tags=["tutor"], dependencies=common_dependencies, responses=ERROR_RESPONSES)
 
@@ -55,3 +55,20 @@ async def feedback(req: AttemptFeedbackRequest, engine: RAGEngine = Depends(get_
         unverified_citations=res["unverified_citations"],
         withheld=res["withheld"],
     )
+
+
+@router.post(
+    "/practice/similar",
+    response_model=SimilarPractice,
+    summary="One new practice question on the same concept, from the same passages (answer never returned)",
+    description=(
+        "Writes one question from the `context` passages. It is returned only if it cites one of them, shares content "
+        "with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it "
+        "with `/attempt/feedback`. One model call per request; nothing is cached or stored."
+    ),
+)
+async def similar(req: SimilarPracticeRequest):
+    res = raise_if_failed(await run_in_threadpool(
+        similar_practice.similar_question, req.question, [c.model_dump() for c in req.context], req.previous, req.model, req.temperature
+    ))
+    return SimilarPractice(question=res["question"], citations=[CitationCheck(**c) for c in res["citations"]], model=res.get("model"))

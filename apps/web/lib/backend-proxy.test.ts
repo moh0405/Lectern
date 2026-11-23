@@ -20,6 +20,10 @@ describe("isAllowed", () => {
     expect(isAllowed("POST", "attempt/feedback")).toBe(true);
     expect(isAllowed("GET", "attempt/feedback")).toBe(false);
     expect(isAllowed("POST", "attempt/feedback/extra")).toBe(false);
+    expect(isAllowed("POST", "practice/similar")).toBe(true);
+    expect(isAllowed("GET", "practice/similar")).toBe(false);
+    expect(isAllowed("POST", "practice/similar/extra")).toBe(false);
+    expect(isAllowed("PUT", "history/1/note")).toBe(false); // a note stays in the browser in the demo
     expect(isAllowed("POST", "attempt")).toBe(false);
   });
   it("does not match on a prefix", () => {
