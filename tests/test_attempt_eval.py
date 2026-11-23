@@ -3,7 +3,7 @@
 import json
 
 from backend.attempt_feedback import split_units
-from eval.attempt_eval import load, main, passages, run
+from eval.attempt_eval import LEETCODE_DATA, load, main, passages, run
 
 
 def oracle(note=lambda case, unit: "Compare this with the cited passage.", cite=True, verdict=None):
@@ -51,6 +51,30 @@ def test_uncited_verdicts_are_scored_as_unchecked():
 def test_notes_that_give_the_answer_away_are_replaced_before_scoring():
     s = run(oracle(note=lambda case, unit: case["answer_key"]))["summary"]
     assert s["leaks"] == 0 and s["withheld"] > 0
+
+
+def test_leetcode_set_covers_correct_wrong_and_partial_attempts():
+    cases = load(LEETCODE_DATA)
+    assert {c["kind"] for c in cases} == {"correct", "wrong", "partial"} and all(c["judge"] == "problem" for c in cases)
+    for c in cases:
+        units = split_units(c["attempt"], c["format"])
+        assert [p["doc"] for p in passages(c)] == [c["doc"]]
+        assert all(1 <= int(u) <= len(units) and units[int(u) - 1].strip() for u in c["expected"]), c["id"]
+        assert any(v == "contradicted" for v in c["expected"].values()) == (c["kind"] != "correct"), c["id"]
+
+
+def test_leetcode_set_scores_reasoned_verdicts_and_catches_a_lazy_judge():
+    def judge(verdict=None):
+        def reply(case, _prompt):
+            items = [{"unit": int(u), "verdict": verdict or v, "basis": "problem", "note": "Trace a small case.", "citations": []}
+                     for u, v in case["expected"].items()]
+            return json.dumps({"answer_key": case["answer_key"], "summary": "Trace it.", "items": items})
+        return reply
+    cases = load(LEETCODE_DATA)
+    perfect = run(judge(), cases)["summary"]
+    assert perfect["accuracy"] == 1 and perfect["wrong_flagged"] == 1 and perfect["leaks"] == 0 and perfect["citations_verified"] is None
+    lazy = run(judge("supported"), cases)["summary"]
+    assert lazy["wrong_flagged"] == 0 and lazy["false_confidence"] == lazy["wrong_units"] > 0
 
 
 def test_cli_runs_the_scripted_baseline_and_rescoring_saved_replies(tmp_path, capsys):
