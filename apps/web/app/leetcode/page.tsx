@@ -11,6 +11,7 @@ export default function Page() {
   return (
     <>
       <PageHeader
+        eyebrow="Practice"
         title="LeetCode"
         description="Search a bank of coding problems and get an AI study guide for any of them."
       />

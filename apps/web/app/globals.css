@@ -230,7 +230,11 @@ mark.hl { background: rgb(124 108 240 / 0.35); color: inherit; border-radius: 3p
 .status-page-link-blurb { display: block; margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
 .status-page-hint { margin-top: 24px; font-size: 13px; color: var(--color-muted); }
 .status-page-hint kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid var(--color-border); border-radius: 4px; font: 11px/1.7 var(--font-mono), monospace; text-align: center; color: var(--color-fg); }
-.lectern-card { box-shadow: 0 3px 20px #00000006; }
+.lectern-card { box-shadow: none; }
+
+/* Paper: source material on the desk. Components inside keep their token classes and read as ink on warm paper, in both themes. */
+.paper-tokens { color-scheme: light; --color-bg: var(--color-paper-2); --color-surface: var(--color-paper); --color-surface-2: var(--color-paper-2); --color-border: var(--color-paper-line); --color-fg: var(--color-paper-fg); --color-muted: var(--color-paper-muted); --color-accent: var(--color-paper-accent); --color-accent-fg: #ffffff; --color-accent-2: var(--color-paper-accent); --color-good: #176a4b; --color-warn: #7a5006; --color-bad: #a3283e; color: var(--color-paper-fg); }
+.paper-tokens .md-body pre { background: var(--color-paper-2); }
 .lectern-button { cursor: pointer; }
 .lectern-button:active:not(:disabled) { transform: translateY(1px); }
 
