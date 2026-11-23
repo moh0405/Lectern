@@ -2,6 +2,26 @@
 
 This pass retains Lectern's retrieval, citation, storage and provider behavior while testing the redesigned learning workspace.
 
+## Current screenshots (Phase 6)
+
+`after/` holds 28 JPEGs of the shipped Evidence Desk design, captured on 2026-11-23 from commit `a948447`. There are seven scenes, each at 1440 and 390 px in dark and light, named `<scene>-<width>-<theme>.jpg`:
+
+| Scene | Shows |
+|---|---|
+| `ask-answer` | An answer with a checked citation and its passage |
+| `ask-try-first` | Feedback on a three-step attempt |
+| `ask-understanding` | The Understanding step with a saved note |
+| `library` | Indexed sources |
+| `practice` | Flashcards |
+| `leetcode-try-first` | Try first on a LeetCode problem |
+| `tools-math` | The Math tool (a real symbolic result, no language model) |
+
+How they were made: Playwright drove a production build against `tests/e2e_server.py`, which uses temporary storage, the hashing embedder and the scripted `FakeGemini`. No real model was called, and any request to a non-loopback host would have been blocked (none was attempted). The indexed material is the `heaps.pdf` and `graphs.pdf` test fixtures.
+
+**These images show the interface, not answer quality.** Verdicts, notes and answers in them come from a scripted model, so each capture with model-style text carries a "Scripted test model, not real output" label, added by the capture script and not part of the app. A "checked" citation means the cited page was retrieved. It does not mean the claim is true.
+
+The sections below record the earlier UX verification pass from 2026-11-09. Its test counts and `capture-provenance.json` describe that pass, not the current images.
+
 ## Public baseline
 
 `before/` contains actual read-only browser captures of https://lectern-tutor.vercel.app at 1440/390/320 widths. All API, model/provider download and non-GET requests were deliberately blocked. The offline/loading/error state in these images is therefore an audit condition, not evidence of a production API failure. See `before/README.md` and the recorded bounds/text JSON.
@@ -32,7 +52,7 @@ A real asynchronous-content overflow was found in the regular deployment's LeetC
 
 The light-mode Plotly legend was fixed and independently verified using actual rendered SVG text plus the plot layout: font #202939 matches theme foreground, legend background #fff matches the theme surface. An actual mouse drag changed the 3D camera; toggling theme preserved its eye, center and up coordinates. All 4 checks passed (`plot-theme-camera.json`).
 
-`after/` contains 20 actual production screenshots with no development indicator. Ask-answer captures show an actual UI result from the isolated FakeGemini fixture/cache, clearly identified by the visible fake-model badge, with a citation to heaps.pdf. These establish interface behavior and provenance display, not real provider inference. No cloud model call, embedding download, real user upload, shared production data write or deployment was performed by this QA agent. Captures blocked every non-loopback request. Public before captures deliberately blocked APIs as documented; do not compare their backend/offline state as a service-quality benchmark.
+That pass produced 20 production screenshots with no development indicator (since replaced in `after/`; see the top of this page). Its Ask-answer captures showed an actual UI result from the isolated FakeGemini fixture/cache, clearly identified by the visible fake-model badge, with a citation to heaps.pdf. These establish interface behavior and provenance display, not real provider inference. No cloud model call, embedding download, real user upload, shared production data write or deployment was performed by this QA agent. Captures blocked every non-loopback request. Public before captures deliberately blocked APIs as documented; do not compare their backend/offline state as a service-quality benchmark.
 
 Physical touch devices, real Safari on hardware, cloud latency and semantic embedding quality are outside this browser QA boundary. The default simulated map remains qualified as hashing-based. Final code/capture provenance is recorded in `capture-provenance.json`. All child-owned browsers are closed; servers remain owned by root.
 
