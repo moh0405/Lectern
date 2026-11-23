@@ -134,7 +134,7 @@ export interface paths {
         put?: never;
         /**
          * Feedback on your own attempt, checked against your sources (never the full solution)
-         * @description Splits the attempt into steps, code lines or sentences and judges each one as `supported`, `contradicted` or `not_covered` by the passages retrieved for the question (or the `context` given). Each verdict's citations are checked against those passages the same way `/ask` checks an answer; a verdict without a verified citation has `checked: false` and should be shown as not checked against your sources. The feedback gives pointers only: ask `/ask` ("Show me the evidence") for the answer. One model call per request; nothing is cached or stored.
+         * @description Splits the attempt into steps, code lines or sentences and judges each one as `supported`, `contradicted` or `not_covered` by the passages retrieved for the question (or the `context` given). Each verdict's citations are checked against those passages the same way `/ask` checks an answer; a verdict without a verified citation has `checked: false` and should be shown as not checked against your sources. The feedback gives pointers only: ask `/ask` ("Show me the evidence") for the answer. With `judge: problem` a unit may instead be judged on whether its reasoning works for the problem statement: such an item has `basis: problem`, `checked: false` and no verified citation, and must be shown as reasoned from the problem, not from your sources. One model call per request; nothing is cached or stored.
          */
         post: operations["feedback_api_v1_attempt_feedback_post"];
         delete?: never;
@@ -552,7 +552,7 @@ export interface paths {
         put?: never;
         /**
          * One new practice question on the same concept, from the same passages (answer never returned)
-         * @description Writes one question from the `context` passages. It is returned only if it cites one of them, shares content with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it with `/attempt/feedback`. One model call per request; nothing is cached or stored.
+         * @description Writes one question from the `context` passages. It is returned only if it cites one of them, shares content with that passage, does not give its answer away and is not a rewording of `question` or `previous`. Answer it with `/attempt/feedback`. Up to two model calls per request (a second only when a guard rejects the first draft, never after a provider, quota or daily-limit error); each counts against the daily limit. Nothing is cached or stored.
          */
         post: operations["similar_api_v1_practice_similar_post"];
         delete?: never;
@@ -968,6 +968,13 @@ export interface components {
              */
             format?: "steps" | "code" | "short_answer";
             /**
+             * Judge
+             * @description sources: judge only against the passages. problem: a unit may also be judged on whether its reasoning works for the problem statement in the passages; those verdicts have `basis: problem` and are never `checked`.
+             * @default sources
+             * @enum {string}
+             */
+            judge?: "sources" | "problem";
+            /**
              * K
              * @description Number of passages to judge against (ignored when `context` is given)
              * @default 3
@@ -993,6 +1000,13 @@ export interface components {
         };
         /** AttemptItem */
         AttemptItem: {
+            /**
+             * Basis
+             * @description sources: judged against the passages. problem: reasoned from the problem statement, not from your sources, so it is never `checked` and carries no verified citation.
+             * @default sources
+             * @enum {string}
+             */
+            basis?: "sources" | "problem";
             /**
              * Checked
              * @description True when the verdict is supported or contradicted and at least one of its citations is verified. Otherwise the verdict was not checked against your sources and should be shown as such.

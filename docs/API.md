@@ -45,9 +45,9 @@ All routes except `/health` live under `/api/v1`. If `API_KEY` is set on the ser
 |---|---|---|
 | POST | `/api/v1/concept-map` | `{topic, temperature}` → `{nodes, edges, dot, model, warning, chunks, grounding_note}` (built from the passages retrieved for the topic) |
 | POST | `/api/v1/socratic` | `{question, depth, k, temperature}` → `{questions, hints, ...}` |
-| POST | `/api/v1/practice/similar` | `{question, context, previous?, model?}` → `{question, citations, model}`. One model call; the question must cite a given passage and not state its answer, which is never returned |
+| POST | `/api/v1/practice/similar` | `{question, context, previous?, model?}` → `{question, citations, model}`. Up to two model calls (a second only when a guard rejects the first draft, never after a provider, quota or daily-limit error; both count against the daily limit); the question must cite a given passage and not state its answer, which is never returned |
 | PUT | `/api/v1/history/{id}/note` | `{note}` → the saved turn. An empty note clears it. Refused in the public demo |
-| POST | `/api/v1/attempt/feedback` | `{question, attempt, format: steps\|code\|short_answer, language?, k, context?, model?}` → `{units, items: [{unit, ref, verdict, note, citations, checked}], summary, chunks, ...}`. One model call; citations checked like `/ask`; `checked: false` means not checked against your sources; never returns the solution |
+| POST | `/api/v1/attempt/feedback` | `{question, attempt, format: steps\|code\|short_answer, judge?: sources\|problem, language?, k, context?, model?}` → `{units, items: [{unit, ref, verdict, note, citations, checked, basis}], summary, chunks, ...}`. One model call; citations checked like `/ask`; `checked: false` means not checked against your sources; `basis: problem` (only with `judge: problem`) means reasoned from the problem statement, never with a verified citation; never returns the solution |
 | POST | `/api/v1/synthesis` | `{topic, k_per_doc, temperature}` → `{similarities, conflicts, synthesis, citations, chunks, checked_citations, unverified_citations, grounding_note}` (each document's passages most relevant to the topic; citations checked against them) |
 | POST | `/api/v1/adaptive` | `{question, level, temperature}` → explanation at a level with a mini quiz |
 | POST | `/api/v1/math` | `{input}` → `{kind, latex, steps}` |
