@@ -256,7 +256,7 @@ class SimilarPracticeRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000, description="The question the student just studied")
     context: List[ContextPassage] = Field(..., min_length=1, max_length=10, description="The passages to write the new question from. Nothing is stored.")
     previous: List[str] = Field(default_factory=list, max_length=5, description="Practice questions already offered, so a new one differs")
-    model: Optional[str] = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
+    model: RequestedModel = Field(None, max_length=100, description="A model named here is used as is, never swapped for another")
     temperature: float = Field(0.4, ge=0.0, le=1.0)
 
     @field_validator("previous")

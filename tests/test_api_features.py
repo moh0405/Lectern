@@ -405,6 +405,7 @@ def test_socratic_normalizes_model_hint_shapes(indexed, fake_gemini, hints, expe
     ("/api/v1/ask/agent/stream", {"question": "What is a heap?"}),
     ("/api/v1/agent/run/stream", {"task": "What is a heap?"}),
     ("/api/v1/attempt/feedback", {"question": "What is a heap?", "attempt": "A tree."}),
+    ("/api/v1/practice/similar", {"question": "What is a heap?", "context": [{"doc": "heaps.pdf", "page": 1, "text": "A heap is a tree."}]}),
 ])
 @pytest.mark.parametrize("model", ["gemini-pro-latest", "gemini-99-ultra", "models/gemini-3.6-flash", "../x"])
 def test_every_route_refuses_a_model_off_the_allowlist(api, fake_gemini, path, body, model):
