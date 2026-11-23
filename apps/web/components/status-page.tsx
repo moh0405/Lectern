@@ -3,7 +3,7 @@ import { NAV } from "@/lib/nav";
 import { SECTIONS } from "@/lib/sections";
 
 const BLURB: Record<string, string> = {
-  Ask: "Ask a question; the answer cites its sources.",
+  Ask: "Ask a question; answers show the passages they came from, and citations are checked.",
   Library: "Your sources, the embedding map and insights into what you asked.",
   Practice: "Flashcards, LeetCode, guided hints and explanations at your level.",
   Tools: "Concept maps, source comparison, the agent and math.",

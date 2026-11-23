@@ -22,7 +22,7 @@ const plexMono = localFont({
 });
 
 const DESCRIPTION = "A RAG tutor for Computer Science: ask your own material, get cited answers.";
-const SHARE_DESCRIPTION = "Ask your Computer Science material and get answers that cite the passage they came from.";
+const SHARE_DESCRIPTION = "Ask your Computer Science material and get answers that show the passages they came from, with citations checked.";
 
 export const metadata: Metadata = {
   title: { default: "Lectern", template: "%s · Lectern" },
