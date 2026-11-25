@@ -4,7 +4,7 @@ This pass retains Lectern's retrieval, citation, storage and provider behavior w
 
 ## Current screenshots (Phase 6)
 
-`after/` holds 28 JPEGs of the shipped Evidence Desk design, captured on 2026-11-23 from commit `a948447`. There are seven scenes, each at 1440 and 390 px in dark and light, named `<scene>-<width>-<theme>.jpg`:
+`after/` holds 28 JPEGs of the shipped Evidence Desk design. Most were captured on 2026-11-23 from commit `a948447`. The `leetcode-try-first`, `library` and `tools-math` images were recaptured on 2026-11-24 from `ed8677f` (#69), which added the LeetCode problem-reasoned verdicts and changed the footer to "Answers show the passages they came from, and citations are checked." The Ask and Practice scenes show no footer, so they were not recaptured. There are seven scenes, each at 1440 and 390 px in dark and light, named `<scene>-<width>-<theme>.jpg`:
 
 | Scene | Shows |
 |---|---|
@@ -13,10 +13,10 @@ This pass retains Lectern's retrieval, citation, storage and provider behavior w
 | `ask-understanding` | The Understanding step with a saved note |
 | `library` | Indexed sources |
 | `practice` | Flashcards |
-| `leetcode-try-first` | Try first on a LeetCode problem |
+| `leetcode-try-first` | Try first on Two Sum: one step backed by the problem statement, two labelled "Reasoned from the problem, not from your sources" |
 | `tools-math` | The Math tool (a real symbolic result, no language model) |
 
-How they were made: Playwright drove a production build against `tests/e2e_server.py`, which uses temporary storage, the hashing embedder and the scripted `FakeGemini`. No real model was called, and any request to a non-loopback host would have been blocked (none was attempted). The indexed material is the `heaps.pdf` and `graphs.pdf` test fixtures.
+How they were made: Playwright drove a production build against `tests/e2e_server.py`, which uses temporary storage, the hashing embedder and the scripted `FakeGemini`. No real model was called, and any request to a non-loopback host would have been blocked (none was attempted). The indexed material is the `heaps.pdf` and `graphs.pdf` test fixtures, except in the `leetcode-try-first` captures, which ran with an empty library (the header reads "0 passages indexed"), so every verdict there comes from the problem statement.
 
 **These images show the interface, not answer quality.** Verdicts, notes and answers in them come from a scripted model, so each capture with model-style text carries a "Scripted test model, not real output" label, added by the capture script and not part of the app. A "checked" citation means the cited page was retrieved. It does not mean the claim is true.
 
