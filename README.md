@@ -10,11 +10,11 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 **Live demo: [lectern-tutor.vercel.app](https://lectern-tutor.vercel.app)**: ask questions of three CS textbooks, with streamed cited answers. It is a read-and-ask demo: uploading sources, history and analytics are switched off because they would be shared between all visitors. Flashcards and LeetCode progress still work, saved in your own browser only, and you can add your own PDFs and ask about them: they are read, embedded and searched inside your browser and never uploaded. It has a daily cap on model calls and sits on Google's free tier, so it can answer "busy, try again" at times. The first question after a quiet period takes up to about 30 seconds while the API wakes up.
 
-![Ask page: a streamed answer with verified citations and retrieved passages](docs/images/ask.png)
+![Ask page: an answer with a checked citation linked to its retrieved passage (scripted test model)](docs/ui-refresh/after/ask-answer-1440-dark.jpg)
 
 **Demo video (51 s):** [docs/demo/lectern-demo.mp4](docs/demo/lectern-demo.mp4). Recorded with Playwright against the local demo server (scripted model, as below); regenerate with `cd apps/web && npx playwright test -c playwright.video.config.ts`.
 
-> **About the screenshots.** They use **scripted test data**: the real API, chunking and retrieval over small committed fixtures (`tests/screenshot_server.py`; the embedding map and Insights use the sample corpus in `scripts/demo_server.py`), with the simple hashing embedder and a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers.
+> **About the screenshots.** They use **scripted test data**: the real API, chunking and retrieval over small committed fixtures (`tests/screenshot_server.py`; the embedding map and Insights use the sample corpus in `scripts/demo_server.py`), with the simple hashing embedder and a **scripted stand-in for the language model** (no API key). Answer text in the screenshots is therefore not model output. Run the app with a `GEMINI_API_KEY` for real answers. The current design's captures are in [`docs/ui-refresh/after/`](docs/ui-refresh/after/) (see [how they were made](docs/ui-refresh/README.md)); those showing model-style text carry a visible "Scripted test model" label. Images in `docs/images/` predate the redesign.
 
 ---
 
@@ -24,7 +24,9 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 - **Tool-using agent (the Agent page):** give it a task and the *model* decides which tools to call, in a ReAct loop (reason, act, observe, repeat) using Gemini function calling: search your documents, list them, read a page, solve math in the sandboxed solver, find a LeetCode problem. Each call and result streams to the page, the final answer's citations are checked against what the tools returned, and the loop is bounded (a step limit, then a forced wrap-up; every model turn counts against the daily cap). Tools that change data (saving flashcards) exist only when a deployment turns them on.
 - **MCP server:** the same tools are available to Claude Desktop, Claude Code, Cursor or any MCP client (`python -m backend.mcp_server`, see [docs/MCP.md](docs/MCP.md)).
 - **Agentic mode (optional, LangGraph):** for harder questions the Ask page can run a small workflow that rewrites the search query, asks the model whether the retrieved passages are enough (searching once more if not), writes the answer, and re-checks its citations (rewriting once if it cited sources it was never given). The steps are shown with the answer. It is slower and uses up to 6 model calls per question; its benefit has not been measured (see Status and limits).
-- **Answers only from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **verified** against the retrieved passages and flagged if the document or page was never retrieved.
+- **Answers from your sources**, streamed token by token, with `[document (page N)]` citations. Each citation is **checked** against the retrieved passages and flagged if the document or page was never retrieved. This proves the cited page reached the model, not that the claim is true.
+- **Try first:** write your own attempt (steps, code or a short answer) before seeing an answer. One model call judges each step, line or sentence as supported, contradicted or not covered by the retrieved passages. A verdict without a verified citation is shown as unchecked, and feedback that restates the answer is replaced with a neutral pointer. On a LeetCode problem the library rarely describes the method, so a step can instead be judged on whether its reasoning works for the problem statement. Those verdicts are labelled "Reasoned from the problem, not from your sources" and are never shown as checked.
+- **Understanding step:** under a cited answer you can rewrite the key idea in your own words and save the note (to your history, or in this browser on the public demo), turn it into a flashcard, ask for one similar practice question from the same passages (up to two model calls: one more try only if a guard rejects the first draft), or get a different explanation. Model calls happen only when you click.
 - **Retrieves with hybrid search**: embeddings (meaning) + BM25 (exact terms), merged by reciprocal rank fusion. Measured, not assumed.
 - **Study tools**: concept maps, source comparison, *Work it out* (Socratic hints, never the answer), *Explain at my level*, symbolic math. A finished answer links straight into them.
 - **Four sections**: **Ask**; **Library** (Sources, Map, Insights); **Practice** (Flashcards, LeetCode, Work it out, Explain at my level); **Tools** (Concept map, Compare sources, Agent, Math).
@@ -35,12 +37,12 @@ Full stack: Python/FastAPI backend with a hand-built vector store and hybrid sea
 
 | | |
 |---|---|
-| ![Sources and jobs](docs/images/sources.png) | ![Concept map](docs/images/concept-map.png) |
-| Sources: upload, URLs, indexed documents | Concept map (React Flow + dagre) |
-| ![Embedding map](docs/images/embedding-map.png) | ![LeetCode](docs/images/leetcode.png) |
-| 3D map of the real embeddings (PCA) | LeetCode search and study guide |
+| ![Try first feedback on a three-step attempt](docs/ui-refresh/after/ask-try-first-1440-light.jpg) | ![Understanding step with a saved note](docs/ui-refresh/after/ask-understanding-1440-dark.jpg) |
+| Try first: each step judged against the sources | Understanding: a note in your own words |
+| ![Library with indexed sources](docs/ui-refresh/after/library-1440-light.jpg) | ![LeetCode Try first](docs/ui-refresh/after/leetcode-try-first-1440-dark.jpg) |
+| Library: add material, see what is indexed | LeetCode with Try first |
 
-More: [Flashcards](docs/images/flashcards.png) · [Work it out](docs/images/socratic.png) · [Math](docs/images/math.png) · [Insights](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
+Earlier design: [Concept map](docs/images/concept-map.png) · [Embedding map](docs/images/embedding-map.png) · [Flashcards](docs/images/flashcards.png) · [Work it out](docs/images/socratic.png) · [Math](docs/images/math.png) · [Insights](docs/images/analytics.png) · [Command palette](docs/images/command-palette.png) · [Mobile](docs/images/mobile.png)
 
 ---
 
@@ -95,14 +97,14 @@ How the pieces fit:
 |---|---|---|
 | Web app | Next.js 16, React 19, TypeScript (strict), Tailwind v4, TanStack Query | UI, streaming, state |
 | Typed client | OpenAPI → `openapi-typescript` + `openapi-fetch`, custom SSE reader | Frontend types generated from the backend |
-| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 42 operations under `/api/v1` |
+| API | FastAPI, Pydantic, Uvicorn, Server-Sent Events | 45 operations (all under `/api/v1` except `/health`) |
 | Retrieval | NumPy exact search (FAISS opt-in), BM25, RRF, optional cross-encoder | Hybrid search |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-d), hashing fallback | Meaning as vectors |
 | Generation | Provider interface: Google Gemini (`google-genai`) or any OpenAI-compatible server | Answers, tutor tools, JSON mode |
 | Agents | LangGraph (`langgraph`, `langchain-core`), Gemini function calling, MCP (`mcp`) | A fixed workflow (rewrite, grade, verify) and a tool-using ReAct agent; the tools also served over MCP |
 | Storage | JSONL + NumPy + JSON manifest; SQLite for analytics | No pickle, no server |
 | Cloud | AWS Lambda (container), S3, ECR, Secrets Manager, Budgets, Terraform | API hosting, durable state, infrastructure as code |
-| Quality | pytest (453), Vitest (142), Playwright (46 + 3 in demo mode, plus an opt-in 12-test suite against a real Gemini model) + axe, GitHub Actions, evaluation harness | CI gates |
+| Quality | pytest (835, plus 3 skipped), Vitest (393), Playwright (171, plus 29 in demo mode of which 2 are skipped, plus an opt-in 12-test suite against a real Gemini model) + axe, GitHub Actions, evaluation harness | CI gates |
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -110,8 +112,11 @@ Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 - **Own vector store** with atomic writes, content-hash de-duplication, incremental indexing (SHA-256 fingerprints) and a manifest that refuses to mix embedders.
 - **A real debugging story**: a macOS crash traced to FAISS and PyTorch each bundling an OpenMP runtime; resolved by making exact NumPy search the default (about 1 ms at this scale) and FAISS opt-in.
-- **Citation verification**: catches invented documents and pages in model output.
+- **Citation verification**: catches invented documents and pages in model output. It does not judge whether the cited page supports the claim.
 - **Safe by design**: sanitized uploads, optional API key, restricted CORS, rate limiting, one error schema with no internal text, math in a sandboxed worker process with a timeout (no `eval`), allow-list HTML sanitizer.
+- **SSRF guard** (`backend/safe_fetch.py`): URLs a visitor adds may use only http(s) on ports 80 and 443. Private, loopback, link-local and cloud-metadata addresses are refused, at connect time and on every redirect, with size and time limits.
+- **Model allowlist**: a request can name only Flash and Flash-Lite models (`ALLOWED_MODELS` overrides the list). Any other is refused with a 422, never swapped.
+- **Atomic spend cap** (`backend/spend_cap.py`): with `DAILY_LLM_LIMIT` and S3, every model request, retry and failover is counted through S3 conditional writes shared by all Lambda copies. If the count cannot be checked, calls are refused.
 - **Schema as contract**: CI fails if the OpenAPI file or generated TypeScript types are stale.
 - **Tested without a paid model**: a scripted model drives end-to-end browser tests with accessibility scans.
 
@@ -126,11 +131,11 @@ All under `/api/v1` except `/health`. Interactive docs at `/docs`. Full detail a
 | Health and corpus | `GET /health` · `GET /stats` · `GET /documents` · `DELETE /sources?key=` |
 | Ingestion | `POST /sources/files` · `POST /sources/urls` · `GET /jobs/{job_id}` |
 | Ask and search | `POST /ask` · `POST /ask/stream` (SSE) · `POST /ask/agent/stream` (SSE, agentic) · `POST /agent/run/stream` (SSE, tool-using agent) · `GET /search` · `GET /suggestions` · `GET /models` |
-| Tutor tools | `POST /concept-map` · `/socratic` · `/attempt/feedback` · `/synthesis` · `/adaptive` · `/math` |
+| Tutor tools | `POST /concept-map` · `/socratic` · `/attempt/feedback` · `/practice/similar` · `/synthesis` · `/adaptive` · `/math` |
 | LeetCode | `GET /leetcode/stats` · `/leetcode/search` · `/leetcode/problems/{pid}` · `POST /leetcode/problems/{pid}/explain` |
 | Flashcards | `GET` / `POST /cards` · `POST /cards/generate` · `GET /cards/export` · `POST /cards/{id}/review` · `DELETE /cards/{id}` |
 | LeetCode progress | `GET /leetcode/progress` · `PUT` / `DELETE /leetcode/progress/{pid}` · `GET /leetcode/plan` |
-| History | `GET` / `POST /history` · `DELETE /history` · `DELETE /history/{id}` |
+| History | `GET` / `POST /history` · `DELETE /history` · `DELETE /history/{id}` · `PUT /history/{id}/note` |
 | Notes and export | `POST /notes` · `POST /export` |
 | Analytics and viz | `GET` / `DELETE /analytics` · `GET /embeddings/projection` |
 
@@ -226,11 +231,11 @@ docs/            architecture, concepts, phases, API, plan
 
 Phases 0 to 5 are done (hygiene, retrieval core, API, frontend, answer quality, study tools). Phase 6 (deployment) is done except automatic deploys: the API runs on AWS and the web app on Vercel, and a GitHub-OIDC deploy workflow is written but opt-in (see `infra/README.md`). Phase 7 is release polish: docs are filled in and screenshots refreshed; a demo video and the v1.0 tag are what remain. See [`docs/PLAN.md`](docs/PLAN.md). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-- **Free Gemini keys are tight.** One tested free key allowed 5 requests a minute and 20 a day per model. A plain question uses 1 call, but agentic mode uses up to 6 and the tool-using agent up to 9, so on a free key they can hit the per-minute limit or the daily one. The server waits out short limits (up to 30 s) and, when the chosen model is overloaded or out of quota, moves on to the next model (default `gemini-3.6-flash`, then `gemini-3.1-flash-lite`, `gemini-flash-lite-latest` and `gemini-2.5-flash-lite`), each of which has its own quota; if every model fails it says so. The one exception is the tool-using agent: its first turn can switch models, but a later turn cannot (the conversation belongs to one model), so on a free key a long run can stop mid-way with a "wait about N seconds" message. A billed key avoids all of this.
+- **Free Gemini keys are tight.** One tested free key allowed 5 requests a minute and 20 a day per model. A plain question uses 1 call, but agentic mode uses up to 6 and the tool-using agent up to 9, so on a free key they can hit the per-minute limit or the daily one. The server waits out short limits (up to 30 s) and, when the chosen model is overloaded or out of quota, moves on to the next model (default `gemini-3.6-flash`, then `gemini-3.1-flash-lite`, `gemini-flash-lite-latest` and `gemini-2.5-flash-lite`), each of which has its own quota; if every model fails it says so. The one exception is the tool-using agent: its first turn can switch models, but a later turn cannot (the conversation belongs to one model), so on a free key a long run can stop mid-way with a "wait about N seconds" message. Failover reduces these failures but does not remove them: a request can still fail when every model is busy or out of quota, including on the public demo. A billed key raises these limits.
 - The AWS deployment is a single-user demo design: study data is a SQLite file synced through S3, not a database that several users can write to at once.
 - Single process and single user: in-memory jobs and rate limits, and flashcards, progress and history live in one SQLite file with no accounts (a deliberate portfolio-scope decision).
 - Exact search is right up to roughly 100k passages; beyond that you would want an approximate index.
-- Evaluation measures retrieval, not whether a generated claim is faithful to its source; citation checks catch invented sources only. The agentic workflow and the tool-using agent have no evaluation of their own: they are tested for behaviour (steps, retries, tool use, bounded model calls) with a scripted model, and the tool-using agent was run against real Gemini by hand on a handful of tasks, but neither is shown to improve answers. The agent can be prompt-injected by text inside a document; the default tools are read-only to limit the damage.
+- Evaluation measures retrieval, not whether a generated claim is faithful to its source. A citation check verifies that the cited document and page were retrieved, not that the passage supports the claim, so a "checked" answer or a "supported" Try first verdict can still be wrong. The agentic workflow and the tool-using agent have no evaluation of their own: they are tested for behaviour (steps, retries, tool use, bounded model calls) with a scripted model, and the tool-using agent was run against real Gemini by hand on a handful of tasks, but neither is shown to improve answers. The agent can be prompt-injected by text inside a document; the default tools are read-only to limit the damage.
 - The demo screenshots use a scripted model, as noted above.
 
 ## License
