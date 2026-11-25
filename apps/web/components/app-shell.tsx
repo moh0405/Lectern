@@ -196,6 +196,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     </header>
     {multiPage ? <SectionBar section={multiPage} pathname={pathname} /> : null}
     <main id="workspace-content" tabIndex={-1} className={desk ? "desk-main" : "workspace-content"}>{children}</main>
-    {desk ? null : <footer className="workspace-footer"><span>Lectern<span className="workspace-footer-separator">/</span>An AI tutor that shows its sources.</span><span>Every answer cites the passage it came from.</span></footer>}
+    {desk ? null : <footer className="workspace-footer"><span>Lectern<span className="workspace-footer-separator">/</span>An AI tutor that shows its sources.</span><span>Answers show the passages they came from, and citations are checked.</span></footer>}
   </div>;
 }

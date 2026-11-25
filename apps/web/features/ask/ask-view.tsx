@@ -632,7 +632,7 @@ export function AskView() {
                 <br />
                 Keep the source close.
               </h2>
-              <p className={styles.openingLead}>Bring your material into the conversation. Every answer cites the passages it came from, and each citation opens beside the answer.</p>
+              <p className={styles.openingLead}>Bring your material into the conversation. Answers show the passages they came from, and citations are checked. Each citation opens beside the answer.</p>
               {offline ? (
                 <div className={styles.offline}>
                   <CloudOff aria-hidden="true" />

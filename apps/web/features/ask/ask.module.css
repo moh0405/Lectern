@@ -934,6 +934,8 @@
 .verdict svg { width: 14px; height: 14px; flex-shrink: 0; }
 .verdict[data-kind="supported"] { color: var(--color-good); }
 .verdict[data-kind="contradicted"] { color: var(--color-bad); }
+.verdict[data-kind="reasoned"] { color: var(--color-accent-2); border: 1px dashed currentColor; }
+.verdict[data-kind="reasoned_wrong"] { color: var(--color-warn); border: 1px dashed currentColor; }
 .verdict[data-kind="unchecked"] { color: var(--color-warn); }
 .verdict[data-kind="not_covered"] { color: var(--color-muted); }
 button.verdict:hover { background: var(--color-surface-2); }

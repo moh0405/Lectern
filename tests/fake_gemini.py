@@ -13,6 +13,8 @@ import re
 _WORD = re.compile(r"[a-z][a-z0-9]{3,}")
 _NEGATION = re.compile(r"\b(not|never|no|cannot|can't|doesn't|isn't|don't|without)\b", re.I)
 _HEDGE = re.compile(r"\b(i think|maybe|probably|i guess)\b", re.I)
+_METHOD = re.compile(r"\b(hash|map|lookup|pointers?|stack|sort|loop)\b", re.I)
+FORCE_REJECTION = "[e2e: reject first draft]"  # in the original question: the first draft leaks, the retry is clean
 
 
 def scripted_attempt_feedback(prompt: str) -> dict:
@@ -21,6 +23,7 @@ def scripted_attempt_feedback(prompt: str) -> dict:
     otherwise, and supported but uncited when it hedges with "I think"/"maybe"); anything else is not covered."""
     passages = re.findall(r"^- \[(.+?)\] (.+)$", prompt, re.M)
     units = re.findall(r"^(Step|Line|Sentence) (\d+): (.+)$", prompt, re.M)
+    problem_mode = "JUDGE: problem" in prompt
     items = []
     for _kind, n, text in units:
         words = set(_WORD.findall(text.lower()))
@@ -29,7 +32,12 @@ def scripted_attempt_feedback(prompt: str) -> dict:
             shared = len(words & set(_WORD.findall(body.lower())))
             if shared > overlap:
                 best, overlap = label, shared
-        if best is None or overlap < 2:
+        if problem_mode and (best is None or overlap < 2) and _METHOD.search(text):
+            # Reasoned from the problem: no citation, a pointer only. A negated method step is the scripted wrong one.
+            wrong = bool(_NEGATION.search(text))
+            items.append({"unit": int(n), "verdict": "contradicted" if wrong else "supported", "basis": "problem", "citations": [],
+                          "note": "What happens on a small input if you trace this?" if wrong else "This reasoning works for the statement."})
+        elif best is None or overlap < 2:
             items.append({"unit": int(n), "verdict": "not_covered", "note": "Your passages do not mention this.", "citations": []})
         elif _HEDGE.search(text):
             items.append({"unit": int(n), "verdict": "supported", "note": "This sounds right, but say which passage backs it.", "citations": []})
@@ -39,7 +47,7 @@ def scripted_attempt_feedback(prompt: str) -> dict:
             items.append({"unit": int(n), "verdict": "supported", "note": f"This matches {best}.", "citations": [best]})
     wrong = [i["unit"] for i in items if i["verdict"] == "contradicted"]
     summary = f"Look at step {wrong[0]} first." if wrong else "Your attempt is on track so far."
-    return {"answer_key": "", "summary": summary, "items": items}
+    return {"answer_key": "SCRIPTED-HIDDEN-ANSWER stays on the server." if problem_mode else "", "summary": summary, "items": items}
 
 
 def scripted_similar_question(prompt: str) -> dict:
@@ -48,6 +56,8 @@ def scripted_similar_question(prompt: str) -> dict:
     if not passages:
         return {"question": "", "answer_key": "", "citations": []}
     label, body = passages[0]
+    if FORCE_REJECTION in prompt and "YOUR PREVIOUS DRAFT WAS REJECTED" not in prompt:
+        return {"question": "The answer is SCRIPTED-LEAKED-DRAFT, so what is it?", "answer_key": "SCRIPTED-HIDDEN-ANSWER stays on the server.", "citations": [label]}
     words = list(dict.fromkeys(w for w in _WORD.findall(body.lower()) if len(w) > 4))
     shift = len(re.findall(r"^\* ", prompt, re.M))
     picked = (words[shift:shift + 3] or words[:3])

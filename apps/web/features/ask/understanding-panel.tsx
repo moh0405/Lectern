@@ -100,7 +100,7 @@ function Similar({ turn, busy, onSimilar, onPractise, announce }: { turn: Turn; 
           {source ? <p className={styles.toolHint}>Written from {source.doc}{source.page ? `, ${pageLabel(source.page, null, true)}` : ""}. The answer stays hidden until you ask for the evidence.</p> : null}
         </>
       ) : (
-        <p className={styles.toolHint}>A new question on the same idea, from the same passages. Uses one model call.</p>
+        <p className={styles.toolHint}>A new question on the same idea, from the same passages. Uses up to two model calls.</p>
       )}
       <div className={styles.toolActions}>
         {current ? (

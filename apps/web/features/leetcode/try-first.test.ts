@@ -1,6 +1,6 @@
 import type { Chunk } from "@ai-study-mentor/api-client";
 import { describe, expect, it } from "vitest";
-import { attemptContext, attemptQuestion, LIBRARY_PASSAGES } from "./try-first";
+import { attemptContext, attemptJudge, attemptQuestion, LIBRARY_PASSAGES } from "./try-first";
 
 const problem = { pid: "1", title: "Two Sum", description: "Given an array of integers, return two indices." };
 const chunk = (n: number): Chunk => ({ text: `passage ${n}`, doc: `book${n}.pdf`, page: n, score: 0.5 });
@@ -15,6 +15,11 @@ describe("LeetCode Try first", () => {
     expect(context[0]).toMatchObject({ doc: "LeetCode 1. Two Sum", text: problem.description, page: null });
     expect(context).toHaveLength(1 + LIBRARY_PASSAGES);
     expect(context[1]).toMatchObject({ doc: "book1.pdf", page: 1 });
+  });
+
+  it("asks for the problem judge only when there is a statement to reason from", () => {
+    expect(attemptJudge(problem)).toBe("problem");
+    expect(attemptJudge({ ...problem, description: " \n" })).toBe("sources");
   });
 
   it("still works when the library has nothing", () => {

@@ -8,6 +8,10 @@ and the expected verdict for the units that make a judgeable claim.
     python -m eval.attempt_eval --outputs FILE         # re-score saved model replies, offline
     python -m eval.attempt_eval --live --save FILE     # call the configured model once per attempt (15 calls; never in CI)
     python -m eval.attempt_eval --write                # also write eval/reports/attempts.md
+    python -m eval.attempt_eval --set leetcode [--live]  # the LeetCode set, judged with `judge="problem"` (8 calls if live)
+
+`eval/leetcode_attempts.jsonl` holds correct, wrong and partial LeetCode attempts whose statement describes no method.
+The model is only called with `--live`; the scripted baseline cannot reason, so its numbers on this set are only a floor.
 
 Every reply, whatever its source, goes through the production code path (`interpret`): citation checks, the
 unchecked label and the answer-leak guard. Metrics:
@@ -33,7 +37,9 @@ from backend.attempt_feedback import build_prompt, interpret, leaked, split_unit
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "attempts.jsonl"
+LEETCODE_DATA = ROOT / "leetcode_attempts.jsonl"
 REPORT = ROOT / "reports" / "attempts.md"
+LEETCODE_REPORT = ROOT / "reports" / "leetcode_attempts.md"
 
 Reply = Callable[[Dict[str, Any], str], str]  # (attempt case, prompt) -> raw model text
 
@@ -52,13 +58,16 @@ def section(doc: str, heading: str) -> str:
 
 def passages(case: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Corpus sections as passages. Markdown has no pages, so the label is the document name, as in the app."""
-    return [{"doc": doc, "page": None, "text": section(doc, heading), "score": 1.0} for doc, heading in case["passages"]]
+    statement = [{"doc": case["doc"], "page": None, "text": case["statement"], "score": 1.0}] if case.get("statement") else []
+    return statement + [{"doc": doc, "page": None, "text": section(doc, heading), "score": 1.0} for doc, heading in case["passages"]]
 
 
 def shown(item: Optional[Dict[str, Any]]) -> str:
     """The verdict the student sees: an uncited or unverified supported/contradicted is shown as unchecked."""
     if item is None:
         return "missing"
+    if item.get("basis") == "problem":  # labelled as reasoned from the problem, so its verdict is what the student reads
+        return item["verdict"]
     if item["verdict"] != "not_covered" and not item["checked"]:
         return "unchecked"
     return item["verdict"]
@@ -72,7 +81,7 @@ def score_case(case: Dict[str, Any], raw: str) -> Dict[str, Any]:
         data = json.loads(raw[start : end + 1])
     except ValueError:
         data = {}
-    fb = interpret(data if isinstance(data, dict) else {}, case["question"], case["attempt"], units, case["format"], chunks)
+    fb = interpret(data if isinstance(data, dict) else {}, case["question"], case["attempt"], units, case["format"], chunks, case.get("judge", "sources"))
     by_unit = {i["unit"]: i for i in fb["items"]}
     rows = [{"unit": int(u), "expected": v, "shown": shown(by_unit.get(int(u)))} for u, v in case["expected"].items()]
     cites = [c for i in fb["items"] for c in i["citations"]]
@@ -110,7 +119,7 @@ def run(reply: Reply, cases: Optional[List[Dict[str, Any]]] = None) -> Dict[str,
     results, raws = [], {}
     for case in cases:
         units = split_units(case["attempt"], case["format"])
-        prompt = build_prompt(case["question"], units, case["format"], passages(case), case.get("language"))
+        prompt = build_prompt(case["question"], units, case["format"], passages(case), case.get("language"), case.get("judge", "sources"))
         raw = reply(case, prompt)
         raws[case["id"]] = raw
         results.append(score_case(case, raw))
@@ -168,22 +177,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--outputs", type=Path, help="JSON file {attempt id: raw model reply} to re-score offline")
     src.add_argument("--live", action="store_true", help="call the configured model (one call per attempt; needs a key)")
+    ap.add_argument("--set", dest="dataset", choices=("attempts", "leetcode"), default="attempts", help="which labelled set to score")
     ap.add_argument("--save", type=Path, help="save the raw replies here (for --outputs later)")
     ap.add_argument("--write", action="store_true", help=f"write {REPORT.relative_to(ROOT.parent)}")
     args = ap.parse_args(argv)
+    cases = load(LEETCODE_DATA if args.dataset == "leetcode" else DATA)
+    target = LEETCODE_REPORT if args.dataset == "leetcode" else REPORT
     if args.outputs:
         saved = json.loads(args.outputs.read_text())
-        out, name = run(lambda case, _p: saved.get(case["id"], "")), f"saved replies ({args.outputs.name})"
+        out, name = run(lambda case, _p: saved.get(case["id"], ""), cases), f"saved replies ({args.outputs.name})"
     elif args.live:
-        out, name = run(live_reply), "live model"
+        out, name = run(live_reply, cases), "live model"
     else:
-        out, name = run(baseline_reply), "scripted baseline (word overlap, no model)"
+        out, name = run(baseline_reply, cases), "scripted baseline (word overlap, no model)"
     if args.save:
         args.save.write_text(json.dumps(out["raw"], indent=1))
     text = report(name, out["summary"], out["results"])
     print(text)
     if args.write:
-        REPORT.write_text(text)
+        target.write_text(text)
     return 0
 
 

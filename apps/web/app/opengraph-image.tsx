@@ -22,7 +22,7 @@ export default async function Image() {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -3 }}>An AI tutor that</div>
             <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -3 }}>shows its sources.</div>
-            <div style={{ marginTop: 28, fontSize: 28, color: "#a0acba" }}>Every answer cites the passage it came from.</div>
+            <div style={{ marginTop: 28, fontSize: 28, color: "#a0acba" }}>Answers show the passages they came from, and citations are checked.</div>
           </div>
         </div>
         <div style={{ width: 360, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 40px", background: "#efede7", color: "#2b3033" }}>

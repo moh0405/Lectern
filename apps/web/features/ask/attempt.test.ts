@@ -33,6 +33,31 @@ describe("verdictOf", () => {
   });
 });
 
+describe("verdicts reasoned from the problem", () => {
+  it("are labelled apart from source-checked verdicts, and a wrong step is still flagged", () => {
+    const right = verdictOf({ verdict: "supported", checked: false, basis: "problem" });
+    const wrong = verdictOf({ verdict: "contradicted", checked: false, basis: "problem" });
+    expect(right).toMatchObject({ kind: "reasoned", label: "Works for this problem" });
+    expect(wrong).toMatchObject({ kind: "reasoned_wrong", label: "Does not hold for this problem" });
+    expect(right.long).toContain("Reasoned from the problem, not from your sources");
+    expect(wrong.long).toContain("Reasoned from the problem, not from your sources");
+  });
+
+  it("never outrank the basis, even if an item claims to be checked", () => {
+    expect(verdictOf({ verdict: "supported", checked: true, basis: "problem" }).kind).toBe("reasoned");
+  });
+
+  it("leave saved feedback without a basis as it was", () => {
+    expect(verdictOf({ verdict: "supported", checked: true }).kind).toBe("supported");
+    expect(verdictOf({ verdict: "supported", checked: true, basis: "sources" }).kind).toBe("supported");
+  });
+
+  it("are counted on their own", () => {
+    const items = [item({ checked: false, basis: "problem" }), item({ checked: false, basis: "problem", verdict: "contradicted" })];
+    expect(tally({ items })).toBe("reasoned from the problem: 1 fine, 1 to re-check");
+  });
+});
+
 describe("passagesFor", () => {
   it("maps verified citations to passages, once each, and ignores unverified ones", () => {
     const it_ = item({ citations: [ok("heaps.pdf (page 2)", "heaps.pdf", 2), ok("queues.md", "queues.md"), ok("heaps.pdf", "heaps.pdf"),
