@@ -204,20 +204,23 @@ The stream always ends with `done` or `error`. It opens with an SSE comment line
 
 ## Try first and practice
 
-Both routes make one model call per request and neither caches nor stores anything. The public-demo proxy allows them.
+Attempt feedback makes one model call per request and Similar makes up to two. Neither caches nor stores anything, and the public-demo proxy allows both.
 
-**`POST /api/v1/attempt/feedback`** splits `attempt` (up to 6,000 characters) into steps (up to 30), code lines (up to 200) or sentences (up to 30), and judges each against the `k` retrieved passages or the `context` you send.
+**`POST /api/v1/attempt/feedback`** splits `attempt` (up to 6,000 characters) into steps (up to 30), code lines (up to 200) or sentences (up to 30), and judges each against the `k` retrieved passages or the `context` you send. `judge` is `sources` (the default) or `problem`.
 
 | Field in `items[]` | Meaning |
 |---|---|
 | `verdict` | `supported`, `contradicted` or `not_covered` by the passages |
 | `citations` | checked the same way as `/ask` |
 | `checked` | `true` when a `supported` or `contradicted` verdict has a verified citation. `false` means treat it as not checked against your sources |
+| `basis` | `sources`, or `problem` (only with `judge: problem`): reasoned from the problem statement, not from your sources. A `problem` item is never `checked` and keeps no verified citation |
 | `note` | a pointer, not the solution. A note or summary that restates the model's hidden answer is replaced, and `withheld` counts the replacements |
 
 A unit without an item was not judged. An attempt that is too long or empty is refused with `422 attempt_too_long` or `422 attempt_empty`. `checked: true` means the cited passage was retrieved; it does not prove the verdict is right.
 
-**`POST /api/v1/practice/similar`** writes one new question from `context` (1 to 10 passages). `previous` (up to 5) lists questions already offered. The question is returned only if it cites a given passage, shares content with it, does not state its answer and is not a rewording of `question` or `previous`. Its answer is never returned. If no question passes, the route answers `502 llm_error` with a message to try again.
+With `judge: problem` (the LeetCode page sends it when the problem has a statement) a unit may be judged on whether its reasoning works for the problem statement, including its constraints and edge cases. The server also sets `basis: problem` on a claimed source verdict unless a verified citation points to a passage holding at least half of the unit's content words, since citing the statement does not make it a source for a method it never mentions. In this mode every note and the summary are guarded more strictly: if the model gave no hidden answer key, or the text contains code the student did not write, or a note on a wrong unit (or the summary) states a correction, it is replaced with a neutral pointer. These verdicts are the model's reasoning and are not checked against anything.
+
+**`POST /api/v1/practice/similar`** writes one new question from `context` (1 to 10 passages). `previous` (up to 5) lists questions already offered. The question is returned only if it cites a given passage, shares content with it, does not state its answer and is not a rewording of `question` or `previous`. Its answer is never returned. If the first draft fails one of these guards, or its reply is not valid JSON, the route makes one more model call, told only which guard failed (the rejected draft and its key are not sent back). A provider, quota or daily-limit failure is never retried here. Each call counts against the daily limit. If neither draft passes, the route answers `502 llm_error` with a message to try again.
 
 Model failures on both routes use the standard error shape: `429 daily_limit`, `429 quota_exhausted`, `503 llm_unavailable` or `502 llm_error`.
 
